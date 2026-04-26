@@ -1,22 +1,25 @@
 {
   "expo": {
-    "name": "Fretex",
-    "slug": "fretex",
+    "name": "Ajudaê!",
+    "slug": "ajuda",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "fretex",
+    "scheme": "ajuda",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FF6B1A"
+      "backgroundColor": "#FF5500"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ajuda.app"
     },
-    "android": {},
+    "android": {
+      "package": "com.ajuda.app"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },

@@ -1,6 +1,8 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
-import * as Haptics from 'expo-haptics';
-import { useColors } from '@/hooks/useColors';
+import React from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
+import colors, { fonts, shadows } from "@/constants/colors";
 
 interface PrimaryButtonProps {
   title: string;
@@ -8,68 +10,79 @@ interface PrimaryButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
-  variant?: 'primary' | 'secondary' | 'outline' | 'destructive';
+  variant?: "primary" | "secondary" | "outline" | "ghost";
+  color?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  size?: "lg" | "md" | "sm";
 }
 
-export function PrimaryButton({ title, onPress, disabled, loading, style, variant = 'primary' }: PrimaryButtonProps) {
-  const colors = useColors();
+export function PrimaryButton({
+  title,
+  onPress,
+  disabled,
+  loading,
+  style,
+  variant = "primary",
+  color,
+  icon,
+  size = "lg",
+}: PrimaryButtonProps) {
+  const c = colors.light;
+  const accent = color || c.primary;
 
   const handlePress = () => {
     if (disabled || loading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onPress();
   };
 
-  const getBackgroundColor = () => {
-    if (disabled) return colors.muted;
-    switch (variant) {
-      case 'primary': return colors.primary;
-      case 'secondary': return colors.secondary;
-      case 'outline': return 'transparent';
-      case 'destructive': return colors.destructive;
-      default: return colors.primary;
-    }
-  };
+  const bg =
+    disabled
+      ? c.muted
+      : variant === "primary"
+        ? accent
+        : variant === "secondary"
+          ? c.background
+          : variant === "ghost"
+            ? "transparent"
+            : "transparent";
 
-  const getTextColor = () => {
-    if (disabled) return colors.mutedForeground;
-    switch (variant) {
-      case 'primary': return colors.primaryForeground;
-      case 'secondary': return colors.secondaryForeground;
-      case 'outline': return colors.primary;
-      case 'destructive': return colors.destructiveForeground;
-      default: return colors.primaryForeground;
-    }
-  };
+  const fg =
+    disabled
+      ? c.softMuted
+      : variant === "primary"
+        ? "#fff"
+        : variant === "outline"
+          ? accent
+          : c.text;
 
-  const getBorderColor = () => {
-    if (disabled) return colors.border;
-    switch (variant) {
-      case 'outline': return colors.primary;
-      default: return 'transparent';
-    }
-  };
+  const heightMap = { lg: 52, md: 46, sm: 40 } as const;
+  const fontMap = { lg: 14, md: 13, sm: 12 } as const;
 
   return (
     <Pressable
+      onPress={handlePress}
+      disabled={disabled || loading}
       style={({ pressed }) => [
         styles.button,
         {
-          backgroundColor: getBackgroundColor(),
-          borderColor: getBorderColor(),
-          borderWidth: variant === 'outline' ? 1 : 0,
-          borderRadius: colors.radius,
-          opacity: pressed && !disabled ? 0.8 : 1,
+          backgroundColor: bg,
+          height: heightMap[size],
+          borderColor: variant === "outline" ? accent : "transparent",
+          borderWidth: variant === "outline" ? 1.5 : 0,
+          opacity: pressed && !disabled ? 0.85 : 1,
         },
+        variant === "primary" && !disabled ? { ...shadows.md, shadowColor: accent, shadowOpacity: 0.35 } : null,
         style,
       ]}
-      onPress={handlePress}
-      disabled={disabled || loading}
     >
       {loading ? (
-        <ActivityIndicator color={getTextColor()} />
+        <ActivityIndicator color={fg} />
       ) : (
-        <Text style={[styles.title, { color: getTextColor() }]}>{title}</Text>
+        <>
+          {icon ? <Ionicons name={icon} size={16} color={fg} style={{ marginRight: 8 }} /> : null}
+          <Text style={[styles.title, { color: fg, fontSize: fontMap[size] }]}>{title}</Text>
+        </>
       )}
     </Pressable>
   );
@@ -77,15 +90,11 @@ export function PrimaryButton({ title, onPress, disabled, loading, style, varian
 
 const styles = StyleSheet.create({
   button: {
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    flexDirection: 'row',
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-  },
+  title: { fontFamily: fonts.sans.extra },
 });

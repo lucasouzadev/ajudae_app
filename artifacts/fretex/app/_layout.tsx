@@ -1,10 +1,17 @@
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  useFonts,
-} from "@expo-google-fonts/inter";
+  Fraunces_700Bold,
+  Fraunces_800ExtraBold,
+  Fraunces_900Black,
+  useFonts as useFraunces,
+} from "@expo-google-fonts/fraunces";
+import {
+  Figtree_400Regular,
+  Figtree_500Medium,
+  Figtree_600SemiBold,
+  Figtree_700Bold,
+  Figtree_800ExtraBold,
+  useFonts as useFigtree,
+} from "@expo-google-fonts/figtree";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -18,6 +25,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { RequestsProvider } from "@/contexts/RequestsContext";
 import { PaymentsProvider } from "@/contexts/PaymentsContext";
 import { SupportProvider } from "@/contexts/SupportContext";
+import { StatusBar } from "expo-status-bar";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,33 +39,45 @@ function AuthGate() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === 'auth';
+    const inAuthGroup = segments[0] === "auth";
 
     if (!isAuthenticated && !inAuthGroup) {
-      router.replace('/auth');
+      router.replace("/auth");
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)');
+      router.replace("/");
     }
   }, [isAuthenticated, isLoading, segments]);
 
   return (
-    <Stack screenOptions={{ headerShown: false, headerBackTitle: "Voltar" }}>
+    <Stack screenOptions={{ headerShown: false, headerBackTitle: "Voltar", contentStyle: { backgroundColor: "#F7F5F2" } }}>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="provider/[id]" options={{ presentation: 'card' }} />
-      <Stack.Screen name="payment" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="request" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="marketplace" options={{ headerShown: false }} />
+      <Stack.Screen name="support" options={{ headerShown: false }} />
+      <Stack.Screen name="provider/[id]" options={{ presentation: "card" }} />
+      <Stack.Screen name="payment" options={{ presentation: "modal" }} />
+      <Stack.Screen name="request" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+  const [frauncesLoaded, frauncesError] = useFraunces({
+    Fraunces_700Bold,
+    Fraunces_800ExtraBold,
+    Fraunces_900Black,
   });
+
+  const [figtreeLoaded, figtreeError] = useFigtree({
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
+    Figtree_800ExtraBold,
+  });
+
+  const fontsLoaded = frauncesLoaded && figtreeLoaded;
+  const fontError = frauncesError || figtreeError;
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -77,6 +97,7 @@ export default function RootLayout() {
                 <RequestsProvider>
                   <PaymentsProvider>
                     <SupportProvider>
+                      <StatusBar style="dark" backgroundColor="#F7F5F2" />
                       <AuthGate />
                     </SupportProvider>
                   </PaymentsProvider>

@@ -1,345 +1,327 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, Image as RNImage } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'react-router-dom'; // Note: using expo-router hooks
-import { useLocalSearchParams as useExpoParams, router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-
-import { useColors } from '@/hooks/useColors';
-import { useAuth } from '@/contexts/AuthContext';
-import { MOCK_PROVIDERS } from '@/constants/mockData';
-
-import { Avatar } from '@/components/Avatar';
-import { IconButton } from '@/components/IconButton';
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { SegmentedControl } from '@/components/SegmentedControl';
-import { RatingStars } from '@/components/RatingStars';
+import React from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MOCK_PROVIDERS } from "@/constants/mockData";
+import colors, { fonts, shadows } from "@/constants/colors";
 
 export default function ProviderProfileScreen() {
-  const colors = useColors();
+  const c = colors.light;
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useExpoParams();
-  const { user } = useAuth();
-  
-  const provider = MOCK_PROVIDERS.find(p => p.id === id) || MOCK_PROVIDERS[0];
-  const isOwner = user?.id === id;
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const provider = MOCK_PROVIDERS.find((p) => p.id === id);
 
-  const [tabIndex, setTabIndex] = useState(0); // 0 = Sobre, 1 = Serviços, 2 = Portfólio, 3 = Avaliações
+  if (!provider) {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.background, justifyContent: "center", alignItems: "center" }}>
+        <Text style={{ color: c.text, fontFamily: fonts.sans.semibold }}>Prestador não encontrado.</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Cover */}
-        <View style={styles.coverContainer}>
-          <Image
-            source={{ uri: provider.truckPhoto }}
-            style={styles.coverImage}
-            contentFit="cover"
-          />
-          <LinearGradient
-            colors={['transparent', colors.background]}
-            style={StyleSheet.absoluteFillObject}
-          />
-          <IconButton
-            icon="arrow-left"
-            color="white"
-            variant="solid"
-            style={[styles.backBtn, { top: insets.top + 8 }]}
-            onPress={() => router.back()}
-          />
-          {isOwner && (
-            <IconButton
-              icon="edit-2"
-              color="white"
-              variant="solid"
-              style={[styles.editCoverBtn, { top: insets.top + 8 }]}
-              onPress={() => {}}
-            />
-          )}
-        </View>
-
-        {/* Profile Info */}
-        <View style={styles.profileHeader}>
-          <Avatar src={provider.avatar} name={provider.name} size={96} style={styles.avatar} showRing={provider.isOnline} />
-          <View style={styles.nameRow}>
-            <Text style={[styles.name, { color: colors.foreground }]}>{provider.name}</Text>
-            <Feather name="check-circle" size={20} color={colors.primary} />
-          </View>
-          <Text style={[styles.category, { color: colors.mutedForeground }]}>
-            {provider.category} • {provider.neighborhood}
-          </Text>
-          
-          <View style={styles.ratingContainer}>
-            <RatingStars rating={provider.rating} size={18} />
-            <Text style={[styles.ratingText, { color: colors.foreground }]}>{provider.rating}</Text>
-            <Text style={[styles.reviewsText, { color: colors.mutedForeground }]}>({provider.reviews} avaliações)</Text>
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero */}
+        <LinearGradient
+          colors={[provider.color, `${provider.color}AA`]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.hero, { paddingTop: insets.top + 16 }]}
+        >
+          <View style={styles.heroNav}>
+            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+              <Ionicons name="chevron-back" size={20} color="#fff" />
+            </Pressable>
+            <View style={{ flex: 1 }} />
+            <Pressable style={styles.iconBtn}>
+              <Ionicons name="share-outline" size={18} color="#fff" />
+            </Pressable>
           </View>
 
-          {/* Action Buttons Row */}
-          <View style={styles.actionRow}>
-            <View style={styles.actionItem}>
-              <IconButton icon="message-circle" variant="outline" onPress={() => {}} size={20} />
-              <Text style={[styles.actionText, { color: colors.mutedForeground }]}>Mensagem</Text>
-            </View>
-            <View style={styles.actionItem}>
-              <IconButton icon="phone" variant="outline" onPress={() => {}} size={20} />
-              <Text style={[styles.actionText, { color: colors.mutedForeground }]}>Ligar</Text>
-            </View>
-            <View style={styles.actionItem}>
-              <IconButton icon="heart" variant="outline" onPress={() => {}} size={20} />
-              <Text style={[styles.actionText, { color: colors.mutedForeground }]}>Salvar</Text>
-            </View>
-            <View style={styles.actionItem}>
-              <IconButton icon="share" variant="outline" onPress={() => {}} size={20} />
-              <Text style={[styles.actionText, { color: colors.mutedForeground }]}>Compartilhar</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <SegmentedControl
-            tabs={['Sobre', 'Serviços', 'Portfólio', 'Avaliações']}
-            selectedIndex={tabIndex}
-            onChange={setTabIndex}
-          />
-        </View>
-
-        {/* Tab Content */}
-        <View style={styles.tabContent}>
-          {tabIndex === 0 && (
-            <View>
-              <Text style={[styles.aboutText, { color: colors.foreground }]}>
-                Profissional com mais de 5 anos de experiência em mudanças residenciais e comerciais. 
-                Possuo caminhão baú próprio (tamanho médio), ajudantes treinados e material completo para embalagem.
-              </Text>
-              <View style={[styles.infoCard, { backgroundColor: colors.muted }]}>
-                <Feather name="truck" size={24} color={colors.foreground} />
-                <View style={styles.infoCardText}>
-                  <Text style={[styles.infoCardTitle, { color: colors.foreground }]}>Veículo Próprio</Text>
-                  <Text style={[styles.infoCardDesc, { color: colors.mutedForeground }]}>Caminhão Baú 3/4 - Placa MER-COSUL</Text>
-                </View>
+          <View style={styles.heroBody}>
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{provider.ini}</Text>
+              </View>
+              <View style={[styles.verifyBadge, { backgroundColor: c.success }]}>
+                <Ionicons name="checkmark" size={12} color="#fff" />
               </View>
             </View>
-          )}
+            <Text style={styles.name}>{provider.name}</Text>
+            <View style={styles.metaRow}>
+              <View style={styles.catChip}>
+                {provider.cat === "Mudança" ? (
+                  <Ionicons name="home" size={11} color="#fff" />
+                ) : provider.cat === "Frete" ? (
+                  <MaterialCommunityIcons name="truck" size={12} color="#fff" />
+                ) : (
+                  <Ionicons name="cube" size={11} color="#fff" />
+                )}
+                <Text style={styles.catText}>{provider.cat}</Text>
+              </View>
+              <View style={styles.ratingChip}>
+                <Ionicons name="star" size={12} color="#fff" />
+                <Text style={styles.ratingText}>{provider.rating}</Text>
+                <Text style={styles.jobsText}>· {provider.jobs} serviços</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
 
-          {tabIndex === 1 && (
-            <View>
-              {[
-                { n: 'Mudança Completa', p: 'R$ 450/diária' },
-                { n: 'Frete Pequeno', p: 'R$ 150/saída' },
-                { n: 'Ajudante Extra', p: 'R$ 100/diária' },
-              ].map((s, i) => (
-                <View key={i} style={[styles.serviceRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.serviceName, { color: colors.foreground }]}>{s.n}</Text>
-                  <Text style={[styles.servicePrice, { color: colors.primary }]}>{s.p}</Text>
+        {/* Bio */}
+        <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Sobre</Text>
+          <Text style={[styles.bio, { color: c.sub }]}>{provider.bio}</Text>
+        </View>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          {[
+            { v: provider.responseTime, l: "Resposta" },
+            { v: provider.completionRate, l: "Conclusão" },
+            { v: provider.acceptanceRate, l: "Aceitação" },
+            { v: `${provider.helpers}`, l: "Ajudantes" },
+          ].map((s) => (
+            <View key={s.l} style={[styles.statCell, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.statV, { color: provider.color }]}>{s.v}</Text>
+              <Text style={[styles.statL, { color: c.softMuted }]}>{s.l}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Vehicle */}
+        <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Veículo & equipamento</Text>
+          <View style={styles.detailRow}>
+            <View style={[styles.detailIcon, { backgroundColor: `${provider.color}18` }]}>
+              <MaterialCommunityIcons name="truck" size={18} color={provider.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.detailLabel, { color: c.text }]}>{provider.model}</Text>
+              <Text style={[styles.detailSub, { color: c.softMuted }]}>Placa {provider.plate}</Text>
+            </View>
+          </View>
+          {provider.equipment.length > 0 ? (
+            <View style={styles.tagRow}>
+              {provider.equipment.map((eq) => (
+                <View key={eq} style={[styles.tag, { backgroundColor: c.background, borderColor: c.border }]}>
+                  <Text style={[styles.tagText, { color: c.sub }]}>{eq}</Text>
                 </View>
               ))}
             </View>
+          ) : (
+            <Text style={[styles.detailSub, { color: c.softMuted, marginTop: 8 }]}>Sem equipamento adicional</Text>
           )}
+        </View>
 
-          {tabIndex === 2 && (
-            <View style={styles.portfolioGrid}>
-              <Image source={{ uri: provider.truckPhoto }} style={styles.portfolioImage} />
-              <Image source={{ uri: 'https://images.unsplash.com/photo-1581092921461-7d2d0c24096d?q=80&w=200&auto=format&fit=crop' }} style={styles.portfolioImage} />
-            </View>
-          )}
+        {/* Work areas */}
+        <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Áreas de atuação</Text>
+          <View style={styles.tagRow}>
+            {provider.workAreas.map((a) => (
+              <View key={a} style={[styles.tag, { backgroundColor: c.background, borderColor: c.border }]}>
+                <Ionicons name="location" size={11} color={c.softMuted} />
+                <Text style={[styles.tagText, { color: c.sub }]}>{a}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={[styles.detailSub, { color: c.softMuted, marginTop: 8 }]}>{provider.workShift}</Text>
+        </View>
 
-          {tabIndex === 3 && (
-            <View>
-              <View style={[styles.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.reviewHeader}>
-                  <Text style={[styles.reviewerName, { color: colors.foreground }]}>Mariana Costa</Text>
-                  <RatingStars rating={5} size={12} />
+        {/* Reviews */}
+        <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Avaliações</Text>
+          {provider.reviews.map((r, i) => (
+            <View key={i} style={[styles.reviewRow, i < provider.reviews.length - 1 && { borderBottomColor: c.borderLight, borderBottomWidth: 1 }]}>
+              <View style={[styles.reviewAvatar, { backgroundColor: c.background }]}>
+                <Text style={[styles.reviewIni, { color: c.softMuted }]}>{r.author[0]}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.reviewHead}>
+                  <Text style={[styles.reviewAuthor, { color: c.text }]}>{r.author}</Text>
+                  <Text style={[styles.reviewWhen, { color: c.softMuted }]}>{r.when}</Text>
                 </View>
-                <Text style={[styles.reviewText, { color: colors.mutedForeground }]}>
-                  Excelente serviço! Muito cuidadoso com os móveis e chegou no horário combinado.
-                </Text>
+                <View style={styles.reviewStars}>
+                  {Array.from({ length: r.rating }).map((_, k) => (
+                    <Ionicons key={k} name="star" size={11} color={c.warning} />
+                  ))}
+                </View>
+                <Text style={[styles.reviewText, { color: c.sub }]}>{r.text}</Text>
               </View>
             </View>
-          )}
+          ))}
+        </View>
+
+        {/* Recent services */}
+        <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+          <Text style={[styles.sectionTitle, { color: c.text }]}>Serviços recentes</Text>
+          {provider.recentServices.map((s, i) => (
+            <View
+              key={i}
+              style={[
+                styles.recRow,
+                i < provider.recentServices.length - 1 && { borderBottomColor: c.borderLight, borderBottomWidth: 1 },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.recLabel, { color: c.text }]}>{s.label}</Text>
+                <Text style={[styles.recWhen, { color: c.softMuted }]}>{s.when}</Text>
+              </View>
+              <Text style={[styles.recValue, { color: provider.color }]}>{s.value}</Text>
+            </View>
+          ))}
         </View>
       </ScrollView>
 
-      <View style={[styles.bottomBar, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
-        {isOwner ? (
-          <PrimaryButton title="Editar perfil" variant="secondary" onPress={() => {}} />
-        ) : (
-          <PrimaryButton title="Solicitar serviço" onPress={() => router.push('/request')} />
-        )}
+      {/* Sticky CTA */}
+      <View style={[styles.cta, { paddingBottom: insets.bottom + 14, backgroundColor: c.card, borderTopColor: c.borderLight }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.ctaPriceLabel, { color: c.softMuted }]}>a partir de</Text>
+          <Text style={[styles.ctaPrice, { color: provider.color }]}>{provider.price}</Text>
+        </View>
+        <Pressable
+          onPress={() => router.push({ pathname: "/request", params: { providerId: provider.id } })}
+          style={[styles.ctaBtn, { backgroundColor: provider.color }, shadows.md, { shadowColor: provider.color, shadowOpacity: 0.4 }]}
+        >
+          <Text style={styles.ctaText}>Solicitar agora</Text>
+          <Ionicons name="arrow-forward" size={16} color="#fff" />
+        </Pressable>
       </View>
     </View>
   );
 }
 
-// Need to create LinearGradient manually for the cover fade
-import { LinearGradient } from 'expo-linear-gradient';
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  coverContainer: {
-    height: 240,
-    width: '100%',
-    position: 'relative',
-  },
-  coverImage: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  backBtn: {
-    position: 'absolute',
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  editCoverBtn: {
-    position: 'absolute',
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  profileHeader: {
-    paddingHorizontal: 24,
-    marginTop: -48,
-    alignItems: 'center',
-  },
-  avatar: {
-    borderWidth: 4,
-    marginBottom: 16,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: '700',
-    fontFamily: 'Inter_700Bold',
-  },
-  category: {
-    fontSize: 16,
-    fontFamily: 'Inter_400Regular',
-    marginBottom: 12,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 24,
-  },
-  ratingText: {
-    fontSize: 16,
-    fontWeight: '700',
-    fontFamily: 'Inter_700Bold',
-  },
-  reviewsText: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  actionItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionText: {
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-  },
-  tabsContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  tabContent: {
-    paddingHorizontal: 24,
-  },
-  aboutText: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontFamily: 'Inter_400Regular',
-    marginBottom: 24,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    gap: 16,
-  },
-  infoCardText: {
-    flex: 1,
-  },
-  infoCardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-    marginBottom: 4,
-  },
-  infoCardDesc: {
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-  },
-  serviceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  serviceName: {
-    fontSize: 16,
-    fontFamily: 'Inter_500Medium',
-  },
-  servicePrice: {
-    fontSize: 16,
-    fontWeight: '700',
-    fontFamily: 'Inter_700Bold',
-  },
-  portfolioGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  portfolioImage: {
-    width: '48%',
-    aspectRatio: 1,
+  hero: { paddingHorizontal: 16, paddingBottom: 30 },
+  heroNav: { flexDirection: "row", alignItems: "center" },
+  iconBtn: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  reviewCard: {
-    padding: 16,
-    borderRadius: 16,
+  heroBody: { alignItems: "center", marginTop: 14 },
+  avatarWrap: { position: "relative", marginBottom: 12 },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.4)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { color: "#fff", fontSize: 32, fontFamily: fonts.serif.extra },
+  verifyBadge: {
+    position: "absolute",
+    bottom: 4,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2.5,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  name: { color: "#fff", fontSize: 22, fontFamily: fonts.serif.extra, lineHeight: 26 },
+  metaRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  catChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  catText: { color: "#fff", fontSize: 11, fontFamily: fonts.sans.bold },
+  ratingChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  ratingText: { color: "#fff", fontSize: 12, fontFamily: fonts.serif.extra },
+  jobsText: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontFamily: fonts.sans.regular },
+
+  section: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    marginBottom: 12,
+    padding: 16,
   },
-  reviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+  sectionTitle: { fontSize: 15, fontFamily: fonts.serif.extra, marginBottom: 10 },
+  bio: { fontSize: 13, fontFamily: fonts.sans.regular, lineHeight: 19 },
+  statsRow: { flexDirection: "row", gap: 8, paddingHorizontal: 16, marginTop: 14 },
+  statCell: { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 12, alignItems: "center" },
+  statV: { fontSize: 14, fontFamily: fonts.serif.extra },
+  statL: { fontSize: 10, fontFamily: fonts.sans.regular, marginTop: 3 },
+
+  detailRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 },
+  detailIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  detailLabel: { fontSize: 13, fontFamily: fonts.sans.bold },
+  detailSub: { fontSize: 11, fontFamily: fonts.sans.regular },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
+  tag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
   },
-  reviewerName: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  reviewText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: 'Inter_400Regular',
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
+  tagText: { fontSize: 11, fontFamily: fonts.sans.semibold },
+
+  reviewRow: { flexDirection: "row", gap: 10, paddingVertical: 12 },
+  reviewAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  reviewIni: { fontSize: 13, fontFamily: fonts.serif.extra },
+  reviewHead: { flexDirection: "row", justifyContent: "space-between" },
+  reviewAuthor: { fontSize: 13, fontFamily: fonts.sans.bold },
+  reviewWhen: { fontSize: 10, fontFamily: fonts.sans.regular },
+  reviewStars: { flexDirection: "row", gap: 1, marginTop: 2 },
+  reviewText: { fontSize: 12, fontFamily: fonts.sans.regular, marginTop: 4, lineHeight: 17 },
+
+  recRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
+  recLabel: { fontSize: 13, fontFamily: fonts.sans.bold },
+  recWhen: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  recValue: { fontSize: 14, fontFamily: fonts.serif.extra },
+
+  cta: {
+    position: "absolute",
     left: 0,
     right: 0,
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    bottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
     borderTopWidth: 1,
   },
+  ctaPriceLabel: { fontSize: 11, fontFamily: fonts.sans.regular },
+  ctaPrice: { fontSize: 22, fontFamily: fonts.serif.extra },
+  ctaBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 22,
+    height: 52,
+    borderRadius: 16,
+  },
+  ctaText: { color: "#fff", fontSize: 14, fontFamily: fonts.sans.extra },
 });

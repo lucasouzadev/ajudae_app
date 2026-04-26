@@ -1,68 +1,45 @@
-import React from 'react';
-import { StyleSheet, View, ViewStyle, Text } from 'react-native';
-import { Image } from 'expo-image';
-import { useColors } from '@/hooks/useColors';
+import React from "react";
+import { View, Text, StyleSheet, ViewStyle } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import colors, { fonts } from "@/constants/colors";
 
 interface AvatarProps {
-  src?: string;
-  name: string;
+  initials: string;
   size?: number;
+  color?: string;
+  bordered?: boolean;
   style?: ViewStyle;
-  showRing?: boolean;
 }
 
-export function Avatar({ src, name, size = 48, style, showRing }: AvatarProps) {
-  const colors = useColors();
-
-  const initials = name
-    .split(' ')
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase();
-
-  const containerStyle = [
-    styles.container,
-    {
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-      backgroundColor: colors.muted,
-      borderColor: showRing ? colors.primary : colors.border,
-      borderWidth: showRing ? 2 : 1,
-    },
-    style,
-  ];
-
-  if (src) {
-    return (
-      <View style={containerStyle}>
-        <Image
-          source={{ uri: src }}
-          style={{ width: '100%', height: '100%', borderRadius: size / 2 }}
-          contentFit="cover"
-        />
-      </View>
-    );
-  }
+export function Avatar({ initials, size = 44, color, bordered, style }: AvatarProps) {
+  const c = colors.light;
+  const accent = color || c.primary;
+  const fontSize = Math.round(size * 0.36);
 
   return (
-    <View style={containerStyle}>
-      <Text style={[styles.initials, { color: colors.mutedForeground, fontSize: size * 0.4 }]}>
-        {initials}
-      </Text>
+    <View style={[{ width: size, height: size }, style]}>
+      <LinearGradient
+        colors={[accent, `${accent}AA`]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          styles.bg,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: bordered ? 3 : 0,
+            borderColor: "#fff",
+          },
+        ]}
+      >
+        <Text style={[styles.text, { fontSize }]}>{initials}</Text>
+      </LinearGradient>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  initials: {
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-  },
+  bg: { alignItems: "center", justifyContent: "center" },
+  text: { color: "#fff", fontFamily: fonts.serif.extra },
 });

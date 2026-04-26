@@ -1,34 +1,27 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useColors } from '@/hooks/useColors';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import colors, { fonts } from "@/constants/colors";
 
 interface RatingStarsProps {
   rating: number;
   size?: number;
+  showNumber?: boolean;
 }
 
-export function RatingStars({ rating, size = 16 }: RatingStarsProps) {
-  const colors = useColors();
-  
+export function RatingStars({ rating, size = 14, showNumber = true }: RatingStarsProps) {
+  const c = colors.light;
   return (
-    <View style={styles.container}>
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Feather
-          key={star}
-          name="star"
-          size={size}
-          color={star <= Math.round(rating) ? colors.warning : colors.muted}
-          style={{ fill: star <= Math.round(rating) ? colors.warning : 'transparent' }}
-        />
-      ))}
+    <View style={styles.row}>
+      <Ionicons name="star" size={size} color={c.warning} />
+      {showNumber ? (
+        <Text style={[styles.text, { color: c.warning, fontSize: size - 1 }]}>{rating.toFixed(1)}</Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    gap: 2,
-  },
+  row: { flexDirection: "row", alignItems: "center", gap: 3 },
+  text: { fontFamily: fonts.serif.extra },
 });

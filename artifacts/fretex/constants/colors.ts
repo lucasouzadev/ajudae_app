@@ -1,83 +1,183 @@
+const palette = {
+  primary: "#FF5500",
+  primaryLight: "#FFF0EB",
+  primaryMid: "#FFD4C2",
+  primaryDeep: "#FF8C5A",
+
+  bg: "#F7F5F2",
+  bgDeep: "#E2DDD8",
+  white: "#FFFFFF",
+
+  text: "#1C1917",
+  sub: "#78716C",
+  muted: "#A8A29E",
+
+  border: "#EBEBEB",
+  borderLight: "#F2F0EE",
+
+  success: "#16A34A",
+  successLight: "#DCFCE7",
+  warning: "#D97706",
+  warningLight: "#FEF3C7",
+  blue: "#2563EB",
+  blueLight: "#DBEAFE",
+  purple: "#9333EA",
+};
+
 const colors = {
   light: {
-    text: "#0F1419",
-    tint: "#FF6B1A",
+    text: palette.text,
+    tint: palette.primary,
 
-    background: "#FFFFFF",
-    foreground: "#0F1419",
+    background: palette.bg,
+    foreground: palette.text,
 
-    card: "#FFFFFF",
-    cardForeground: "#0F1419",
+    card: palette.white,
+    cardForeground: palette.text,
 
-    primary: "#FF6B1A",
-    primaryForeground: "#FFFFFF",
+    primary: palette.primary,
+    primaryForeground: palette.white,
 
-    secondary: "#FFF4ED",
-    secondaryForeground: "#7A2E00",
+    secondary: palette.primaryLight,
+    secondaryForeground: palette.primary,
 
-    muted: "#F5F5F4",
-    mutedForeground: "#6B6B6B",
+    muted: palette.borderLight,
+    mutedForeground: palette.sub,
 
-    accent: "#1A2332",
-    accentForeground: "#FFFFFF",
+    accent: palette.text,
+    accentForeground: palette.white,
 
     destructive: "#E11D48",
-    destructiveForeground: "#FFFFFF",
+    destructiveForeground: palette.white,
 
-    success: "#16A34A",
-    successForeground: "#FFFFFF",
+    success: palette.success,
+    successForeground: palette.white,
+    successLight: palette.successLight,
 
-    warning: "#F59E0B",
-    warningForeground: "#FFFFFF",
+    warning: palette.warning,
+    warningForeground: palette.white,
+    warningLight: palette.warningLight,
 
-    border: "#EDEDEB",
-    input: "#EDEDEB",
+    blue: palette.blue,
+    blueLight: palette.blueLight,
+    purple: palette.purple,
 
-    surface: "#FAFAF9",
-    surfaceElevated: "#FFFFFF",
-    overlay: "rgba(15,20,25,0.45)",
+    border: palette.border,
+    borderLight: palette.borderLight,
+    input: palette.border,
+
+    surface: palette.bg,
+    surfaceElevated: palette.white,
+    overlay: "rgba(28,25,23,0.45)",
+
+    sub: palette.sub,
+    softMuted: palette.muted,
+    primaryLight: palette.primaryLight,
+    primaryMid: palette.primaryMid,
+    primaryDeep: palette.primaryDeep,
+    bgDeep: palette.bgDeep,
   },
 
   dark: {
     text: "#FAFAF9",
-    tint: "#FF8A3D",
+    tint: "#FF7A33",
 
-    background: "#0B0F14",
+    background: "#1C1917",
     foreground: "#FAFAF9",
 
-    card: "#141A22",
+    card: "#28231F",
     cardForeground: "#FAFAF9",
 
-    primary: "#FF8A3D",
-    primaryForeground: "#0B0F14",
+    primary: "#FF7A33",
+    primaryForeground: "#1C1917",
 
-    secondary: "#1F2733",
+    secondary: "#3A2A22",
     secondaryForeground: "#FFB585",
 
-    muted: "#1A2129",
-    mutedForeground: "#9BA3AE",
+    muted: "#2A2522",
+    mutedForeground: "#A8A29E",
 
     accent: "#FAFAF9",
-    accentForeground: "#0B0F14",
+    accentForeground: "#1C1917",
 
     destructive: "#F43F5E",
     destructiveForeground: "#FFFFFF",
 
     success: "#22C55E",
-    successForeground: "#0B0F14",
+    successForeground: "#1C1917",
+    successLight: "#14532D",
 
     warning: "#FBBF24",
-    warningForeground: "#0B0F14",
+    warningForeground: "#1C1917",
+    warningLight: "#451A03",
 
-    border: "#1F2733",
-    input: "#1F2733",
+    blue: "#3B82F6",
+    blueLight: "#1E3A8A",
+    purple: "#A855F7",
 
-    surface: "#0F141B",
-    surfaceElevated: "#141A22",
+    border: "#3A332E",
+    borderLight: "#2D2724",
+    input: "#3A332E",
+
+    surface: "#221E1B",
+    surfaceElevated: "#28231F",
     overlay: "rgba(0,0,0,0.6)",
+
+    sub: "#A8A29E",
+    softMuted: "#78716C",
+    primaryLight: "#3A2A22",
+    primaryMid: "#5A3220",
+    primaryDeep: "#FFA070",
+    bgDeep: "#0F0D0C",
   },
 
-  radius: 14,
+  radius: 16,
+};
+
+export const fonts = {
+  serif: {
+    bold: "Fraunces_700Bold",
+    extra: "Fraunces_800ExtraBold",
+    black: "Fraunces_900Black",
+  },
+  sans: {
+    regular: "Figtree_400Regular",
+    medium: "Figtree_500Medium",
+    semibold: "Figtree_600SemiBold",
+    bold: "Figtree_700Bold",
+    extra: "Figtree_800ExtraBold",
+  },
+};
+
+export const shadows = {
+  sm: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  lg: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.16,
+    shadowRadius: 48,
+    elevation: 14,
+  },
+  xl: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.22,
+    shadowRadius: 64,
+    elevation: 22,
+  },
 };
 
 export default colors;
