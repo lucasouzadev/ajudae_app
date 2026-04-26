@@ -163,6 +163,343 @@ const heatStyles = StyleSheet.create({
   hourCatText: { fontSize: 9, fontFamily: fonts.sans.bold },
 });
 
+/* ─── Provider home widgets ─────────────────────────────────────────── */
+
+/* 1. Hot area banner */
+const HOT_AREAS = [
+  { area: "Méier", count: 4, cat: "Frete" },
+  { area: "Tijuca", count: 3, cat: "Mudança" },
+];
+function HotAreaBanner({ onPress }: { onPress: () => void }) {
+  const c = colors.light;
+  const spot = HOT_AREAS[0];
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[pStyles.hotBanner, { backgroundColor: `${c.primary}18`, borderColor: `${c.primary}55` }]}
+    >
+      <View style={[pStyles.hotDot, { backgroundColor: c.primary }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={[pStyles.hotTitle, { color: c.text }]}>
+          🔥 {spot.count} pedidos abertos em {spot.area} agora
+        </Text>
+        <Text style={[pStyles.hotSub, { color: c.sub }]}>
+          Categoria {spot.cat} · aceite médio 4 min
+        </Text>
+      </View>
+      <Ionicons name="arrow-forward" size={15} color="#8B6F00" />
+    </Pressable>
+  );
+}
+
+/* 2. Price suggestion */
+const PRICE_INSIGHTS = [
+  { cat: "Frete", yours: 120, market: 138, delta: +18 },
+  { cat: "Mudança", yours: 214, market: 199, delta: -15 },
+];
+function PriceSuggestion() {
+  const c = colors.light;
+  return (
+    <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+      <View style={pStyles.cardHead}>
+        <Ionicons name="trending-up" size={15} color={c.blue} />
+        <Text style={[pStyles.cardTitle, { color: c.text }]}>Sugestão de preço</Text>
+        <Text style={[pStyles.cardBadge, { backgroundColor: c.blueLight, color: c.blue }]}>Hoje</Text>
+      </View>
+      {PRICE_INSIGHTS.map((p) => {
+        const above = p.delta > 0;
+        return (
+          <View key={p.cat} style={[pStyles.insightRow, { borderTopColor: c.borderLight }]}>
+            <Text style={[pStyles.insightCat, { color: c.sub }]}>{p.cat}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[pStyles.insightMsg, { color: c.text }]}>
+                {above
+                  ? `Mercado cobra R$${p.delta} a mais que você`
+                  : `Você está R$${Math.abs(p.delta)} acima da média`}
+              </Text>
+            </View>
+            <View style={[pStyles.insightDelta, { backgroundColor: above ? c.successLight : c.warningLight }]}>
+              <Text style={[pStyles.insightDeltaText, { color: above ? c.success : c.warning }]}>
+                {above ? "+" : "-"}R${Math.abs(p.delta)}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/* 3. Demand forecast — 48h bar chart */
+const DEMAND_DATA = [
+  { hour: "08h", frete: 3, mudanca: 1, entrega: 2 },
+  { hour: "10h", frete: 5, mudanca: 2, entrega: 4 },
+  { hour: "12h", frete: 2, mudanca: 3, entrega: 3 },
+  { hour: "14h", frete: 7, mudanca: 4, entrega: 2 },
+  { hour: "16h", frete: 6, mudanca: 2, entrega: 5 },
+  { hour: "18h", frete: 4, mudanca: 5, entrega: 3 },
+  { hour: "20h", frete: 2, mudanca: 1, entrega: 2 },
+  { hour: "22h", frete: 1, mudanca: 0, entrega: 1 },
+];
+const CHART_MAX = 10;
+
+function DemandForecast() {
+  const c = colors.light;
+  const [activeCat, setActiveCat] = useState<"frete" | "mudanca" | "entrega">("frete");
+  const catColors: Record<string, string> = { frete: c.blue, mudanca: c.primary, entrega: c.success };
+  const catLabels: Record<string, string> = { frete: "Frete", mudanca: "Mudança", entrega: "Entrega" };
+
+  return (
+    <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+      <View style={pStyles.cardHead}>
+        <Ionicons name="pulse" size={15} color={c.blue} />
+        <Text style={[pStyles.cardTitle, { color: c.text }]}>Previsão de demanda</Text>
+        <Text style={[pStyles.cardBadge, { backgroundColor: c.blueLight, color: c.blue }]}>Próximas 48h</Text>
+      </View>
+
+      {/* Category toggle */}
+      <View style={[pStyles.catToggle, { backgroundColor: c.background }]}>
+        {(["frete", "mudanca", "entrega"] as const).map((k) => (
+          <Pressable
+            key={k}
+            onPress={() => setActiveCat(k)}
+            style={[
+              pStyles.catToggleBtn,
+              activeCat === k && { backgroundColor: catColors[k], borderRadius: 8 },
+            ]}
+          >
+            <Text style={[pStyles.catToggleText, { color: activeCat === k ? (k === "mudanca" ? "#1A1714" : "#fff") : c.sub }]}>
+              {catLabels[k]}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Bars */}
+      <View style={pStyles.chartRow}>
+        {DEMAND_DATA.map((d) => {
+          const val = d[activeCat as keyof typeof d] as number;
+          const heightPct = (val / CHART_MAX) * 100;
+          const color = catColors[activeCat];
+          return (
+            <View key={d.hour} style={pStyles.barCol}>
+              <View style={[pStyles.barTrack, { backgroundColor: c.background }]}>
+                <View style={[pStyles.barFill, { height: `${heightPct}%` as any, backgroundColor: color }]} />
+              </View>
+              <Text style={[pStyles.barLabel, { color: c.softMuted }]}>{d.hour}</Text>
+            </View>
+          );
+        })}
+      </View>
+      <Text style={[pStyles.chartHint, { color: c.softMuted }]}>
+        Pico estimado: 14h–16h · {DEMAND_DATA.reduce((s, d) => s + (d[activeCat as keyof typeof d] as number), 0)} pedidos esperados
+      </Text>
+    </View>
+  );
+}
+
+/* 4. Monthly goals */
+const GOALS = [
+  { label: "Renda do mês", current: 1840, target: 3000, unit: "R$", color: "#16A34A", bg: "#DCFCE7" },
+  { label: "Serviços", current: 14, target: 20, unit: "", color: "#2563EB", bg: "#DBEAFE" },
+  { label: "Avaliação média", current: 4.9, target: 5.0, unit: "★", color: "#D97706", bg: "#FEF3C7" },
+];
+function MonthlyGoals() {
+  const c = colors.light;
+  const month = new Date().toLocaleDateString("pt-BR", { month: "long" });
+  return (
+    <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+      <View style={pStyles.cardHead}>
+        <Ionicons name="flag" size={15} color={c.warning} />
+        <Text style={[pStyles.cardTitle, { color: c.text }]}>Metas de {month}</Text>
+      </View>
+      {GOALS.map((g) => {
+        const pct = Math.min(g.current / g.target, 1);
+        return (
+          <View key={g.label} style={pStyles.goalRow}>
+            <View style={pStyles.goalLabelRow}>
+              <Text style={[pStyles.goalLabel, { color: c.text }]}>{g.label}</Text>
+              <Text style={[pStyles.goalValue, { color: g.color }]}>
+                {g.unit}{typeof g.current === "number" && g.current >= 100 ? g.current.toLocaleString("pt-BR") : g.current}
+                <Text style={[pStyles.goalTarget, { color: c.softMuted }]}>
+                  {" "}/ {g.unit}{g.target}
+                </Text>
+              </Text>
+            </View>
+            <View style={[pStyles.goalTrack, { backgroundColor: c.background }]}>
+              <View style={[pStyles.goalFill, { width: `${pct * 100}%` as any, backgroundColor: g.color }]} />
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/* 5. Badges / conquistas */
+const BADGES = [
+  { icon: "🏆", label: "100 serviços", unlocked: false, target: 100, current: 71 },
+  { icon: "⭐", label: "5 estrelas", unlocked: true, target: 1, current: 1 },
+  { icon: "🔥", label: "7 dias", unlocked: true, target: 7, current: 7 },
+  { icon: "⚡", label: "50 fretes", unlocked: false, target: 50, current: 36 },
+  { icon: "🛡️", label: "Verificado", unlocked: true, target: 1, current: 1 },
+];
+function BadgeRow() {
+  const c = colors.light;
+  return (
+    <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+      <View style={[pStyles.cardHead, { marginBottom: 14 }]}>
+        <Ionicons name="ribbon" size={15} color={c.warning} />
+        <Text style={[pStyles.cardTitle, { color: c.text }]}>Conquistas</Text>
+        <Text style={[pStyles.cardBadge, { backgroundColor: c.successLight, color: c.success }]}>
+          {BADGES.filter((b) => b.unlocked).length}/{BADGES.length}
+        </Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+        {BADGES.map((b) => (
+          <View
+            key={b.label}
+            style={[
+              pStyles.badge,
+              {
+                backgroundColor: b.unlocked ? `${c.primary}18` : c.background,
+                borderColor: b.unlocked ? c.primary : c.border,
+                opacity: b.unlocked ? 1 : 0.6,
+              },
+            ]}
+          >
+            <Text style={pStyles.badgeEmoji}>{b.icon}</Text>
+            <Text style={[pStyles.badgeLabel, { color: b.unlocked ? c.text : c.softMuted }]}>{b.label}</Text>
+            {!b.unlocked ? (
+              <Text style={[pStyles.badgeProgress, { color: c.softMuted }]}>
+                {b.current}/{b.target}
+              </Text>
+            ) : (
+              <View style={[pStyles.badgeCheck, { backgroundColor: c.success }]}>
+                <Ionicons name="checkmark" size={9} color="#fff" />
+              </View>
+            )}
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+/* 6. Recent reviews carousel */
+const RECENT_REVIEWS = MOCK_PROVIDERS[0].reviews.concat([
+  { author: "Sandra L.", text: "Pontual e muito cuidadoso com os móveis. Super indico!", rating: 5, when: "hoje" },
+]).slice(0, 3);
+
+function RecentReviews() {
+  const c = colors.light;
+  return (
+    <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+      <View style={[pStyles.cardHead, { marginBottom: 12 }]}>
+        <Ionicons name="star" size={15} color={c.warning} />
+        <Text style={[pStyles.cardTitle, { color: c.text }]}>Avaliações recentes</Text>
+        <Text style={[pStyles.cardBadge, { backgroundColor: c.warningLight, color: c.warning }]}>★ 4.9</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+        {RECENT_REVIEWS.map((r, i) => (
+          <View key={i} style={[pStyles.reviewCard, { backgroundColor: c.background, borderColor: c.borderLight }]}>
+            <View style={pStyles.reviewHead}>
+              <View style={[pStyles.reviewAvatar, { backgroundColor: `${c.primary}22` }]}>
+                <Text style={[pStyles.reviewIni, { color: "#8B6F00" }]}>{r.author[0]}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[pStyles.reviewAuthor, { color: c.text }]}>{r.author}</Text>
+                <Text style={[pStyles.reviewWhen, { color: c.softMuted }]}>{r.when}</Text>
+              </View>
+              <View style={pStyles.reviewStars}>
+                {Array.from({ length: r.rating }).map((_, k) => (
+                  <Ionicons key={k} name="star" size={10} color={c.warning} />
+                ))}
+              </View>
+            </View>
+            <Text style={[pStyles.reviewText, { color: c.sub }]} numberOfLines={3}>{r.text}</Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+const pStyles = StyleSheet.create({
+  /* Shared card */
+  card: { borderRadius: 18, borderWidth: 1, padding: 14, marginBottom: 14 },
+  cardHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 12 },
+  cardTitle: { flex: 1, fontSize: 13, fontFamily: fonts.serif.extra },
+  cardBadge: { fontSize: 9, fontFamily: fonts.sans.bold, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+
+  /* Hot area banner */
+  hotBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  hotDot: { width: 8, height: 8, borderRadius: 4 },
+  hotTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
+  hotSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 1 },
+
+  /* Price insight */
+  insightRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 10, marginTop: 4, borderTopWidth: 1 },
+  insightCat: { width: 56, fontSize: 11, fontFamily: fonts.sans.bold },
+  insightMsg: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 15 },
+  insightDelta: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  insightDeltaText: { fontSize: 11, fontFamily: fonts.sans.bold },
+
+  /* Demand chart */
+  catToggle: { flexDirection: "row", borderRadius: 10, padding: 3, marginBottom: 14 },
+  catToggleBtn: { flex: 1, paddingVertical: 6, alignItems: "center" },
+  catToggleText: { fontSize: 11, fontFamily: fonts.sans.bold },
+  chartRow: { flexDirection: "row", gap: 4, height: 80, alignItems: "flex-end" },
+  barCol: { flex: 1, alignItems: "center", gap: 4 },
+  barTrack: { flex: 1, width: "100%", borderRadius: 4, justifyContent: "flex-end", overflow: "hidden" },
+  barFill: { borderRadius: 4, width: "100%" },
+  barLabel: { fontSize: 8, fontFamily: fonts.sans.regular },
+  chartHint: { fontSize: 10, fontFamily: fonts.sans.regular, marginTop: 8 },
+
+  /* Goals */
+  goalRow: { marginBottom: 12 },
+  goalLabelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 },
+  goalLabel: { fontSize: 12, fontFamily: fonts.sans.semibold },
+  goalValue: { fontSize: 13, fontFamily: fonts.serif.extra },
+  goalTarget: { fontSize: 11, fontFamily: fonts.sans.regular },
+  goalTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
+  goalFill: { height: 6, borderRadius: 3 },
+
+  /* Badges */
+  badge: {
+    width: 80,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 12,
+    alignItems: "center",
+    gap: 4,
+    position: "relative",
+  },
+  badgeEmoji: { fontSize: 22 },
+  badgeLabel: { fontSize: 9, fontFamily: fonts.sans.bold, textAlign: "center" },
+  badgeProgress: { fontSize: 8, fontFamily: fonts.sans.regular },
+  badgeCheck: { position: "absolute", top: 6, right: 6, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+
+  /* Reviews */
+  reviewCard: { width: 220, borderRadius: 14, borderWidth: 1, padding: 12 },
+  reviewHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  reviewAvatar: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  reviewIni: { fontSize: 11, fontFamily: fonts.serif.extra },
+  reviewAuthor: { fontSize: 12, fontFamily: fonts.sans.bold },
+  reviewWhen: { fontSize: 9, fontFamily: fonts.sans.regular, marginTop: 1 },
+  reviewStars: { flexDirection: "row", gap: 1 },
+  reviewText: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 16 },
+});
+
 export default function HomeScreen() {
   const { user, role } = useAuth();
   if (!user) return null;
@@ -516,6 +853,9 @@ function PrestadorHome() {
           ))}
         </View>
 
+        {/* Hot area banner */}
+        <HotAreaBanner onPress={() => router.push("/marketplace")} />
+
         {/* Radar */}
         <View style={[styles.radarCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <View style={styles.radarHead}>
@@ -533,8 +873,20 @@ function PrestadorHome() {
           </View>
         </View>
 
+        {/* Price suggestion */}
+        <PriceSuggestion />
+
+        {/* Demand forecast */}
+        <DemandForecast />
+
         {/* Activity heatmap */}
         <ActivityHeatmap />
+
+        {/* Monthly goals */}
+        <MonthlyGoals />
+
+        {/* Badges */}
+        <BadgeRow />
 
         {/* Active job — only when prestador has accepted/en_route/in_progress */}
         {inProgress ? (
@@ -609,6 +961,9 @@ function PrestadorHome() {
             </Text>
           </View>
         ) : null}
+
+        {/* Recent reviews */}
+        <RecentReviews />
 
         {/* Chip bar */}
         <View style={{ marginTop: 14 }}>

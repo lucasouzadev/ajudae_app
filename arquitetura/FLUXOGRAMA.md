@@ -103,9 +103,9 @@ stateDiagram-v2
     accepted --> en_route : request_update_status\n(prestador a caminho)
     accepted --> cancelled : request_update_status\n(prestador ou cliente)
 
-    en_route --> in_progress : request_update_status\n(prestador chegou ao local)
+    en_route --> in_progress : PIN de Início validado pelo cliente\n(prestador gera 4 dígitos → cliente confirma)
 
-    in_progress --> completed : request_complete_with_otp\n(OTP correto — máx 5 tentativas)
+    in_progress --> completed : request_complete_with_otp\n(PIN de Conclusão correto — máx 5 tentativas)
     in_progress --> disputed : ticket_open\n(problema reportado)
 
     completed --> [*]
@@ -114,7 +114,19 @@ stateDiagram-v2
     disputed --> [*]
 ```
 
-> **Nota OTP:** cada tentativa inválida gera `to_status = 'otp_failed'` em `request_events`. Após 5 falhas, o pedido vai automaticamente para `disputed`.
+> **Sistema Dual-PIN — atualizado 2026-04-26 (aprovado CPO):**
+> O fluxo anterior usava um único OTP de 6 dígitos gerado na criação do pedido e digitado pelo prestador na conclusão.
+> O novo sistema usa **dois PINs independentes de 4 dígitos**, garantindo proteção simétrica:
+>
+> | PIN | Gerado por | Digitado por | Momento | Bloqueia |
+> |---|---|---|---|---|
+> | **PIN de Início** | Prestador (ao chegar) | Cliente | `en_route → in_progress` | Prestador não inicia sem presença do cliente |
+> | **PIN de Conclusão** | Sistema (na criação do pedido) | Prestador | `in_progress → completed` | Prestador não conclui sem autorização do cliente |
+>
+> - PIN de Início: válido por 10 minutos, máximo 3 gerações/hora por prestador
+> - PIN de Conclusão: exibido UMA única vez ao cliente no Modal OTP (Tela 4B), não recuperável
+> - Após 5 tentativas erradas em qualquer PIN: status → `disputed` automaticamente
+> - Todos os erros registrados em `request_events` para auditoria
 
 ---
 
@@ -132,8 +144,8 @@ flowchart TD
     LIST["Lista de Prestadores\nOrdenados por distância e rating\nApenas verificados + online"]
     CREATE["Formulário do Pedido\nEndereço · Descrição\nFotos — máx 5 × 5MB\nPrecisa de ajudante?"]
 
-    EF_CREATE["Edge Function: request_create\n→ Cria pedido com status: requested\n→ Gera OTP de 6 dígitos"]
-    OTP_MODAL["Modal OTP\n🔑 PIN exibido UMA ÚNICA VEZ\nSem botão fechar\nOrientar o cliente a anotar"]
+    EF_CREATE["Edge Function: request_create\n→ Cria pedido com status: requested\n→ Gera PIN de Conclusão (4 dígitos)"]
+    OTP_MODAL["Modal PIN de Conclusão\n🔑 PIN exibido UMA ÚNICA VEZ\nSem botão fechar — cliente deve guardar\nUsado no final para liberar conclusão"]
 
     TRACK["Tela de Acompanhamento\nBarra de status em tempo real\nvia Realtime WebSocket\nInfo do prestador + Telefone"]
 
@@ -192,9 +204,11 @@ flowchart TD
     ACCEPT["request_accept\n→ Status: accepted"]
 
     EN_ROUTE["A Caminho\nrequest_update_status\n→ Status: en_route"]
-    IN_PROG["Chegou ao local\nrequest_update_status\n→ Status: in_progress"]
+    GEN_PIN["Gerar PIN de Início\n4 dígitos — mostrar ao cliente\nVálido por 10 min"]
+    CLIENT_PIN["Cliente digita\nPIN de Início no app"]
+    IN_PROG["PIN validado\nrequest_update_status\n→ Status: in_progress"]
 
-    OTP_INPUT["Digitar OTP do Cliente\n6 dígitos via numpad"]
+    OTP_INPUT["Digitar PIN de Conclusão\n4 dígitos fornecidos pelo cliente\n(gerado na criação do pedido)"]
     OTP_VALID{"OTP\ncorreto?"}
     OTP_FAIL["Tentativa registrada\nem request_events.meta"]
     MAX_FAIL{"5 falhas\natribuídas?"}
@@ -215,7 +229,7 @@ flowchart TD
     HOME --> TOGGLE_ON --> WAIT --> REQ_CARD
     REQ_CARD --> ACCEPT_DEC
     ACCEPT_DEC -- "Não" --> REJECT --> WAIT
-    ACCEPT_DEC -- "Sim" --> ACCEPT --> EN_ROUTE --> IN_PROG --> OTP_INPUT
+    ACCEPT_DEC -- "Sim" --> ACCEPT --> EN_ROUTE --> GEN_PIN --> CLIENT_PIN --> IN_PROG --> OTP_INPUT
 
     OTP_INPUT --> OTP_VALID
     OTP_VALID -- "Sim" --> COMPLETED --> END_OK

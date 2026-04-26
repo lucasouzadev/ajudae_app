@@ -121,24 +121,74 @@
 
 ---
 
-## Tela 4B — Modal OTP (aparece imediatamente após criar pedido)
+## Tela 4B — Sistema de PIN Duplo (atualizado)
 
-**Propósito:** Mostrar o PIN de conclusão ao cliente uma única vez.
+> **Arquitetura aprovada pelo CPO em 2026-04-26.** Substitui o modelo de PIN único de conclusão.
+> Objetivo: proteção simétrica — nenhum lado (cliente ou prestador) tem controle total sobre o outro.
 
-### Layout
+---
 
+### Visão Geral do Fluxo de PIN
+
+| Momento | PIN | Quem gera | Quem digita | Proteção |
+|---|---|---|---|---|
+| **Início do serviço** | PIN de Início (4 dígitos) | Prestador | Cliente | Impede início sem presença do cliente — protege contra cobranças indevidas |
+| **Conclusão do serviço** | PIN de Conclusão (4 dígitos) | Cliente | Prestador | Prestador só recebe confirmação se o cliente liberar — protege contra conclusão forçada |
+
+### Guardas de Transição de Status
+
+Os seguintes bloqueios são obrigatórios no backend (`request_update_status`):
+
+- `requested → accepted`: apenas o prestador pode aceitar. Requer `verified = true`.
+- `accepted → en_route`: apenas o prestador pode avançar. Sem validação de PIN.
+- `en_route → in_progress`: **bloqueado** — requer PIN de Início validado pelo cliente.
+- `in_progress → completed`: **bloqueado** — requer PIN de Conclusão validado pelo prestador.
+- Cliente **não pode** cancelar após `in_progress` sem taxa de deslocamento.
+- Após 5 tentativas erradas em qualquer PIN: status vai para `disputed` automaticamente.
+
+### PIN de Início — Fluxo Detalhado
+
+**Geração (Prestador — Tela P4):**
+- Ao chegar no local (`en_route`), o prestador clica em "Cheguei / Gerar PIN de Início"
+- Sistema gera PIN de 4 dígitos e exibe na tela do prestador
+- Instrução: "Mostre este código ao cliente para iniciar o serviço"
+- PIN válido por 10 minutos. Após expirar: prestador gera novo PIN (máximo 3 tentativas/hora)
+
+**Confirmação (Cliente — Tela 5):**
+- Cliente vê campo "Digite o código que o prestador mostrou" (teclado numérico)
+- Ao confirmar: status avança para `in_progress`
+- Se errar: mensagem "Código incorreto" sem revelar tentativas restantes
+- Proteção anti-fraude: PIN de Início não pode ser o mesmo do último serviço do mesmo prestador
+
+### PIN de Conclusão — Fluxo Detalhado
+
+**Geração (Cliente — Tela 4B / Tela 5):**
+- O PIN de Conclusão é gerado no momento da criação do pedido (Tela 4B — mantido)
+- Exibido uma única vez ao cliente, com instrução: "Guarde este código. Você vai precisar dele no final para confirmar a entrega."
+- **Sem botão de fechar (X).** Usuário precisa clicar em "Entendi, vou guardar."
+- Se o app fechar antes de confirmar: mostrar novamente ao reabrir (enquanto status ≠ `completed`)
+- PIN não pode ser recuperado pelo cliente. Admin pode gerar novo via painel em caso de emergência.
+
+**Confirmação (Prestador — Tela P5):**
+- Ao concluir o serviço, prestador digita o PIN de 4 dígitos fornecido pelo cliente
+- Ao validar: status avança para `completed`, repasse é liberado
+- Erros: mensagem "Código incorreto" sem revelar contagem
+- Após 5 tentativas erradas: `disputed` automático
+
+### Tela 4B — Modal PIN de Conclusão
+
+**Layout:**
 - Fundo escurecido (modal sobre a tela)
 - Título: "Guarde este código!"
 - PIN em destaque (fonte grande, fácil de ler)
 - Texto: "Você vai precisar deste código no final do serviço para confirmar a conclusão."
 - Botão "Entendi, vou guardar"
-- **Sem botão de fechar (X).** Usuário precisa clicar no botão.
 
-### Regras
+### Regras Gerais de PIN
 
-- O PIN **não pode ser recuperado depois.** Se o usuário perder, o Admin pode gerar um novo via painel.
-- PIN exibido apenas uma vez. Após fechar o modal, nunca mais mostrado.
-- Se o usuário fechar o app antes de ver o modal: mostrar novamente ao reabrir (enquanto status != `completed`).
+- Nenhum PIN é enviado por SMS ou email (reduz risco de interceptação)
+- PINs são gerados com entropia criptográfica no backend (não sequenciais)
+- Logs de todas as tentativas em `request_events` para auditoria
 
 ---
 
@@ -442,3 +492,139 @@
 ## Navegação (Bottom Nav — Prestador)
 
 - Home | Histórico | Perfil
+
+---
+
+# FASE 2 — Escopo Aprovado
+
+> **Decisão CPO — 2026-04-26.** Itens abaixo são fora do MVP atual mas têm aprovação formal para a próxima fase.
+
+## Backend / Infraestrutura
+
+### Supabase Realtime
+- Substituir mock state local (`ServiceContext`) por subscriptions reais via Supabase Realtime
+- Canal por pedido: `requests:{request_id}` — escutar `UPDATE`
+- Desinscrever ao sair da tela para evitar vazamento de memória
+- Todos os avanços de status (`advanceStatus`) devem chamar Edge Functions reais em vez de setState local
+
+### Push Notifications
+- **Mobile:** Expo Push (`expo-notifications`) 
+- **Web:** Web Push API (PWA)
+- Eventos que geram push:
+  - Cliente: pedido aceito, prestador a caminho, PIN de Início gerado (alerta para confirmar), serviço concluído, ticket respondido
+  - Prestador: novo pedido disponível (enquanto online), PIN de Início usado pelo cliente, ticket aberto
+- Token de push salvo em `profiles.push_token`
+
+### Edge Functions novas/atualizadas
+- `request_generate_start_pin` — prestador gera PIN de Início ao chegar; retorna PIN + expiry; salvo em `requests.start_pin_hash`
+- `request_validate_start_pin` — cliente valida PIN de Início; avança para `in_progress` se correto
+- Atualizar `request_complete_with_otp` para validar PIN de 4 dígitos (migrar de 6 para 4 dígitos)
+
+## Painel Admin (A1–A5)
+
+### Plataforma
+- Electron Desktop para uso interno (Admin / COO)
+- Também acessível via Web PWA com role `admin`
+
+### Tela A1 — Dashboard
+- Métricas em tempo real: pedidos criados / aceitos / concluídos / cancelados
+- Tickets abertos, prestadores online agora
+- Alertas: tickets sem resposta há mais de 2h (destaque vermelho)
+
+### Tela A2 — Prestadores Pendentes
+- Lista de prestadores com `verified = false`
+- Botões: "Aprovar" / "Reprovar" (reprovar requer motivo obrigatório)
+- Chamar `admin_verify_provider`
+- Meta: responder em até 24h após cadastro
+
+### Tela A3 — Lista de Pedidos
+- Tabela filtrada por status, categoria, data, cliente, prestador
+- Colunas: ID, status (badge colorido), cliente, prestador, categoria, criado em
+
+### Tela A4 — Detalhe do Pedido
+- Todos os dados do pedido + timeline de `request_events`
+- Ações: mudar status manualmente, gerar novo PIN de Conclusão (emergência), bloquear prestador
+- **Nota:** gerar novo PIN de Início não é possível via admin — deve ser re-gerado pelo prestador
+
+### Tela A5 — Fila de Tickets
+- Lista por status: open / in_review / resolved
+- Ações: mudar status, registrar resolução, notas internas (`notes_admin` — não visível ao usuário)
+- Liberar repasse ou estornar pagamento (Fase 2+)
+
+## Rede Ajudaê — Comunidade de Prestadores
+> Ver seção completa no final deste documento (aprovada 2026-04-26).
+
+---
+
+# REDE AJUDAÊ — Comunidade de Prestadores
+
+> **Aprovado pelo CPO em 2026-04-26.**
+> Comunidade exclusiva para prestadores verificados. Objetivo: troca de indicações, parcerias e dicas operacionais sem desviar o foco para comunicação direta ou concorrência interna.
+
+---
+
+## Visão Geral
+
+- Acesso exclusivo: `verified = true` e `role = provider`
+- Canais fixos (não é possível criar novos canais — ever)
+- Sem DM direto entre usuários — contato apenas via criação de serviço na plataforma
+- Moderação via denúncia entre usuários + análise automática de conteúdo de imagem
+
+## Canais Fixos
+
+| Canal | Emoji | Tipo de Post | Exemplo |
+|---|---|---|---|
+| **Indicações** | 🤝 | Estruturado: categoria + bairro + horário | "Frete — Tijuca — Sábado 10h, não consigo pegar. Alguém?" |
+| **Parceiros** | 👥 | Estruturado: tipo de parceria + bairro + data | "Mudança grande sexta, preciso de 1 ajudante — Maracanã" |
+| **Dicas** | 💡 | Texto curto (máximo 200 chars) | "Para eletrodoméstico frágil: cintas cruzadas >>" |
+
+## Estrutura de Post
+
+Posts não são livres — cada canal tem campos fixos obrigatórios (sem textarea livre no MVP):
+
+**Indicações:**
+- Categoria (select: Frete / Mudança / Entrega)
+- Bairro (input)
+- Horário (date/time picker)
+- Observação opcional (máx 100 chars)
+
+**Parceiros:**
+- Tipo (select: Ajudante / Co-executor / Substituição)
+- Bairro (input)
+- Data (date picker)
+- Observação opcional (máx 100 chars)
+
+**Dicas:**
+- Texto livre (máx 200 chars)
+- Foto opcional (1 imagem, jpg/png/webp, máx 5MB)
+
+## Regras de Moderação
+
+- Posts com número de telefone detectado: ocultados automaticamente antes de publicar
+- Posts com links externos (http/https): bloqueados no input
+- Imagens passam por análise de conteúdo (texto visível na imagem é verificado para detectar números/links)
+- Usuários podem denunciar posts (botão "Reportar" em cada post)
+- 3 denúncias distintas → post oculto automaticamente + notificação interna para revisão
+- Prestador com 2 posts removidos por violação → suspenso da Rede por 7 dias
+
+## Interações Permitidas
+
+- Curtir (👍) — visível para todos
+- Comentar — mesmo tipo de campo estruturado do canal (sem textarea livre)
+- Compartilhar para outro canal da Rede (não fora do app)
+
+## Tela R1 — Feed da Rede
+
+### Layout
+
+- Selector de canal no topo (Indicações / Parceiros / Dicas)
+- Feed cronológico reverso
+- Card de post: avatar do prestador (verificado ✓) + campo estruturado + hora relativa + contador de curtidas
+- Botão flutuante "+" para criar post no canal ativo
+
+### Regras
+
+- Apenas prestadores verificados veem e interagem com a Rede
+- Clientes não têm acesso a esta seção
+- Post próprio: botão "Excluir" disponível (sem edição — exclui e recria)
+- Feed não tem busca no MVP
