@@ -30,7 +30,7 @@ function ChipBar({ onService, onInbox, onMarketplace, badgeColor = "#FF5500" }: 
         <Text style={chipStyles.label}>Serviço</Text>
       </Pressable>
       <Pressable onPress={onInbox} style={[chipStyles.chip, { backgroundColor: c.card, borderColor: c.border }, shadows.md]}>
-        <Ionicons name="mail" size={13} color={c.text} />
+        <Ionicons name="chatbubbles" size={13} color={c.text} />
         <Text style={chipStyles.label}>Inbox</Text>
         <View style={[chipStyles.badge, { backgroundColor: badgeColor }]}>
           <Text style={chipStyles.badgeText}>2</Text>
@@ -177,7 +177,7 @@ function ClienteHome() {
       <View style={[styles.actionChipsWrap, { bottom: 198 + insets.bottom }]}>
         <ChipBar
           onService={() => router.push("/request")}
-          onInbox={() => router.push("/support")}
+          onInbox={() => router.push("/inbox")}
           onMarketplace={() => router.push("/marketplace")}
         />
       </View>
@@ -409,7 +409,7 @@ function PrestadorHome() {
         <View style={{ marginTop: 14 }}>
           <ChipBar
             onService={() => router.push("/request")}
-            onInbox={() => router.push("/support")}
+            onInbox={() => router.push("/inbox")}
             onMarketplace={() => router.push("/marketplace")}
             badgeColor={c.blue}
           />

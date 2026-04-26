@@ -53,6 +53,7 @@ function AuthGate() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="marketplace" options={{ headerShown: false }} />
+      <Stack.Screen name="inbox" options={{ headerShown: false }} />
       <Stack.Screen name="support" options={{ headerShown: false }} />
       <Stack.Screen name="provider/[id]" options={{ presentation: "card" }} />
       <Stack.Screen name="payment" options={{ presentation: "modal" }} />
