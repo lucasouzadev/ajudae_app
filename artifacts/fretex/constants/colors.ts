@@ -1,19 +1,19 @@
 const palette = {
-  primary: "#FF5500",
-  primaryLight: "#FFF0EB",
-  primaryMid: "#FFD4C2",
-  primaryDeep: "#FF8C5A",
+  primary: "#FFCC00",
+  primaryLight: "#FFFBE0",
+  primaryMid: "#FFE566",
+  primaryDeep: "#E8B400",
 
-  bg: "#F7F5F2",
-  bgDeep: "#E2DDD8",
+  bg: "#F8F5EC",
+  bgDeep: "#EDE8DA",
   white: "#FFFFFF",
 
-  text: "#1C1917",
-  sub: "#78716C",
-  muted: "#A8A29E",
+  text: "#1A1714",
+  sub: "#6B6259",
+  muted: "#A39B90",
 
-  border: "#EBEBEB",
-  borderLight: "#F2F0EE",
+  border: "#E8E3D8",
+  borderLight: "#F0EDE4",
 
   success: "#16A34A",
   successLight: "#DCFCE7",

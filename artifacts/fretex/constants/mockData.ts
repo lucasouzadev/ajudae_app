@@ -31,7 +31,7 @@ export interface Provider {
 }
 
 export const CATEGORY_COLORS: Record<Category, string> = {
-  Mudança: "#FF5500",
+  Mudança: "#FFCC00",
   Frete: "#2563EB",
   Entrega: "#16A34A",
 };
@@ -52,7 +52,7 @@ export const MOCK_PROVIDERS: Provider[] = [
     priceFrom: 89,
     lat: 28,
     lng: 20,
-    color: "#FF5500",
+    color: "#FFCC00",
     area: "Tijuca",
     km: 2.4,
     helpers: 2,
@@ -196,7 +196,7 @@ export const MOCK_PROVIDERS: Provider[] = [
     priceFrom: 180,
     lat: 62,
     lng: 34,
-    color: "#D97706",
+    color: "#FFCC00",
     area: "Barra",
     km: 9.2,
     helpers: 3,

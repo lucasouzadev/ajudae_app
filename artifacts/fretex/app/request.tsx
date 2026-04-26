@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { View, StyleSheet, Text, ScrollView, TextInput, Pressable, Switch, Image } from "react-native";
+import { View, StyleSheet, Text, ScrollView, TextInput, Pressable, Switch, Image, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -114,6 +114,11 @@ export default function RequestFlowScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Pressable onPress={handleBack} style={[styles.iconBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
@@ -178,6 +183,8 @@ export default function RequestFlowScreen() {
                   placeholderTextColor={c.softMuted}
                   value={origin}
                   onChangeText={setOrigin}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
                 />
                 <Text style={[styles.label, { color: c.softMuted, marginTop: 16 }]}>DESTINO (OPCIONAL)</Text>
                 <TextInput
@@ -186,6 +193,8 @@ export default function RequestFlowScreen() {
                   placeholderTextColor={c.softMuted}
                   value={destination}
                   onChangeText={setDestination}
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
                 />
               </View>
             </View>
@@ -216,6 +225,9 @@ export default function RequestFlowScreen() {
               numberOfLines={4}
               value={description}
               onChangeText={setDescription}
+              returnKeyType="done"
+              blurOnSubmit
+              onSubmitEditing={Keyboard.dismiss}
             />
             <Text style={[styles.helper, { color: description.length >= 10 ? c.softMuted : c.destructive }]}>
               {description.length}/300 · mínimo 10 caracteres
@@ -360,6 +372,8 @@ export default function RequestFlowScreen() {
         />
       </View>
     </View>
+    </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 

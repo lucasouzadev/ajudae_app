@@ -16,6 +16,153 @@ import { ProviderPin } from "@/components/ProviderPin";
 import { Chip } from "@/components/Chip";
 import { ProviderModal } from "@/components/ProviderModal";
 
+/* ─── Activity Heatmap ───────────────────────────────────────────────── */
+const WEEKS = 12;
+const DAYS = 7;
+const CELL = 14;
+const CELL_GAP = 3;
+
+function generateActivityData(): { count: number; day: Date }[] {
+  const today = new Date();
+  const cells: { count: number; day: Date }[] = [];
+  for (let w = WEEKS - 1; w >= 0; w--) {
+    for (let d = 0; d < DAYS; d++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (w * DAYS + (DAYS - 1 - d)));
+      const rand = Math.random();
+      const count = rand < 0.25 ? 0 : rand < 0.55 ? 1 : rand < 0.75 ? 2 : rand < 0.9 ? 3 : 4;
+      cells.push({ count, day: date });
+    }
+  }
+  return cells;
+}
+
+const ACTIVITY_DATA = generateActivityData();
+
+const BEST_HOURS = [
+  { hour: "08h–10h", score: 87, label: "Frete" },
+  { hour: "13h–15h", score: 73, label: "Mudança" },
+  { hour: "17h–19h", score: 65, label: "Entrega" },
+];
+
+function ActivityHeatmap() {
+  const c = colors.light;
+  const cellColor = (count: number) => {
+    if (count === 0) return c.border;
+    if (count === 1) return `${c.primary}55`;
+    if (count === 2) return `${c.primary}99`;
+    if (count === 3) return c.primary;
+    return c.primaryDeep;
+  };
+
+  const totalServices = ACTIVITY_DATA.reduce((s, d) => s + (d.count > 0 ? d.count : 0), 0);
+  const activeDays = ACTIVITY_DATA.filter((d) => d.count > 0).length;
+  const streak = (() => {
+    let s = 0;
+    for (let i = ACTIVITY_DATA.length - 1; i >= 0; i--) {
+      if (ACTIVITY_DATA[i].count > 0) s++;
+      else break;
+    }
+    return s;
+  })();
+
+  return (
+    <View style={[heatStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+      <View style={heatStyles.head}>
+        <Text style={[heatStyles.title, { color: c.text }]}>Atividade</Text>
+        <Text style={[heatStyles.sub, { color: c.sub }]}>últimas {WEEKS} semanas</Text>
+      </View>
+
+      {/* Stats row */}
+      <View style={heatStyles.statsRow}>
+        <View style={[heatStyles.statPill, { backgroundColor: `${c.primary}22` }]}>
+          <Text style={[heatStyles.statVal, { color: "#8B6F00" }]}>{totalServices}</Text>
+          <Text style={[heatStyles.statLbl, { color: c.sub }]}>serviços</Text>
+        </View>
+        <View style={[heatStyles.statPill, { backgroundColor: c.blueLight }]}>
+          <Text style={[heatStyles.statVal, { color: c.blue }]}>{activeDays}</Text>
+          <Text style={[heatStyles.statLbl, { color: c.sub }]}>dias ativos</Text>
+        </View>
+        <View style={[heatStyles.statPill, { backgroundColor: c.successLight }]}>
+          <Text style={[heatStyles.statVal, { color: c.success }]}>{streak}</Text>
+          <Text style={[heatStyles.statLbl, { color: c.sub }]}>sequência</Text>
+        </View>
+      </View>
+
+      {/* Grid */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+        <View style={{ flexDirection: "row", gap: CELL_GAP }}>
+          {Array.from({ length: WEEKS }).map((_, w) => (
+            <View key={w} style={{ flexDirection: "column", gap: CELL_GAP }}>
+              {Array.from({ length: DAYS }).map((_, d) => {
+                const cell = ACTIVITY_DATA[w * DAYS + d];
+                return (
+                  <View
+                    key={d}
+                    style={[
+                      heatStyles.cell,
+                      { backgroundColor: cellColor(cell?.count ?? 0), width: CELL, height: CELL },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Legend */}
+      <View style={heatStyles.legend}>
+        <Text style={[heatStyles.legendText, { color: c.softMuted }]}>Menos</Text>
+        {[0, 1, 2, 3, 4].map((v) => (
+          <View key={v} style={[heatStyles.legendCell, { backgroundColor: cellColor(v) }]} />
+        ))}
+        <Text style={[heatStyles.legendText, { color: c.softMuted }]}>Mais</Text>
+      </View>
+
+      {/* Best hours report */}
+      <View style={[heatStyles.divider, { backgroundColor: c.border }]} />
+      <Text style={[heatStyles.reportTitle, { color: c.text }]}>Melhores horários</Text>
+      {BEST_HOURS.map((h) => (
+        <View key={h.hour} style={heatStyles.hourRow}>
+          <Text style={[heatStyles.hourLabel, { color: c.text }]}>{h.hour}</Text>
+          <View style={[heatStyles.hourBar, { backgroundColor: c.border }]}>
+            <View style={[heatStyles.hourFill, { width: `${h.score}%` as any, backgroundColor: c.primary }]} />
+          </View>
+          <Text style={[heatStyles.hourScore, { color: "#8B6F00" }]}>{h.score}%</Text>
+          <View style={[heatStyles.hourCat, { backgroundColor: `${c.blue}18` }]}>
+            <Text style={[heatStyles.hourCatText, { color: c.blue }]}>{h.label}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const heatStyles = StyleSheet.create({
+  card: { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 16 },
+  head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  title: { fontSize: 14, fontFamily: fonts.serif.extra },
+  sub: { fontSize: 11, fontFamily: fonts.sans.regular },
+  statsRow: { flexDirection: "row", gap: 8 },
+  statPill: { flex: 1, borderRadius: 12, padding: 8, alignItems: "center" },
+  statVal: { fontSize: 15, fontFamily: fonts.serif.extra },
+  statLbl: { fontSize: 9, fontFamily: fonts.sans.regular, marginTop: 2 },
+  cell: { borderRadius: 3 },
+  legend: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
+  legendText: { fontSize: 9, fontFamily: fonts.sans.regular },
+  legendCell: { width: 10, height: 10, borderRadius: 2 },
+  divider: { height: 1, marginVertical: 14 },
+  reportTitle: { fontSize: 12, fontFamily: fonts.sans.bold, marginBottom: 10 },
+  hourRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  hourLabel: { width: 72, fontSize: 11, fontFamily: fonts.sans.semibold },
+  hourBar: { flex: 1, height: 6, borderRadius: 3, overflow: "hidden" },
+  hourFill: { height: 6, borderRadius: 3 },
+  hourScore: { width: 34, fontSize: 11, fontFamily: fonts.sans.bold, textAlign: "right" },
+  hourCat: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
+  hourCatText: { fontSize: 9, fontFamily: fonts.sans.bold },
+});
+
 export default function HomeScreen() {
   const { user, role } = useAuth();
   if (!user) return null;
@@ -386,6 +533,9 @@ function PrestadorHome() {
           </View>
         </View>
 
+        {/* Activity heatmap */}
+        <ActivityHeatmap />
+
         {/* Active job — only when prestador has accepted/en_route/in_progress */}
         {inProgress ? (
           <Pressable onPress={() => router.push("/job")}>
@@ -609,7 +759,7 @@ const styles = StyleSheet.create({
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
 const SCREEN_H = Dimensions.get("window").height;
-const COLLAPSED_H = 196;
+const COLLAPSED_H = 76;   // only handle + subtitle visible — no overlap with filters
 const EXPANDED_H = Math.min(SCREEN_H * 0.78, 640);
 
 function ProvidersSheet({
