@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -201,47 +201,18 @@ function ClienteHome() {
         ))}
       </ScrollView>
 
-      {/* Bottom sheet */}
-      <View style={[styles.sheet, { backgroundColor: c.card, paddingBottom: insets.bottom }, shadows.xl]}>
-        <View style={[styles.sheetHandle, { backgroundColor: "#D6D3D1" }]} />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 18, gap: 10 }}
-        >
-          {filtered.map((p) => (
-            <Pressable
-              key={p.id}
-              onPress={() => {
-                setActive(p);
-                setModalProvider(p);
-              }}
-              style={[
-                styles.providerMiniCard,
-                {
-                  backgroundColor: c.background,
-                  borderColor: active?.id === p.id ? p.color : c.borderLight,
-                },
-              ]}
-            >
-              <View style={styles.providerMiniHead}>
-                <View style={[styles.providerMiniIcon, { backgroundColor: `${p.color}18` }]}>
-                  {p.cat === "Mudança" ? (
-                    <Ionicons name="home" size={12} color={p.color} />
-                  ) : p.cat === "Frete" ? (
-                    <MaterialCommunityIcons name="truck" size={13} color={p.color} />
-                  ) : (
-                    <Ionicons name="cube" size={12} color={p.color} />
-                  )}
-                </View>
-                <Text style={[styles.providerMiniPrice, { color: p.color }]}>{p.price}</Text>
-              </View>
-              <Text style={[styles.providerMiniName, { color: c.text }]}>{p.name}</Text>
-              <Text style={[styles.providerMiniMeta, { color: c.softMuted }]}>★ {p.rating} · {p.vehicle}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
+      {/* Bottom draggable sheet */}
+      <ProvidersSheet
+        providers={filtered}
+        active={active}
+        onSelect={(p) => {
+          setActive(p);
+          setModalProvider(p);
+        }}
+        onOpenProfile={(p) => router.push(`/provider/${p.id}`)}
+        onSeeAll={() => router.push("/marketplace")}
+        insetsBottom={insets.bottom}
+      />
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
       <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Cliente"} initials={initials} />
@@ -463,18 +434,8 @@ const styles = StyleSheet.create({
   activeRequestText: { color: "#fff", fontSize: 13, fontFamily: fonts.sans.bold },
   actionChipsWrap: { position: "absolute", right: 16, zIndex: 33 },
   filtersWrap: { position: "absolute", left: 0, right: 0, zIndex: 32, maxHeight: 40 },
-  sheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    zIndex: 31,
-  },
-  sheetHandle: { width: 34, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 8 },
   providerMiniCard: {
-    width: 140,
+    width: 150,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1.5,
@@ -539,4 +500,250 @@ const styles = StyleSheet.create({
   requestRefuseText: { fontSize: 12, fontFamily: fonts.sans.semibold },
   requestAccept: { flex: 2, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   requestAcceptText: { color: "#fff", fontSize: 13, fontFamily: fonts.sans.bold },
+});
+
+/* ─── Draggable providers sheet ─────────────────────────────────────── */
+const SCREEN_H = Dimensions.get("window").height;
+const COLLAPSED_H = 196;
+const EXPANDED_H = Math.min(SCREEN_H * 0.78, 640);
+
+function ProvidersSheet({
+  providers,
+  active,
+  onSelect,
+  onOpenProfile,
+  onSeeAll,
+  insetsBottom,
+}: {
+  providers: Provider[];
+  active: Provider | null;
+  onSelect: (p: Provider) => void;
+  onOpenProfile: (p: Provider) => void;
+  onSeeAll: () => void;
+  insetsBottom: number;
+}) {
+  const c = colors.light;
+  const heightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
+  const startH = useRef(COLLAPSED_H);
+  const [expanded, setExpanded] = useState(false);
+
+  const snap = (target: number) => {
+    Animated.spring(heightAnim, {
+      toValue: target,
+      tension: 70,
+      friction: 13,
+      useNativeDriver: false,
+    }).start();
+    startH.current = target;
+    setExpanded(target === EXPANDED_H);
+  };
+
+  const responder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderGrant: () => {
+        // capture current animated value
+        // @ts-expect-error access internal
+        startH.current = (heightAnim as any)._value ?? startH.current;
+        heightAnim.stopAnimation();
+      },
+      onPanResponderMove: (_, g) => {
+        const next = Math.max(COLLAPSED_H, Math.min(EXPANDED_H, startH.current - g.dy));
+        heightAnim.setValue(next);
+      },
+      onPanResponderRelease: (_, g) => {
+        const mid = (COLLAPSED_H + EXPANDED_H) / 2;
+        // @ts-expect-error access internal
+        const value = (heightAnim as any)._value ?? startH.current;
+        const target = g.vy < -0.5 ? EXPANDED_H : g.vy > 0.5 ? COLLAPSED_H : value > mid ? EXPANDED_H : COLLAPSED_H;
+        snap(target);
+      },
+    }),
+  ).current;
+
+  const toggle = () => snap(expanded ? COLLAPSED_H : EXPANDED_H);
+
+  return (
+    <Animated.View
+      style={[
+        sheetStyles.sheet,
+        { backgroundColor: c.card, height: heightAnim, paddingBottom: insetsBottom },
+        shadows.xl,
+      ]}
+    >
+      {/* Drag header */}
+      <View {...responder.panHandlers} style={sheetStyles.header}>
+        <View style={[sheetStyles.handle, { backgroundColor: "#D6D3D1" }]} />
+        <View style={sheetStyles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[sheetStyles.headerTitle, { color: c.text }]}>
+              {expanded ? "Prestadores na sua área" : "Perto de você"}
+            </Text>
+            <Text style={[sheetStyles.headerSub, { color: c.softMuted }]}>
+              {providers.length} disponíveis · {expanded ? "deslize para baixo" : "puxe para ver lista"}
+            </Text>
+          </View>
+          <Pressable onPress={toggle} style={[sheetStyles.toggleBtn, { backgroundColor: c.background, borderColor: c.borderLight }]}>
+            <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={16} color={c.text} />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Body — list when expanded, carousel when collapsed */}
+      {expanded ? (
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {providers.map((p) => (
+            <Pressable
+              key={p.id}
+              onPress={() => onOpenProfile(p)}
+              style={[
+                sheetStyles.listRow,
+                {
+                  backgroundColor: c.background,
+                  borderColor: active?.id === p.id ? p.color : c.borderLight,
+                  borderWidth: active?.id === p.id ? 2 : 1,
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={[p.color, `${p.color}AA`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={sheetStyles.listAvatar}
+              >
+                <Text style={sheetStyles.listIni}>{p.ini}</Text>
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <View style={sheetStyles.listHeadRow}>
+                  <Text style={[sheetStyles.listName, { color: c.text }]} numberOfLines={1}>{p.name}</Text>
+                  {p.isOnline ? (
+                    <View style={[sheetStyles.onlineDot, { backgroundColor: c.success }]} />
+                  ) : null}
+                </View>
+                <View style={sheetStyles.listMeta}>
+                  <View style={[sheetStyles.catTag, { backgroundColor: `${p.color}18` }]}>
+                    {p.cat === "Mudança" ? (
+                      <Ionicons name="home" size={9} color={p.color} />
+                    ) : p.cat === "Frete" ? (
+                      <MaterialCommunityIcons name="truck" size={10} color={p.color} />
+                    ) : (
+                      <Ionicons name="cube" size={9} color={p.color} />
+                    )}
+                    <Text style={[sheetStyles.catTxt, { color: p.color }]}>{p.cat}</Text>
+                  </View>
+                  <Ionicons name="star" size={10} color={c.warning} />
+                  <Text style={[sheetStyles.metaTxt, { color: c.warning }]}>{p.rating}</Text>
+                  <Text style={[sheetStyles.metaTxt, { color: c.softMuted }]}>·</Text>
+                  <Text style={[sheetStyles.metaTxt, { color: c.sub }]}>{p.km} km</Text>
+                  <Text style={[sheetStyles.metaTxt, { color: c.softMuted }]}>·</Text>
+                  <Text style={[sheetStyles.metaTxt, { color: c.sub }]}>{p.area}</Text>
+                </View>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={[sheetStyles.listPrice, { color: p.color }]}>{p.price}</Text>
+                <Text style={[sheetStyles.listPriceSub, { color: c.softMuted }]}>desde</Text>
+              </View>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={onSeeAll}
+            style={[sheetStyles.seeAll, { backgroundColor: c.background, borderColor: c.borderLight }]}
+          >
+            <Text style={[sheetStyles.seeAllTxt, { color: c.text }]}>Ver tudo no Marketplace</Text>
+            <Ionicons name="arrow-forward" size={14} color={c.text} />
+          </Pressable>
+        </ScrollView>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 18, gap: 10 }}
+        >
+          {providers.map((p) => (
+            <Pressable
+              key={p.id}
+              onPress={() => onSelect(p)}
+              style={[
+                styles.providerMiniCard,
+                {
+                  backgroundColor: c.background,
+                  borderColor: active?.id === p.id ? p.color : c.borderLight,
+                },
+              ]}
+            >
+              <View style={styles.providerMiniHead}>
+                <View style={[styles.providerMiniIcon, { backgroundColor: `${p.color}18` }]}>
+                  {p.cat === "Mudança" ? (
+                    <Ionicons name="home" size={12} color={p.color} />
+                  ) : p.cat === "Frete" ? (
+                    <MaterialCommunityIcons name="truck" size={13} color={p.color} />
+                  ) : (
+                    <Ionicons name="cube" size={12} color={p.color} />
+                  )}
+                </View>
+                <Text style={[styles.providerMiniPrice, { color: p.color }]}>{p.price}</Text>
+              </View>
+              <Text style={[styles.providerMiniName, { color: c.text }]} numberOfLines={1}>{p.name}</Text>
+              <Text style={[styles.providerMiniMeta, { color: c.softMuted }]}>★ {p.rating} · {p.vehicle}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+    </Animated.View>
+  );
+}
+
+const sheetStyles = StyleSheet.create({
+  sheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    zIndex: 31,
+    overflow: "hidden",
+  },
+  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
+  handle: { width: 38, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  headerTitle: { fontSize: 14, fontFamily: fonts.sans.bold },
+  headerSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  toggleBtn: { width: 32, height: 32, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+
+  listRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 8,
+  },
+  listAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  listIni: { color: "#fff", fontSize: 13, fontFamily: fonts.serif.extra },
+  listHeadRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  listName: { flex: 1, fontSize: 13, fontFamily: fonts.sans.bold },
+  onlineDot: { width: 7, height: 7, borderRadius: 4 },
+  listMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap" },
+  catTag: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
+  catTxt: { fontSize: 9, fontFamily: fonts.sans.bold },
+  metaTxt: { fontSize: 10, fontFamily: fonts.sans.semibold },
+  listPrice: { fontSize: 14, fontFamily: fonts.serif.extra },
+  listPriceSub: { fontSize: 9, fontFamily: fonts.sans.regular, marginTop: 1 },
+
+  seeAll: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  seeAllTxt: { fontSize: 13, fontFamily: fonts.sans.bold },
 });
