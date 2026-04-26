@@ -198,6 +198,25 @@ export default function TrackScreen() {
           </View>
         ) : null}
 
+        {/* PIN de Início banner — shown when provider has arrived and generated the start PIN */}
+        {active.status === "en_route" && active.startPin ? (
+          <Pressable
+            onPress={() => router.push("/confirm-start-pin")}
+            style={[styles.startPinBanner, { backgroundColor: c.primary, borderColor: "#E8B400" }, shadows.md]}
+          >
+            <View style={styles.startPinLeft}>
+              <View style={styles.startPinDot} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.startPinTitle}>Prestador chegou!</Text>
+                <Text style={styles.startPinSub}>Confirme o PIN de Início para começar o serviço</Text>
+              </View>
+            </View>
+            <View style={styles.startPinArrow}>
+              <Ionicons name="arrow-forward" size={16} color="#1A1714" />
+            </View>
+          </Pressable>
+        ) : null}
+
         {/* Route */}
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <Text style={[styles.sectionLabel, { color: c.softMuted }]}>ENDEREÇOS</Text>
@@ -427,6 +446,20 @@ const styles = StyleSheet.create({
   tlBar: { width: 2, flex: 1, marginTop: 2 },
   tlSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2, lineHeight: 15 },
 
+  startPinBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginTop: 12,
+    gap: 0,
+  },
+  startPinLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  startPinDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#1A1714", opacity: 0.6 },
+  startPinTitle: { fontSize: 14, fontFamily: fonts.sans.bold, color: "#1A1714" },
+  startPinSub: { fontSize: 11, fontFamily: fonts.sans.medium, color: "#1A1714", opacity: 0.7, marginTop: 1 },
+  startPinArrow: { width: 32, height: 32, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.1)", alignItems: "center", justifyContent: "center" },
   hintBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", padding: 10, borderRadius: 12, borderWidth: 1, marginTop: 14 },
   hintTxt: { flex: 1, fontSize: 11, fontFamily: fonts.sans.medium },
 

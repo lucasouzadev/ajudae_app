@@ -7,7 +7,11 @@ interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: Role;
+  onboardingCompleted: boolean;
+  gpsGranted?: boolean;
+  verified?: boolean;
 }
 
 interface AuthContextType {
@@ -17,6 +21,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, senha: string) => Promise<void>;
   signup: (nome: string, email: string, telefone: string, senha: string, role: Role) => Promise<void>;
+  completeOnboarding: (name: string, phone: string, gpsGranted: boolean) => Promise<void>;
   logout: () => Promise<void>;
   switchRole: (newRole: Role) => Promise<void>;
 }
@@ -48,18 +53,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, senha: string) => {
-    // Mock login
-    const mockUser: User = { id: '1', name: 'João Silva', email, role: 'cliente' };
+    const mockUser: User = { id: '1', name: 'João Silva', email, role: 'cliente', onboardingCompleted: true };
     await AsyncStorage.setItem('@fretex_user', JSON.stringify(mockUser));
     setUser(mockUser);
     setRole('cliente');
   };
 
   const signup = async (nome: string, email: string, telefone: string, senha: string, role: Role) => {
-    const mockUser: User = { id: '2', name: nome, email, role };
+    const mockUser: User = { id: '2', name: nome, email, role, onboardingCompleted: false, verified: role === 'cliente' };
     await AsyncStorage.setItem('@fretex_user', JSON.stringify(mockUser));
     setUser(mockUser);
     setRole(role);
+  };
+
+  const completeOnboarding = async (name: string, phone: string, gpsGranted: boolean) => {
+    if (!user) return;
+    const updated: User = { ...user, name, phone, gpsGranted, onboardingCompleted: true };
+    await AsyncStorage.setItem('@fretex_user', JSON.stringify(updated));
+    setUser(updated);
   };
 
   const logout = async () => {
@@ -85,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         signup,
+        completeOnboarding,
         logout,
         switchRole,
       }}

@@ -506,13 +506,39 @@ export default function HomeScreen() {
   return role === "cliente" ? <ClienteHome /> : <PrestadorHome />;
 }
 
-function ChipBar({ onService, onInbox, onMarketplace, badgeColor = "#FF5500" }: { onService: () => void; onInbox: () => void; onMarketplace: () => void; badgeColor?: string }) {
+function ChipBar({
+  onService,
+  onInbox,
+  onMarketplace,
+  badgeColor = "#FF5500",
+  serviceLabel = "Serviço",
+  serviceActive = false,
+}: {
+  onService: () => void;
+  onInbox: () => void;
+  onMarketplace: () => void;
+  badgeColor?: string;
+  serviceLabel?: string;
+  serviceActive?: boolean;
+}) {
   const c = colors.light;
   return (
     <View style={chipStyles.row}>
-      <Pressable onPress={onService} style={[chipStyles.chip, { backgroundColor: c.card, borderColor: c.border }, shadows.md]}>
-        <MaterialCommunityIcons name="truck" size={14} color={c.text} />
-        <Text style={chipStyles.label}>Serviço</Text>
+      <Pressable
+        onPress={onService}
+        style={[
+          chipStyles.chip,
+          serviceActive
+            ? { backgroundColor: c.primary, borderColor: "#E8B400" }
+            : { backgroundColor: c.card, borderColor: c.border },
+          shadows.md,
+        ]}
+      >
+        <MaterialCommunityIcons name="truck" size={14} color={serviceActive ? "#1A1714" : c.text} />
+        <Text style={[chipStyles.label, { color: serviceActive ? "#1A1714" : "#1C1917" }]}>{serviceLabel}</Text>
+        {serviceActive && (
+          <View style={[chipStyles.activeDot, { backgroundColor: "#1A1714" }]} />
+        )}
       </Pressable>
       <Pressable onPress={onInbox} style={[chipStyles.chip, { backgroundColor: c.card, borderColor: c.border }, shadows.md]}>
         <Ionicons name="chatbubbles" size={13} color={c.text} />
@@ -543,6 +569,7 @@ const chipStyles = StyleSheet.create({
   label: { fontSize: 12, fontFamily: fonts.sans.bold, color: "#1C1917" },
   badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
   badgeText: { color: "#fff", fontSize: 9, fontFamily: fonts.sans.extra },
+  activeDot: { width: 7, height: 7, borderRadius: 4 },
 });
 
 /* ─── ClienteHome ─────────────────────────────────────────────────────── */
@@ -662,13 +689,15 @@ function ClienteHome() {
       {/* Active service tracking banner */}
       {activeService && activeService.status !== "completed" && activeService.status !== "cancelled" ? (
         <Pressable
-          onPress={() => router.push("/track")}
+          onPress={() => router.push(activeService.status === "en_route" && activeService.startPin ? "/confirm-start-pin" : "/track")}
           style={[
             styles.trackBanner,
             {
               top: insets.top + 70,
               backgroundColor:
-                activeService.category === "Mudança"
+                activeService.status === "en_route" && activeService.startPin
+                  ? c.primary
+                  : activeService.category === "Mudança"
                   ? c.primary
                   : activeService.category === "Frete"
                   ? c.blue
@@ -679,9 +708,15 @@ function ClienteHome() {
         >
           <View style={styles.trackPulse} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.trackEyebrow}>ACOMPANHAR PEDIDO · #{activeService.id.slice(-6).toUpperCase()}</Text>
-            <Text style={styles.trackTitle}>
-              {activeService.status === "requested"
+            <Text style={[styles.trackEyebrow, { color: activeService.status === "en_route" && activeService.startPin ? "#1A1714" : "#fff", opacity: 0.75 }]}>
+              {activeService.status === "en_route" && activeService.startPin
+                ? "AÇÃO NECESSÁRIA"
+                : `ACOMPANHAR · #${activeService.id.slice(-6).toUpperCase()}`}
+            </Text>
+            <Text style={[styles.trackTitle, { color: activeService.status === "en_route" && activeService.startPin ? "#1A1714" : "#fff" }]}>
+              {activeService.status === "en_route" && activeService.startPin
+                ? "Prestador chegou! Confirme o PIN →"
+                : activeService.status === "requested"
                 ? "Aguardando prestador aceitar"
                 : activeService.status === "accepted"
                 ? `${activeService.providerName || "Prestador"} aceitou`
@@ -694,14 +729,25 @@ function ClienteHome() {
                 : activeService.category}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#fff" />
+          <Ionicons name="chevron-forward" size={16} color={activeService.status === "en_route" && activeService.startPin ? "#1A1714" : "#fff"} />
         </Pressable>
       ) : null}
 
       {/* Chip buttons */}
       <View style={[styles.actionChipsWrap, { bottom: 198 + insets.bottom }]}>
         <ChipBar
-          onService={() => router.push(activeService && activeService.status !== "completed" && activeService.status !== "cancelled" ? "/track" : "/request")}
+          serviceLabel="Pedidos"
+          serviceActive={!!(activeService && activeService.status !== "completed" && activeService.status !== "cancelled")}
+          onService={() => {
+            const hasActive = activeService && activeService.status !== "completed" && activeService.status !== "cancelled";
+            if (hasActive && activeService.status === "en_route" && activeService.startPin) {
+              router.push("/confirm-start-pin");
+            } else if (hasActive) {
+              router.push("/track");
+            } else {
+              router.push("/request");
+            }
+          }}
           onInbox={() => router.push("/inbox")}
           onMarketplace={() => router.push("/marketplace")}
         />
@@ -978,6 +1024,7 @@ function PrestadorHome() {
             onInbox={() => router.push("/inbox")}
             onMarketplace={() => router.push("/marketplace")}
             badgeColor={c.blue}
+            serviceActive={!!(inProgress || incoming)}
           />
         </View>
       </ScrollView>

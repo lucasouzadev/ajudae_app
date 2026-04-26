@@ -8,10 +8,10 @@ import * as Haptics from "expo-haptics";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useService } from "@/contexts/ServiceContext";
 
-export default function JobOtpScreen() {
+export default function ConfirmStartPinScreen() {
   const c = colors.light;
   const insets = useSafeAreaInsets();
-  const { active, completeWithOtp } = useService();
+  const { active, validateStartPin } = useService();
   const [digits, setDigits] = useState(["", "", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -33,25 +33,29 @@ export default function JobOtpScreen() {
   };
 
   const handleKey = (i: number, key: string) => {
-    if (key === "Backspace" && !digits[i] && i > 0) inputs.current[i - 1]?.focus();
+    if (key === "Backspace" && !digits[i] && i > 0) {
+      inputs.current[i - 1]?.focus();
+    }
   };
 
   const submit = async () => {
     if (!complete || submitting) return;
     setSubmitting(true);
     Keyboard.dismiss();
-    const result = await completeWithOtp(code);
+    const result = await validateStartPin(code);
     if (result.ok) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      setTimeout(() => router.replace("/"), 600);
-    } else if (result.disputed) {
+      router.replace("/track");
+    } else if (result.expired) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-      setError("Pedido em disputa após 5 tentativas. Entre em contato com o suporte.");
-      setTimeout(() => router.replace("/"), 1800);
+      setError("Este PIN expirou. Peça ao prestador para gerar um novo.");
+      setDigits(["", "", "", ""]);
+      inputs.current[0]?.focus();
+      setSubmitting(false);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-      setError(`Código incorreto. Tente novamente.`);
-      setDigits(["", "", "", "", "", ""]);
+      setError("Código incorreto. Confirme com o prestador e tente novamente.");
+      setDigits(["", "", "", ""]);
       inputs.current[0]?.focus();
       setSubmitting(false);
     }
@@ -60,21 +64,22 @@ export default function JobOtpScreen() {
   if (!active) {
     return (
       <View style={[styles.wrap, { backgroundColor: c.background, paddingTop: insets.top + 60 }]}>
-        <Text style={[styles.title, { color: c.text }]}>Sem serviço ativo</Text>
+        <Text style={[styles.title, { color: c.text }]}>Nenhum pedido ativo</Text>
         <Pressable onPress={() => router.replace("/")} style={[styles.btn, { backgroundColor: c.primary, marginTop: 20 }]}>
-          <Text style={styles.btnTxt}>Voltar</Text>
+          <Text style={[styles.btnTxt, { color: "#1A1714" }]}>Voltar</Text>
         </Pressable>
       </View>
     );
   }
 
   return (
-    <View style={[styles.wrap, { backgroundColor: c.background, paddingTop: insets.top }]}>
-      <View style={styles.header}>
+    <View style={[styles.wrap, { backgroundColor: c.background }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => router.back()} style={[styles.iconBtn, { backgroundColor: c.card, borderColor: c.border }]}>
           <Ionicons name="chevron-back" size={18} color={c.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: c.text }]}>Concluir serviço</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Confirmar início</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -85,14 +90,15 @@ export default function JobOtpScreen() {
           end={{ x: 1, y: 1 }}
           style={[styles.iconBig, shadows.md]}
         >
-          <Ionicons name="key" size={32} color="#fff" />
+          <Ionicons name="shield-checkmark" size={32} color={accent === c.primary ? "#1A1714" : "#fff"} />
         </LinearGradient>
 
-        <Text style={[styles.title, { color: c.text }]}>Peça o PIN ao cliente</Text>
+        <Text style={[styles.title, { color: c.text }]}>Prestador chegou!</Text>
         <Text style={[styles.subtitle, { color: c.softMuted }]}>
-          Digite o código de 4 dígitos que o cliente recebeu no início do pedido.
+          Digite o código de 4 dígitos que o prestador está mostrando para confirmar o início do serviço.
         </Text>
 
+        {/* 4-digit input */}
         <View style={styles.pinRow}>
           {digits.map((d, i) => (
             <TextInput
@@ -122,10 +128,10 @@ export default function JobOtpScreen() {
             <Text style={[styles.errorTxt, { color: c.destructive }]}>{error}</Text>
           </View>
         ) : (
-          <View style={[styles.helpBox, { backgroundColor: c.primaryLight, borderColor: `${accent}33` }]}>
+          <View style={[styles.helpBox, { backgroundColor: `${accent}12`, borderColor: `${accent}33` }]}>
             <Ionicons name="information-circle" size={14} color={accent} />
             <Text style={[styles.helpTxt, { color: c.text }]}>
-              Após 5 tentativas erradas o pedido entra em disputa automaticamente.
+              Ao confirmar, o serviço começa oficialmente. Você não poderá cancelar sem custo após essa etapa.
             </Text>
           </View>
         )}
@@ -133,15 +139,17 @@ export default function JobOtpScreen() {
         <Pressable
           onPress={submit}
           disabled={!complete || submitting}
-          style={[styles.btn, { backgroundColor: complete ? accent : c.borderLight, opacity: submitting ? 0.7 : 1 }, shadows.md]}
+          style={[
+            styles.btn,
+            { backgroundColor: complete ? accent : c.borderLight, opacity: submitting ? 0.7 : 1 },
+            shadows.md,
+          ]}
         >
-          <Ionicons name="checkmark-circle" size={16} color="#fff" />
-          <Text style={styles.btnTxt}>{submitting ? "Verificando..." : "Confirmar conclusão"}</Text>
+          <Ionicons name="play-circle" size={16} color={complete && accent === c.primary ? "#1A1714" : "#fff"} />
+          <Text style={[styles.btnTxt, { color: complete && accent === c.primary ? "#1A1714" : "#fff" }]}>
+            {submitting ? "Confirmando..." : "Confirmar e iniciar serviço"}
+          </Text>
         </Pressable>
-
-        <Text style={[styles.hint, { color: c.softMuted }]}>
-          Tentativas usadas: {active.otpAttempts}/5
-        </Text>
       </View>
     </View>
   );
@@ -149,20 +157,25 @@ export default function JobOtpScreen() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
   headerTitle: { fontSize: 14, fontFamily: fonts.sans.bold },
   iconBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  content: { flex: 1, padding: 24, alignItems: "center" },
-  iconBig: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginTop: 16, marginBottom: 24 },
+  content: { flex: 1, padding: 24, alignItems: "center", justifyContent: "center" },
+  iconBig: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 24 },
   title: { fontSize: 24, fontFamily: fonts.serif.extra, textAlign: "center", marginBottom: 8 },
   subtitle: { fontSize: 13, fontFamily: fonts.sans.regular, textAlign: "center", marginBottom: 28, lineHeight: 19, paddingHorizontal: 12 },
-  pinRow: { flexDirection: "row", gap: 8, marginBottom: 18 },
-  pinSlot: { width: 44, height: 56, borderRadius: 12, borderWidth: 2, fontSize: 22, fontFamily: fonts.serif.extra, textAlign: "center" },
-  errorBox: { flexDirection: "row", gap: 8, alignItems: "center", padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 18, alignSelf: "stretch" },
-  errorTxt: { flex: 1, fontSize: 12, fontFamily: fonts.sans.semibold },
+  pinRow: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  pinSlot: { width: 56, height: 68, borderRadius: 14, borderWidth: 2, fontSize: 28, fontFamily: fonts.serif.extra, textAlign: "center" },
+  errorBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 18, alignSelf: "stretch" },
+  errorTxt: { flex: 1, fontSize: 12, fontFamily: fonts.sans.semibold, lineHeight: 17 },
   helpBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 18, alignSelf: "stretch" },
   helpTxt: { flex: 1, fontSize: 11, fontFamily: fonts.sans.medium, lineHeight: 15 },
   btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 52, borderRadius: 14, alignSelf: "stretch", marginTop: 4 },
-  btnTxt: { color: "#fff", fontSize: 14, fontFamily: fonts.sans.bold },
-  hint: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 14 },
+  btnTxt: { fontSize: 14, fontFamily: fonts.sans.bold },
 });

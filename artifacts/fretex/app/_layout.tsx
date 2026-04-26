@@ -41,13 +41,20 @@ function AuthGate() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === "auth";
+    const inOnboarding = segments[0] === "onboarding";
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace("/auth");
     } else if (isAuthenticated && inAuthGroup) {
-      router.replace("/");
+      if (user && !user.onboardingCompleted) {
+        router.replace("/onboarding");
+      } else {
+        router.replace("/");
+      }
+    } else if (isAuthenticated && !inOnboarding && user && !user.onboardingCompleted) {
+      router.replace("/onboarding");
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, user]);
 
   return (
     <Stack screenOptions={{ headerShown: false, headerBackTitle: "Voltar", contentStyle: { backgroundColor: "#F7F5F2" } }}>
@@ -66,6 +73,9 @@ function AuthGate() {
       <Stack.Screen name="ticket" options={{ presentation: "modal" }} />
       <Stack.Screen name="job" options={{ headerShown: false }} />
       <Stack.Screen name="job-otp" options={{ presentation: "modal" }} />
+      <Stack.Screen name="start-pin" options={{ presentation: "modal", gestureEnabled: false }} />
+      <Stack.Screen name="confirm-start-pin" options={{ presentation: "modal" }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
     </Stack>
   );
 }

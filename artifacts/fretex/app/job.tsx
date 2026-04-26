@@ -74,7 +74,7 @@ export default function JobScreen() {
     if (active.status === "accepted") {
       await advanceStatus("en_route", "Prestador saiu");
     } else if (active.status === "en_route") {
-      await advanceStatus("in_progress", "Serviço iniciado");
+      router.push("/start-pin");
     } else if (active.status === "in_progress") {
       router.push("/job-otp");
     }
