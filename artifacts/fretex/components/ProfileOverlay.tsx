@@ -61,13 +61,11 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
           shadows.xl,
         ]}
       >
-        <View style={{ height: insets.top + 56 }} />
-
         <LinearGradient
           colors={[accent, c.primaryDeep]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.hero}
+          style={[styles.hero, { paddingTop: insets.top + 20 }]}
         >
           <View style={styles.heroRow}>
             <View style={styles.heroAvatar}>

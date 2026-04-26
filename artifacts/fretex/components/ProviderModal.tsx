@@ -5,6 +5,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import colors, { fonts, shadows } from "@/constants/colors";
 import type { Provider, Category } from "@/constants/mockData";
 import { PrimaryButton } from "./PrimaryButton";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ProviderModalProps {
   open: boolean;
@@ -28,7 +29,10 @@ function CatIcon({ cat, size, color }: { cat: Category; size: number; color: str
 
 export function ProviderModal({ open, provider, onClose, onRequest, onProfile }: ProviderModalProps) {
   const c = colors.light;
+  const { role } = useAuth();
+  const isClient = role === "cliente";
   if (!provider) return null;
+  const accentText = provider.color === "#FFCC00" ? "#8B6F00" : provider.color;
 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -124,7 +128,7 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
             </View>
           </ScrollView>
 
-          {/* CTAs */}
+          {/* CTAs — diferenciados por role */}
           <View style={[styles.ctas, { borderTopColor: c.borderLight }]}>
             <PrimaryButton
               variant="outline"
@@ -134,14 +138,22 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
               onPress={() => onProfile(provider)}
               style={{ flex: 1 }}
             />
-            <PrimaryButton
-              title="Solicitar"
-              size="md"
-              color={provider.color}
-              onPress={() => onRequest(provider)}
-              icon="arrow-forward"
-              style={{ flex: 1.4 }}
-            />
+            {isClient ? (
+              <PrimaryButton
+                title="Solicitar"
+                size="md"
+                color={provider.color}
+                onPress={() => onRequest(provider)}
+                icon="arrow-forward"
+                style={{ flex: 1.4 }}
+              />
+            ) : (
+              /* Prestador: sem CTA de solicitação */
+              <View style={[styles.peerCta, { backgroundColor: c.blueLight, flex: 1.4 }]}>
+                <Ionicons name="bar-chart" size={14} color={c.blue} />
+                <Text style={[styles.peerCtaText, { color: c.blue }]}>Pesquisa</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -250,4 +262,13 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
   },
+  peerCta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  peerCtaText: { fontSize: 13, fontFamily: fonts.sans.bold },
 });

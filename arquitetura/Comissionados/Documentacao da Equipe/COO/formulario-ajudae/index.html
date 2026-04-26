@@ -1,0 +1,408 @@
+
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ajuda&ecirc; &mdash; Cadastro de Prestador</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="header">
+  <div class="logo"><div class="logo-dot">A</div>Ajuda&ecirc;</div>
+  <div class="header-badge">Cadastro de Prestador</div>
+</div>
+
+<div class="progress-wrap" id="prog-wrap">
+  <div class="steps-row">
+    <div class="step-node active" id="sn-1"><div class="step-dot">1</div><span class="step-lbl">Dados</span></div>
+    <div class="step-line" id="sl-1"></div>
+    <div class="step-node" id="sn-2"><div class="step-dot">2</div><span class="step-lbl">Servi&ccedil;o</span></div>
+    <div class="step-line" id="sl-2"></div>
+    <div class="step-node" id="sn-3"><div class="step-dot">3</div><span class="step-lbl">Documentos</span></div>
+    <div class="step-line" id="sl-3"></div>
+    <div class="step-node" id="sn-4"><div class="step-dot">4</div><span class="step-lbl">Ve&iacute;culo</span></div>
+    <div class="step-line" id="sl-4"></div>
+    <div class="step-node" id="sn-5"><div class="step-dot">5</div><span class="step-lbl">Revis&atilde;o</span></div>
+  </div>
+</div>
+
+<div class="card">
+
+  <!-- STEP 1 -->
+
+  <div class="step-panel active" id="step-1">
+    <div class="step-tag">Etapa 1 de 5</div>
+    <div class="step-title">Dados pessoais</div>
+    <div class="step-desc">Preencha suas informa&ccedil;&otilde;es b&aacute;sicas. Campos com <span style="color:var(--accent)">*</span> s&atilde;o obrigat&oacute;rios.</div>
+
+
+<div class="field">
+  <label>Nome completo <span class="req">*</span></label>
+  <input type="text" id="nome" maxlength="100" placeholder="Ex.: Jo&atilde;o da Silva" autocomplete="off"/>
+  <div class="hint" id="h-nome"></div>
+</div>
+<div class="frow c2">
+  <div class="field"><label>CPF <span class="req">*</span></label><input type="text" id="cpf" maxlength="14" placeholder="000.000.000-00"/><div class="hint" id="h-cpf"></div></div>
+  <div class="field"><label>Data de nascimento <span class="req">*</span></label><input type="text" id="dtnasc" maxlength="10" placeholder="DD/MM/AAAA"/><div class="hint" id="h-dtnasc"></div></div>
+</div>
+<div class="frow c2">
+  <div class="field"><label>Telefone (WhatsApp) <span class="req">*</span></label><input type="text" id="tel" maxlength="15" placeholder="(00) 00000-0000"/><div class="hint" id="h-tel"></div></div>
+  <div class="field"><label>E-mail <span class="req">*</span></label><input type="email" id="email" maxlength="100" placeholder="email@exemplo.com"/><div class="hint" id="h-email"></div></div>
+</div>
+
+<hr class="divider"/>
+<div class="sec-title">Foto de perfil</div>
+<div class="photo-row">
+  <div class="pcircle" id="pcircle">📷</div>
+  <div style="flex:1;">
+    <div class="ubox" id="pbox">
+      <input type="file" id="foto-input" accept="image/jpeg,image/png,image/webp" onchange="handlePhoto(this)"/>
+      <div class="uicon">🖼️</div>
+      <div class="ulbl">Clique ou arraste sua foto</div>
+      <div class="usub">JPG, PNG ou WEBP &middot; m&aacute;x. 5 MB</div>
+      <span class="uchip" id="foto-chip"></span>
+    </div>
+    <div class="rule-grid">
+      <div class="rule" id="r-real"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Foto real do prestador</div>
+      <div class="rule" id="r-rosto"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 10h.01M15 10h.01M9.5 15c1.5 1 3.5 1 5 0"/></svg>Rosto vis&iacute;vel e centralizado</div>
+      <div class="rule" id="r-nitida"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>N&iacute;tida e bem iluminada</div>
+      <div class="rule" id="r-unica"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Apenas uma pessoa</div>
+    </div>
+    <div class="hint" id="h-foto" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<div class="btn-row"><div></div><button class="btn btn-p" onclick="go(2)">Continuar &rarr;</button></div>
+
+
+  </div>
+
+  <!-- STEP 2 -->
+
+  <div class="step-panel" id="step-2">
+    <div class="step-tag">Etapa 2 de 5</div>
+    <div class="step-title">Tipo de servi&ccedil;o</div>
+    <div class="step-desc">Selecione o tipo e a categoria do servi&ccedil;o que voc&ecirc; ir&aacute; oferecer.</div>
+
+
+<div class="sec-title">Tipo de servi&ccedil;o <span class="req" style="color:var(--accent)">*</span></div>
+<div class="svc-grid">
+  <label class="svc-card" id="sc-frete" onclick="selSvc('frete')">
+    <input type="radio" name="svc" value="frete"/>
+    <div class="svc-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="svc-icon">🚚</div><div class="svc-name">Frete</div><div class="svc-desc">Transporte leve a m&eacute;dio</div>
+  </label>
+  <label class="svc-card" id="sc-mudan&ccedil;a" onclick="selSvc('mudan&ccedil;a')">
+    <input type="radio" name="svc" value="mudan&ccedil;a"/>
+    <div class="svc-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+    <div class="svc-icon">📦</div><div class="svc-name">Mudan&ccedil;a</div><div class="svc-desc">Pequena, m&eacute;dia ou grande</div>
+  </label>
+</div>
+<div class="hint" id="h-svc" style="margin-top:8px;"></div>
+<hr class="divider"/>
+<div class="sec-title">Categoria <span class="req" style="color:var(--accent)">*</span></div>
+<div class="field">
+  <select id="categoria" onchange="onCat()">
+    <option value="">Selecione a categoria...</option>
+    <optgroup label="Frete"><option value="frete-leve">Frete leve</option><option value="frete-medio">Frete m&eacute;dio</option></optgroup>
+    <optgroup label="Mudan&ccedil;a"><option value="mudan&ccedil;a-pequena">Mudan&ccedil;a pequena</option><option value="mudan&ccedil;a-media">Mudan&ccedil;a m&eacute;dia</option><option value="mudan&ccedil;a-grande">Mudan&ccedil;a grande</option></optgroup>
+  </select>
+  <div class="hint" id="h-cat"></div>
+</div>
+<div class="btn-row"><button class="btn btn-g" onclick="go(1)">&larr; Voltar</button><button class="btn btn-p" onclick="go(3)">Continuar &rarr;</button></div>
+
+
+  </div>
+
+  <!-- STEP 3 -->
+
+  <div class="step-panel" id="step-3">
+    <div class="step-tag">Etapa 3 de 5</div>
+    <div class="step-title">Documentos</div>
+    <div class="step-desc">Envie seus documentos. Devem estar leg&iacute;veis, completos e com boa ilumina&ccedil;&atilde;o.<br><strong>Formatos aceitos: JPG, PNG, PDF.</strong> GIF e outros formatos n&atilde;o s&atilde;o permitidos.</div>
+
+
+<div class="sec-title">Documentos obrigat&oacute;rios</div>
+<div class="field">
+  <label>Documento de identidade (RG ou equivalente) <span class="req">*</span></label>
+  <div class="ubox" id="box-rg"><input type="file" id="doc-rg" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="handleDoc('rg',this)"/><div class="uicon">🪪</div><div class="ulbl">Clique ou arraste</div><div class="usub">JPG, PNG ou PDF &middot; m&aacute;x. 10 MB</div><span class="uchip" id="chip-rg"></span></div>
+  <div class="hint" id="h-rg"></div>
+</div>
+<div class="field">
+  <label>Comprovante de resid&ecirc;ncia <span class="req">*</span></label>
+  <div class="ubox" id="box-res"><input type="file" id="doc-res" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="handleDoc('res',this)"/><div class="uicon">🏠</div><div class="ulbl">Clique ou arraste</div><div class="usub">JPG, PNG ou PDF &middot; m&aacute;x. 10 MB &middot; emitido h&aacute; no m&aacute;x. 90 dias</div><span class="uchip" id="chip-res"></span></div>
+  <div class="hint" id="h-res"></div>
+</div>
+<hr class="divider"/>
+<div class="sec-title">Para motoristas</div>
+<div class="field">
+  <label>CNH &mdash; Carteira Nacional de Habilita&ccedil;&atilde;o <span class="req">*</span></label>
+  <div class="ubox" id="box-cnh"><input type="file" id="doc-cnh" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="handleDoc('cnh',this)"/><div class="uicon">🚗</div><div class="ulbl">Clique ou arraste</div><div class="usub">JPG, PNG ou PDF &middot; m&aacute;x. 10 MB &middot; dentro da validade</div><span class="uchip" id="chip-cnh"></span></div>
+  <div class="hint" id="h-cnh"></div>
+</div>
+<div class="field">
+  <label>Documento do ve&iacute;culo (CRLV ou equivalente)</label>
+  <div class="ubox" id="box-crlv"><input type="file" id="doc-crlv" accept="image/jpeg,image/png,image/webp,application/pdf" onchange="handleDoc('crlv',this)"/><div class="uicon">📋</div><div class="ulbl">Clique ou arraste</div><div class="usub">JPG, PNG ou PDF &middot; m&aacute;x. 10 MB</div><span class="uchip" id="chip-crlv"></span></div>
+  <div class="hint" id="h-crlv"></div>
+</div>
+<hr class="divider"/>
+<div class="sec-title">Crit&eacute;rios de qualidade</div>
+<div class="chk-list">
+  <label class="chk-item"><input type="checkbox" id="c1" onchange="updChk()"/><span class="chk-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span class="chk-text">Documentos leg&iacute;veis <small>Texto e dados claramente vis&iacute;veis</small></span></label>
+  <label class="chk-item"><input type="checkbox" id="c2" onchange="updChk()"/><span class="chk-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span class="chk-text">Documentos completos <small>Todas as p&aacute;ginas relevantes inclu&iacute;das</small></span></label>
+  <label class="chk-item"><input type="checkbox" id="c3" onchange="updChk()"/><span class="chk-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span class="chk-text">Nome compat&iacute;vel com o cadastro <small>Igual ao nome informado no formul&aacute;rio</small></span></label>
+  <label class="chk-item"><input type="checkbox" id="c4" onchange="updChk()"/><span class="chk-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span class="chk-text">Documentos dentro da validade <small>CNH, CRLV e comprovante dentro do prazo</small></span></label>
+</div>
+<div class="hint" id="h-chk" style="margin-top:10px;"></div>
+<div class="btn-row"><button class="btn btn-g" onclick="go(2)">&larr; Voltar</button><button class="btn btn-p" onclick="go(4)">Continuar &rarr;</button></div>
+
+
+  </div>
+
+  <!-- STEP 4 -->
+
+  <div class="step-panel" id="step-4">
+    <div class="step-tag">Etapa 4 de 5</div>
+    <div class="step-title">Dados do ve&iacute;culo</div>
+    <div class="step-desc">Informe os dados do ve&iacute;culo utilizado. Ele deve ser compat&iacute;vel com a categoria selecionada.</div>
+
+
+<div class="frow c2">
+  <div class="field"><label>Modelo <span class="req">*</span></label><input type="text" id="vmod" maxlength="60" placeholder="Ex.: Fiat Strada" onblur="vModB()"/><div class="hint" id="h-vmod"></div></div>
+  <div class="field"><label>Ano <span class="req">*</span></label><input type="text" id="vano" maxlength="4" placeholder="AAAA" oninput="this.value=this.value.replace(/\D/g,'').slice(0,4)" onblur="vAnoB()"/><div class="hint" id="h-vano"></div></div>
+</div>
+<div class="frow c2">
+  <div class="field"><label>Placa <span class="req">*</span></label><input type="text" id="vplaca" maxlength="8" placeholder="ABC-1234" style="text-transform:uppercase" oninput="this.value=mPlaca(this.value)" onblur="vPlacaB()"/><div class="hint" id="h-vplaca"></div></div>
+  <div class="field"><label>Tipo do ve&iacute;culo <span class="req">*</span></label>
+    <select id="vtipo" onchange="chkCompat()">
+      <option value="">Selecione...</option>
+      <option value="carro-utilitario">Carro utilit&aacute;rio / pickup pequena</option>
+      <option value="pickup-media">Pickup m&eacute;dia</option>
+      <option value="furgao">Furg&atilde;o</option>
+      <option value="van-carga">Van de carga</option>
+      <option value="van-grande">Van grande</option>
+      <option value="caminhao">Caminh&atilde;o</option>
+    </select>
+    <div class="hint" id="h-vtipo"></div>
+  </div>
+</div>
+<div class="compat" id="compat"></div>
+<hr class="divider"/>
+<div class="sec-title">Verifica&ccedil;&atilde;o de identidade</div>
+<div class="frow c2">
+  <div class="field"><label>M&eacute;todo preferido <span class="req">*</span></label>
+    <select id="vmet"><option value="">Selecione...</option><option value="ligacao">Liga&ccedil;&atilde;o telef&ocirc;nica</option><option value="whatsapp">WhatsApp</option></select>
+    <div class="hint" id="h-vmet">Voc&ecirc; ser&aacute; contatado antes da aprova&ccedil;&atilde;o.</div>
+  </div>
+  <div class="field"><label>Disponibilidade <span class="req">*</span></label>
+    <select id="vdisp"><option value="">Selecione...</option><option value="manha">Manh&atilde; (8h&ndash;12h)</option><option value="tarde">Tarde (13h&ndash;18h)</option><option value="noite">Noite (18h&ndash;21h)</option><option value="qualquer">Qualquer hor&aacute;rio</option></select>
+    <div class="hint" id="h-vdisp"></div>
+  </div>
+</div>
+<div class="btn-row"><button class="btn btn-g" onclick="go(3)">&larr; Voltar</button><button class="btn btn-p" onclick="go(5)">Revisar &rarr;</button></div>
+
+
+  </div>
+
+  <!-- STEP 5: REVIS&Atilde;O ONLY PREVIEW -->
+
+  <div class="step-panel" id="step-5">
+    <div class="step-tag">Etapa 5 de 5</div>
+    <div class="step-title">Revise seu cadastro</div>
+    <div class="step-desc">Confira todas as informa&ccedil;&otilde;es antes de enviar. Volte a qualquer etapa para corrigir.</div>
+    <div class="rev-grid" id="rev-content"></div>
+    <div class="btn-row"><button class="btn btn-g" onclick="go(4)">&larr; Voltar</button><button class="btn btn-p" onclick="submit()">Enviar cadastro &rarr;</button></div>
+  </div>
+
+  <!-- SUCCESS -->
+
+  <div class="step-panel" id="step-ok">
+    <div class="ok-wrap">
+      <div class="ok-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="ok-title">Cadastro enviado!</div>
+      <div class="ok-msg">Seu cadastro foi recebido com sucesso.<br>Nossa equipe ir&aacute; analisar em at&eacute; <strong>24 horas</strong>.</div>
+      <div class="ok-msg" style="margin-top:10px;font-size:13px;">A resposta ser&aacute; enviada para:</div>
+      <div class="email-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg>
+        <span id="ok-email"></span>
+      </div>
+      <div class="ok-info" id="ok-info"></div>
+      <button class="btn btn-p" style="margin-top:24px;width:100%;" onclick="resetForm()">Novo cadastro</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const S={step:1,svc:'',cat:'',foto:false,docs:{rg:false,res:false,cnh:false,crlv:false}};
+
+// masks
+function mCPF(v){v=v.replace(/\D/g,'').slice(0,11);return v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})\.(\d{3})(\d)/,'$1.$2.$3').replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/,'$1.$2.$3-$4');}
+function mPhone(v){v=v.replace(/\D/g,'').slice(0,11);if(v.length<=10)return v.replace(/(\d{2})(\d{4})(\d)/,'($1) $2-$3');return v.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3');}
+function mDate(v){v=v.replace(/\D/g,'').slice(0,8);return v.replace(/(\d{2})(\d)/,'$1/$2').replace(/(\d{2})\/(\d{2})(\d)/,'$1/$2/$3');}
+function mPlaca(v){v=v.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,7);if(v.length<=3)return v;return v.slice(0,3)+'-'+v.slice(3);}
+
+document.getElementById('cpf').addEventListener('input',function(){this.value=mCPF(this.value);vCPF();});
+document.getElementById('tel').addEventListener('input',function(){this.value=mPhone(this.value);vTel();});
+document.getElementById('dtnasc').addEventListener('input',function(){this.value=mDate(this.value);});
+document.getElementById('dtnasc').addEventListener('blur',function(){vDateField(this,'h-dtnasc');});
+document.getElementById('nome').addEventListener('blur',vNome);
+document.getElementById('email').addEventListener('blur',vEmail);
+
+function hint(id,t,msg){const el=document.getElementById(id);const ic={ok:'&#10003;',err:'&#9888;',warn:'&#8505;'};el.className='hint'+(t?' h'+t:'');el.innerHTML=msg?`<span>${ic[t]||''}</span>${msg}`:''}
+function sv(id,s){const el=document.getElementById(id);el.classList.remove('ok','er');if(s===true)el.classList.add('ok');else if(s===false)el.classList.add('er');}
+
+function vNome(){const v=document.getElementById('nome').value.trim();if(!v){hint('h-nome','e','Nome &eacute; obrigat&oacute;rio.');sv('nome',false);return false;}if(v.split(' ').filter(Boolean).length<2){hint('h-nome','w','Informe nome e sobrenome.');sv('nome',false);return false;}hint('h-nome','','');sv('nome',true);return true;}
+function vCPF(){const r=document.getElementById('cpf').value.replace(/\D/g,'');if(r.length<11){hint('h-cpf','','');sv('cpf',null);return false;}if(!chkCPF(r)){hint('h-cpf','e','CPF inv&aacute;lido.');sv('cpf',false);return false;}hint('h-cpf','o','CPF v&aacute;lido.');sv('cpf',true);return true;}
+function chkCPF(c){if(/^(\d)\1{10}$/.test(c))return false;let s=0;for(let i=0;i<9;i++)s+=parseInt(c[i])*(10-i);let r=s%11,d1=r<2?0:11-r;if(d1!==parseInt(c[9]))return false;s=0;for(let i=0;i<10;i++)s+=parseInt(c[i])*(11-i);r=s%11;return(r<2?0:11-r)===parseInt(c[10]);}
+function vTel(){const r=document.getElementById('tel').value.replace(/\D/g,'');if(r.length<10){if(r.length>0){hint('h-tel','e','Telefone inv&aacute;lido.');sv('tel',false);}return false;}hint('h-tel','','');sv('tel',true);return true;}
+function vDateField(el,hid){const v=el.value;if(v.length<10){hint(hid,'','');sv(el.id,null);return false;}const[d,m,y]=[parseInt(v),parseInt(v.slice(3)),parseInt(v.slice(6))];const dt=new Date(y,m-1,d);if(dt.getFullYear()!==y||dt.getMonth()!==m-1||dt.getDate()!==d){hint(hid,'e','Data inv&aacute;lida.');sv(el.id,false);return false;}hint(hid,'','');sv(el.id,true);return true;}
+function vEmail(){const v=document.getElementById('email').value.trim();if(!v){hint('h-email','e','E-mail &eacute; obrigat&oacute;rio.');sv('email',false);return false;}if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)){hint('h-email','e','E-mail inv&aacute;lido.');sv('email',false);return false;}hint('h-email','','');sv('email',true);return true;}
+function vModB(){const v=document.getElementById('vmod').value.trim();if(v.length<2){hint('h-vmod','e','Informe o modelo.');sv('vmod',false);}else{hint('h-vmod','','');sv('vmod',true);}}
+function vAnoB(){const v=document.getElementById('vano').value,y=parseInt(v),cur=new Date().getFullYear();if(v.length<4||y<1990||y>cur+1){hint('h-vano','e','Ano inv&aacute;lido.');sv('vano',false);}else{hint('h-vano','','');sv('vano',true);}}
+function vPlacaB(){const v=document.getElementById('vplaca').value.replace('-','');const ok=/^[A-Z]{3}\d{4}$/.test(v)||/^[A-Z]{3}\d[A-Z]\d{2}$/.test(v);if(!ok){hint('h-vplaca','e','Use ABC-1234 ou ABC1D23.');sv('vplaca',false);}else{hint('h-vplaca','o','Placa v&aacute;lida.');sv('vplaca',true);}return ok;}
+
+function selSvc(v){S.svc=v;document.querySelectorAll('.svc-card').forEach(c=>c.classList.remove('sel'));document.getElementById('sc-'+v).classList.add('sel');hint('h-svc','o','Tipo selecionado.');const cat=document.getElementById('categoria');for(const o of cat.options)if(o.parentElement.tagName==='OPTGROUP')o.hidden=(v==='frete'?o.parentElement.label!=='Frete':o.parentElement.label!=='Mudan&ccedil;a');cat.value='';hint('h-cat','','');chkCompat();}
+function onCat(){S.cat=document.getElementById('categoria').value;if(S.cat)hint('h-cat','o','Categoria selecionada.');chkCompat();}
+
+const cMap={'frete-leve':['carro-utilitario'],'frete-medio':['pickup-media','furgao'],'mudan&ccedil;a-pequena':['van-carga'],'mudan&ccedil;a-media':['van-grande'],'mudan&ccedil;a-grande':['caminhao']};
+const vN={'carro-utilitario':'Carro utilit&aacute;rio / pickup pequena','pickup-media':'Pickup m&eacute;dia','furgao':'Furg&atilde;o','van-carga':'Van de carga','van-grande':'Van grande','caminhao':'Caminh&atilde;o'};
+const cN={'frete-leve':'Frete leve','frete-medio':'Frete m&eacute;dio','mudan&ccedil;a-pequena':'Mudan&ccedil;a pequena','mudan&ccedil;a-media':'Mudan&ccedil;a m&eacute;dia','mudan&ccedil;a-grande':'Mudan&ccedil;a grande'};
+function chkCompat(){const cat=document.getElementById('categoria').value,vt=document.getElementById('vtipo').value,b=document.getElementById('compat');b.className='compat';b.innerHTML='';if(!cat||!vt)return;const a=cMap[cat]||[];if(a.includes(vt)){b.classList.add('show','ok-c');b.innerHTML=`&#9989; <strong>${vN[vt]}</strong> compat&iacute;vel com <strong>${cN[cat]}</strong>.`;}else{b.classList.add('show','wn-c');b.innerHTML=`&#9888;️ Incompat&iacute;vel &mdash; ${cN[cat]} requer: <strong>${a.map(x=>vN[x]).join(' ou ')}</strong>.`;}}
+document.getElementById('vtipo').addEventListener('change',chkCompat);
+
+// UPLOAD &mdash; GIF bloqueado explicitamente
+const ALLOWED_DOC=['image/jpeg','image/png','image/webp','application/pdf'];
+function handleDoc(k,input){
+  const file=input.files[0];const box=document.getElementById('box-'+k),chip=document.getElementById('chip-'+k),hid='h-'+k;
+  if(!file)return;
+  if(!ALLOWED_DOC.includes(file.type)){box.className='ubox bad';chip.className='uchip show bad-c';chip.textContent='&#10005; Formato n&atilde;o permitido';hint(hid,'e','Use JPG, PNG ou PDF. GIF e outros formatos n&atilde;o s&atilde;o aceitos.');S.docs[k]=false;return;}
+  if(file.size>10*1024*1024){box.className='ubox bad';chip.className='uchip show bad-c';chip.textContent='&#10005; Arquivo muito grande (m&aacute;x. 10 MB)';hint(hid,'e','O arquivo excede 10 MB.');S.docs[k]=false;return;}
+  box.className='ubox done';chip.className='uchip show';chip.innerHTML=`&#10003; ${file.name.slice(0,44)}`;hint(hid,'o','Documento enviado com sucesso.');S.docs[k]=true;
+}
+function handlePhoto(input){
+  const file=input.files[0];const box=document.getElementById('pbox'),chip=document.getElementById('foto-chip');
+  if(!file)return;
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)){box.className='ubox bad';chip.className='uchip show bad-c';chip.textContent='&#10005; Formato inv&aacute;lido';hint('h-foto','e','Use JPG, PNG ou WEBP.');S.foto=false;return;}
+  if(file.size>5*1024*1024){box.className='ubox bad';chip.className='uchip show bad-c';chip.textContent='&#10005; Imagem maior que 5 MB';hint('h-foto','e','A foto excede 5 MB.');S.foto=false;return;}
+  const reader=new FileReader();
+  reader.onload=e=>{const c=document.getElementById('pcircle');c.innerHTML=`<img src="${e.target.result}" alt="preview"/>`;c.classList.add('ok-p');['r-real','r-rosto','r-nitida','r-unica'].forEach(id=>document.getElementById(id).classList.add('ok-r'));hint('h-foto','o','Foto carregada. Confirme visualmente os crit&eacute;rios.');box.className='ubox done';chip.className='uchip show';chip.innerHTML=`&#10003; ${file.name.slice(0,30)}`;S.foto=true;};
+  reader.readAsDataURL(file);
+}
+
+function updChk(){if(['c1','c2','c3','c4'].every(id=>document.getElementById(id).checked))hint('h-chk','o','Todos os crit&eacute;rios confirmados.');else hint('h-chk','','');}
+
+function validateStep(){
+  const s=S.step;
+  if(s===1){const n=vNome(),c=vCPF(),t=vTel(),e=vEmail(),dn=vDateField(document.getElementById('dtnasc'),'h-dtnasc');if(!n||!c||!t||!e||!dn){toast('Corrija os campos destacados.','err');return false;}if(!S.foto){toast('Envie a foto de perfil.','warn');return false;}return true;}
+  if(s===2){if(!S.svc){toast('Selecione o tipo de servi&ccedil;o.','err');return false;}if(!document.getElementById('categoria').value){hint('h-cat','e','Selecione a categoria.');toast('Selecione a categoria.','err');return false;}return true;}
+  if(s===3){if(!S.docs.rg){toast('Envie o documento de identidade.','err');return false;}if(!S.docs.res){toast('Envie o comprovante de resid&ecirc;ncia.','err');return false;}if(!S.docs.cnh){toast('Envie a CNH.','err');return false;}if(!['c1','c2','c3','c4'].every(id=>document.getElementById(id).checked)){toast('Confirme todos os crit&eacute;rios de qualidade.','warn');return false;}return true;}
+  if(s===4){vModB();vAnoB();const vmod=document.getElementById('vmod').value.trim(),vano=document.getElementById('vano').value,vt=document.getElementById('vtipo').value,vm=document.getElementById('vmet').value,vd=document.getElementById('vdisp').value,pOk=vPlacaB();if(!vmod||vano.length<4||!pOk||!vt){toast('Preencha todos os dados do ve&iacute;culo.','err');return false;}if(!vm){toast('Selecione o m&eacute;todo de verifica&ccedil;&atilde;o.','err');return false;}if(!vd){toast('Selecione a disponibilidade.','err');return false;}const cat=document.getElementById('categoria').value,a=cMap[cat]||[];if(a.length&&!a.includes(vt)&&!confirm('&#9888;️ Ve&iacute;culo incompat&iacute;vel com a categoria.\nDeseja continuar mesmo assim?'))return false;return true;}
+  return true;
+}
+
+function go(n){
+  if(n>S.step&&!validateStep())return;
+  document.getElementById('step-'+S.step).classList.remove('active');
+  S.step=n;
+  const id=n===6?'step-ok':'step-'+n;
+  document.getElementById(id).classList.add('active');
+  updProg(n);if(n===5)buildReview();window.scrollTo({top:0,behavior:'smooth'});
+}
+function updProg(n){
+  for(let i=1;i<=5;i++){
+    const sn=document.getElementById('sn-'+i),sl=document.getElementById('sl-'+i);
+    sn.className='step-node'+(i<n?' done':i===n?' active':'');
+    if(sl)sl.className='step-line'+(i<n?' done':'');
+    const dot=sn.querySelector('.step-dot');
+    if(i<n)dot.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+    else dot.textContent=i;
+  }
+}
+
+function buildReview(){
+  const catNm=cN[S.cat]||S.cat;
+  const vtNm=vN[document.getElementById('vtipo').value]||'&mdash;';
+  const metNm={ligacao:'Liga&ccedil;&atilde;o telef&ocirc;nica',whatsapp:'WhatsApp'}[document.getElementById('vmet').value]||'&mdash;';
+  const dispNm={manha:'Manh&atilde; (8h&ndash;12h)',tarde:'Tarde (13h&ndash;18h)',noite:'Noite (18h&ndash;21h)',qualquer:'Qualquer hor&aacute;rio'}[document.getElementById('vdisp').value]||'&mdash;';
+  const chips=Object.entries({rg:'RG/Identidade',res:'Comprovante',cnh:'CNH',crlv:'CRLV'}).filter(([k])=>S.docs[k]).map(([,l])=>`<div class="dchip">&#10003; ${l}</div>`).join('');
+  function e(v){return String(v||'').replace(/</g,'&lt;');}
+  document.getElementById('rev-content').innerHTML=`
+    <div class="rev-card"><div class="rev-head">👤 Dados pessoais</div><div class="rev-body">
+      <div class="rev-row"><span>Nome</span><span>${e(document.getElementById('nome').value)}</span></div>
+      <div class="rev-row"><span>CPF</span><span>${e(document.getElementById('cpf').value)}</span></div>
+      <div class="rev-row"><span>Nascimento</span><span>${e(document.getElementById('dtnasc').value)}</span></div>
+      <div class="rev-row"><span>Telefone</span><span>${e(document.getElementById('tel').value)}</span></div>
+      <div class="rev-row"><span>E-mail</span><span>${e(document.getElementById('email').value)}</span></div>
+      <div class="rev-row"><span>Foto de perfil</span><span><span class="pill pg">&#10003; Enviada</span></span></div>
+    </div></div>
+    <div class="rev-card"><div class="rev-head">🚚 Servi&ccedil;o</div><div class="rev-body">
+      <div class="rev-row"><span>Tipo</span><span><span class="pill pp">${S.svc}</span></span></div>
+      <div class="rev-row"><span>Categoria</span><span>${catNm}</span></div>
+    </div></div>
+    <div class="rev-card"><div class="rev-head">📄 Documentos</div><div class="rev-body">
+      <div class="doc-chips">${chips||'<span style="color:var(--text-muted);font-size:13px">Nenhum enviado</span>'}</div>
+    </div></div>
+    <div class="rev-card"><div class="rev-head">🚗 Ve&iacute;culo</div><div class="rev-body">
+      <div class="rev-row"><span>Modelo</span><span>${e(document.getElementById('vmod').value)}</span></div>
+      <div class="rev-row"><span>Ano</span><span>${e(document.getElementById('vano').value)}</span></div>
+      <div class="rev-row"><span>Placa</span><span>${e(document.getElementById('vplaca').value)}</span></div>
+      <div class="rev-row"><span>Tipo</span><span>${vtNm}</span></div>
+    </div></div>
+    <div class="rev-card"><div class="rev-head">📞 Verifica&ccedil;&atilde;o de identidade</div><div class="rev-body">
+      <div class="rev-row"><span>M&eacute;todo preferido</span><span>${metNm}</span></div>
+      <div class="rev-row"><span>Disponibilidade</span><span>${dispNm}</span></div>
+    </div></div>`;
+}
+
+function submit(){
+  const email=document.getElementById('email').value.trim();
+  function e(v){return String(v||'').replace(/</g,'&lt;');}
+  document.getElementById('step-5').classList.remove('active');
+  document.getElementById('step-ok').classList.add('active');
+  document.getElementById('ok-email').textContent=email;
+  document.getElementById('ok-info').innerHTML=`
+    <div class="s-row"><span>Prestador</span><span>${e(document.getElementById('nome').value)}</span></div>
+    <div class="s-row"><span>Categoria</span><span>${cN[S.cat]||S.cat}</span></div>
+    <div class="s-row"><span>Ve&iacute;culo</span><span>${e(document.getElementById('vmod').value)} &middot; ${e(document.getElementById('vplaca').value)}</span></div>
+    <div class="s-row"><span>Status</span><span><span class="pill pb">Aguardando an&aacute;lise</span></span></div>
+    <div class="s-row"><span>Prazo</span><span>At&eacute; 24 horas</span></div>`;
+  document.getElementById('prog-wrap').style.opacity='.35';
+  updProg(6);
+}
+
+function resetForm(){
+  document.getElementById('step-ok').classList.remove('active');
+  S.step=1;S.svc='';S.cat='';S.foto=false;S.docs={rg:false,res:false,cnh:false,crlv:false};
+  document.querySelectorAll('input:not([type=file]):not([type=checkbox]):not([type=radio]),select,textarea').forEach(el=>{el.value='';el.classList.remove('ok','er');});
+  document.querySelectorAll('.hint').forEach(el=>{el.textContent='';el.className='hint';});
+  document.querySelectorAll('.ubox').forEach(b=>b.className='ubox');
+  document.querySelectorAll('.uchip').forEach(c=>{c.className='uchip';c.textContent='';});
+  document.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false);
+  document.querySelectorAll('.svc-card').forEach(c=>c.classList.remove('sel'));
+  document.getElementById('pcircle').innerHTML='📷';document.getElementById('pcircle').classList.remove('ok-p');
+  ['r-real','r-rosto','r-nitida','r-unica'].forEach(id=>document.getElementById(id).classList.remove('ok-r'));
+  document.getElementById('compat').className='compat';
+  document.getElementById('prog-wrap').style.opacity='1';
+  document.getElementById('step-1').classList.add('active');
+  updProg(1);window.scrollTo({top:0});
+}
+
+let _tt;
+function toast(msg,t=''){const el=document.getElementById('toast');el.className='toast'+(t==='err'?' te':t==='ok'?' to':'');el.innerHTML=(t==='err'?'&#9888;️ ':t==='ok'?'&#9989; ':'&#8505;️ ')+msg;el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),3400);}
+
+document.querySelectorAll('.ubox').forEach(box=>{
+  box.addEventListener('dragover',e=>{e.preventDefault();box.classList.add('drag');});
+  box.addEventListener('dragleave',()=>box.classList.remove('drag'));
+  box.addEventListener('drop',e=>{e.preventDefault();box.classList.remove('drag');const input=box.querySelector('input[type=file]');if(!input||!e.dataTransfer.files.length)return;const dt=new DataTransfer();dt.items.add(e.dataTransfer.files[0]);input.files=dt.files;input.dispatchEvent(new Event('change'));});
+});
+</script>
+
+</body>
+</html>

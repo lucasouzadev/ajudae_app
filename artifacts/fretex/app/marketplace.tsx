@@ -306,16 +306,6 @@ function ClienteMarketplace() {
           <Text style={[styles.heroEyebrow, { color: "rgba(26,23,20,0.65)" }]}>MARKETPLACE</Text>
           <Text style={[styles.heroTitle, { color: "#1A1714" }]}>Quem você quer perto?</Text>
           <Text style={[styles.heroSub, { color: "rgba(26,23,20,0.75)" }]}>Compare prestadores, propostas e tempo de chegada.</Text>
-
-          {/* Custom order CTA inside hero */}
-          <Pressable
-            onPress={() => setOrderModalOpen(true)}
-            style={[styles.heroOrderBtn, { backgroundColor: "#1A1714" }]}
-          >
-            <Ionicons name="add-circle" size={16} color={c.primary} />
-            <Text style={[styles.heroOrderText, { color: c.primary }]}>Criar pedido customizado</Text>
-            <Ionicons name="chevron-forward" size={14} color={c.primary} />
-          </Pressable>
         </LinearGradient>
 
         {/* Live map */}
@@ -327,6 +317,16 @@ function ClienteMarketplace() {
           subtitle={`${onlinePins.length} online · disponíveis agora`}
           badgeColor={c.success}
         />
+
+        {/* Compact custom order button */}
+        <Pressable
+          onPress={() => setOrderModalOpen(true)}
+          style={[styles.orderBtn, { backgroundColor: c.text }]}
+        >
+          <Ionicons name="add" size={15} color={c.primary} />
+          <Text style={[styles.orderBtnText, { color: c.primary }]}>Criar pedido customizado</Text>
+          <Ionicons name="chevron-forward" size={13} color={`${c.primary}99`} />
+        </Pressable>
 
         {/* Search */}
         <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
@@ -675,17 +675,16 @@ const styles = StyleSheet.create({
   heroEyebrow: { color: "rgba(255,255,255,0.78)", fontSize: 10, letterSpacing: 1, fontFamily: fonts.sans.bold },
   heroTitle: { color: "#fff", fontSize: 22, fontFamily: fonts.serif.extra, marginTop: 4, lineHeight: 26 },
   heroSub: { color: "rgba(255,255,255,0.85)", fontSize: 12, fontFamily: fonts.sans.regular, marginTop: 2, lineHeight: 18 },
-  heroOrderBtn: {
+  orderBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginTop: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    marginBottom: 12,
   },
-  heroOrderText: { fontSize: 13, fontFamily: fonts.sans.bold },
+  orderBtnText: { flex: 1, fontSize: 13, fontFamily: fonts.sans.bold },
   readonlyBadge: {
     flexDirection: "row",
     alignItems: "center",

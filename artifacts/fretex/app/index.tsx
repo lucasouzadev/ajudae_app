@@ -258,7 +258,7 @@ function ClienteHome() {
                 left: `${p.lng}%`,
                 top: `${topPct}%`,
                 transform: [{ translateX: -30 }, { translateY: -16 }],
-                zIndex: 35,
+                zIndex: 20,
               }}
             >
               <ProviderPin
@@ -613,7 +613,13 @@ function PrestadorHome() {
         {/* Chip bar */}
         <View style={{ marginTop: 14 }}>
           <ChipBar
-            onService={() => router.push("/request")}
+            onService={() =>
+              inProgress
+                ? router.push("/job")
+                : incoming
+                ? router.push("/request-details")
+                : router.push("/marketplace")
+            }
             onInbox={() => router.push("/inbox")}
             onMarketplace={() => router.push("/marketplace")}
             badgeColor={c.blue}
@@ -759,7 +765,7 @@ const styles = StyleSheet.create({
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
 const SCREEN_H = Dimensions.get("window").height;
-const COLLAPSED_H = 76;   // only handle + subtitle visible — no overlap with filters
+const COLLAPSED_H = 196;  // shows handle + subtitle + carousel
 const EXPANDED_H = Math.min(SCREEN_H * 0.78, 640);
 
 function ProvidersSheet({

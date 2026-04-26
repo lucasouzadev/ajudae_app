@@ -6,13 +6,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MOCK_PROVIDERS } from "@/constants/mockData";
 import colors, { fonts, shadows } from "@/constants/colors";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ProviderProfileScreen() {
   const c = colors.light;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { role } = useAuth();
   const provider = MOCK_PROVIDERS.find((p) => p.id === id);
+  const isClient = role === "cliente";
 
   if (!provider) {
     return (
@@ -21,6 +24,10 @@ export default function ProviderProfileScreen() {
       </View>
     );
   }
+
+  /* Contraste para texto sobre amarelo */
+  const onColor = provider.color === "#FFCC00" ? "#1A1714" : "#fff";
+  const accentText = provider.color === "#FFCC00" ? "#8B6F00" : provider.color;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -37,43 +44,63 @@ export default function ProviderProfileScreen() {
         >
           <View style={styles.heroNav}>
             <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <Ionicons name="chevron-back" size={20} color="#fff" />
+              <Ionicons name="chevron-back" size={20} color={onColor} />
             </Pressable>
             <View style={{ flex: 1 }} />
+            {/* Badge de contexto por role */}
+            {!isClient ? (
+              <View style={[styles.peerBadge, { backgroundColor: "rgba(0,0,0,0.22)" }]}>
+                <Ionicons name="eye-outline" size={12} color={onColor} />
+                <Text style={[styles.peerBadgeText, { color: onColor }]}>Somente visualização</Text>
+              </View>
+            ) : null}
             <Pressable style={styles.iconBtn}>
-              <Ionicons name="share-outline" size={18} color="#fff" />
+              <Ionicons name="share-outline" size={18} color={onColor} />
             </Pressable>
           </View>
 
           <View style={styles.heroBody}>
             <View style={styles.avatarWrap}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{provider.ini}</Text>
+                <Text style={[styles.avatarText, { color: onColor }]}>{provider.ini}</Text>
               </View>
               <View style={[styles.verifyBadge, { backgroundColor: c.success }]}>
                 <Ionicons name="checkmark" size={12} color="#fff" />
               </View>
             </View>
-            <Text style={styles.name}>{provider.name}</Text>
+            <Text style={[styles.name, { color: onColor }]}>{provider.name}</Text>
             <View style={styles.metaRow}>
               <View style={styles.catChip}>
                 {provider.cat === "Mudança" ? (
-                  <Ionicons name="home" size={11} color="#fff" />
+                  <Ionicons name="home" size={11} color={onColor} />
                 ) : provider.cat === "Frete" ? (
-                  <MaterialCommunityIcons name="truck" size={12} color="#fff" />
+                  <MaterialCommunityIcons name="truck" size={12} color={onColor} />
                 ) : (
-                  <Ionicons name="cube" size={11} color="#fff" />
+                  <Ionicons name="cube" size={11} color={onColor} />
                 )}
-                <Text style={styles.catText}>{provider.cat}</Text>
+                <Text style={[styles.catText, { color: onColor }]}>{provider.cat}</Text>
               </View>
               <View style={styles.ratingChip}>
-                <Ionicons name="star" size={12} color="#fff" />
-                <Text style={styles.ratingText}>{provider.rating}</Text>
-                <Text style={styles.jobsText}>· {provider.jobs} serviços</Text>
+                <Ionicons name="star" size={12} color={onColor} />
+                <Text style={[styles.ratingText, { color: onColor }]}>{provider.rating}</Text>
+                <Text style={[styles.jobsText, { color: `${onColor}CC` }]}>· {provider.jobs} serviços</Text>
               </View>
             </View>
           </View>
         </LinearGradient>
+
+        {/* Aviso de pesquisa de mercado — só para prestador */}
+        {!isClient ? (
+          <View style={[styles.researchBanner, { backgroundColor: c.blueLight, borderColor: `${c.blue}44` }]}>
+            <Ionicons name="bar-chart" size={15} color={c.blue} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.researchTitle, { color: c.blue }]}>Pesquisa de mercado</Text>
+              <Text style={[styles.researchSub, { color: c.sub }]}>
+                Você está visualizando o perfil de um colega de plataforma. Solicitações são exclusivas para clientes.
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* Bio */}
         <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
@@ -90,7 +117,7 @@ export default function ProviderProfileScreen() {
             { v: `${provider.helpers}`, l: "Ajudantes" },
           ].map((s) => (
             <View key={s.l} style={[styles.statCell, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={[styles.statV, { color: provider.color }]}>{s.v}</Text>
+              <Text style={[styles.statV, { color: accentText }]}>{s.v}</Text>
               <Text style={[styles.statL, { color: c.softMuted }]}>{s.l}</Text>
             </View>
           ))}
@@ -100,8 +127,8 @@ export default function ProviderProfileScreen() {
         <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <Text style={[styles.sectionTitle, { color: c.text }]}>Veículo & equipamento</Text>
           <View style={styles.detailRow}>
-            <View style={[styles.detailIcon, { backgroundColor: `${provider.color}18` }]}>
-              <MaterialCommunityIcons name="truck" size={18} color={provider.color} />
+            <View style={[styles.detailIcon, { backgroundColor: `${provider.color}22` }]}>
+              <MaterialCommunityIcons name="truck" size={18} color={accentText} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.detailLabel, { color: c.text }]}>{provider.model}</Text>
@@ -139,7 +166,13 @@ export default function ProviderProfileScreen() {
         <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <Text style={[styles.sectionTitle, { color: c.text }]}>Avaliações</Text>
           {provider.reviews.map((r, i) => (
-            <View key={i} style={[styles.reviewRow, i < provider.reviews.length - 1 && { borderBottomColor: c.borderLight, borderBottomWidth: 1 }]}>
+            <View
+              key={i}
+              style={[
+                styles.reviewRow,
+                i < provider.reviews.length - 1 && { borderBottomColor: c.borderLight, borderBottomWidth: 1 },
+              ]}
+            >
               <View style={[styles.reviewAvatar, { backgroundColor: c.background }]}>
                 <Text style={[styles.reviewIni, { color: c.softMuted }]}>{r.author[0]}</Text>
               </View>
@@ -174,33 +207,72 @@ export default function ProviderProfileScreen() {
                 <Text style={[styles.recLabel, { color: c.text }]}>{s.label}</Text>
                 <Text style={[styles.recWhen, { color: c.softMuted }]}>{s.when}</Text>
               </View>
-              <Text style={[styles.recValue, { color: provider.color }]}>{s.value}</Text>
+              <Text style={[styles.recValue, { color: accentText }]}>{s.value}</Text>
             </View>
           ))}
         </View>
       </ScrollView>
 
-      {/* Sticky CTA */}
-      <View style={[styles.cta, { paddingBottom: insets.bottom + 14, backgroundColor: c.card, borderTopColor: c.borderLight }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.ctaPriceLabel, { color: c.softMuted }]}>a partir de</Text>
-          <Text style={[styles.ctaPrice, { color: provider.color }]}>{provider.price}</Text>
-        </View>
-        <Pressable
-          onPress={() => router.push({ pathname: "/request", params: { providerId: provider.id } })}
-          style={[styles.ctaBtn, { backgroundColor: provider.color }, shadows.md, { shadowColor: provider.color, shadowOpacity: 0.4 }]}
+      {/* ── Sticky footer — diferente por role ── */}
+      {isClient ? (
+        /* Cliente: solicitar agora */
+        <View
+          style={[
+            styles.cta,
+            { paddingBottom: insets.bottom + 14, backgroundColor: c.card, borderTopColor: c.borderLight },
+          ]}
         >
-          <Text style={styles.ctaText}>Solicitar agora</Text>
-          <Ionicons name="arrow-forward" size={16} color="#fff" />
-        </Pressable>
-      </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.ctaPriceLabel, { color: c.softMuted }]}>a partir de</Text>
+            <Text style={[styles.ctaPrice, { color: accentText }]}>{provider.price}</Text>
+          </View>
+          <Pressable
+            onPress={() => router.push({ pathname: "/request", params: { providerId: provider.id } })}
+            style={[
+              styles.ctaBtn,
+              { backgroundColor: provider.color },
+              shadows.md,
+              { shadowColor: provider.color, shadowOpacity: 0.35 },
+            ]}
+          >
+            <Text style={[styles.ctaText, { color: onColor }]}>Solicitar agora</Text>
+            <Ionicons name="arrow-forward" size={16} color={onColor} />
+          </Pressable>
+        </View>
+      ) : (
+        /* Prestador: comparativo de mercado — sem ação de solicitação */
+        <View
+          style={[
+            styles.cta,
+            { paddingBottom: insets.bottom + 14, backgroundColor: c.card, borderTopColor: c.borderLight },
+          ]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.ctaPriceLabel, { color: c.softMuted }]}>cobra a partir de</Text>
+            <Text style={[styles.ctaPrice, { color: accentText }]}>{provider.price}</Text>
+          </View>
+          <View style={[styles.peerActionRow]}>
+            <View style={[styles.peerTag, { backgroundColor: c.blueLight }]}>
+              <Ionicons name="people" size={13} color={c.blue} />
+              <Text style={[styles.peerTagText, { color: c.blue }]}>Colega verificado</Text>
+            </View>
+            <Pressable
+              onPress={() => router.back()}
+              style={[styles.ctaBtn, { backgroundColor: c.background, borderWidth: 1.5, borderColor: c.border }]}
+            >
+              <Ionicons name="arrow-back" size={15} color={c.text} />
+              <Text style={[styles.ctaText, { color: c.text }]}>Voltar</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   hero: { paddingHorizontal: 16, paddingBottom: 30 },
-  heroNav: { flexDirection: "row", alignItems: "center" },
+  heroNav: { flexDirection: "row", alignItems: "center", gap: 8 },
   iconBtn: {
     width: 40,
     height: 40,
@@ -209,6 +281,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  peerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  peerBadgeText: { fontSize: 10, fontFamily: fonts.sans.bold },
   heroBody: { alignItems: "center", marginTop: 14 },
   avatarWrap: { position: "relative", marginBottom: 12 },
   avatar: {
@@ -221,7 +302,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { color: "#fff", fontSize: 32, fontFamily: fonts.serif.extra },
+  avatarText: { fontSize: 32, fontFamily: fonts.serif.extra },
   verifyBadge: {
     position: "absolute",
     bottom: 4,
@@ -234,7 +315,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  name: { color: "#fff", fontSize: 22, fontFamily: fonts.serif.extra, lineHeight: 26 },
+  name: { fontSize: 22, fontFamily: fonts.serif.extra, lineHeight: 26 },
   metaRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   catChip: {
     flexDirection: "row",
@@ -245,7 +326,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.22)",
   },
-  catText: { color: "#fff", fontSize: 11, fontFamily: fonts.sans.bold },
+  catText: { fontSize: 11, fontFamily: fonts.sans.bold },
   ratingChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -255,16 +336,23 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.22)",
   },
-  ratingText: { color: "#fff", fontSize: 12, fontFamily: fonts.serif.extra },
-  jobsText: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontFamily: fonts.sans.regular },
+  ratingText: { fontSize: 12, fontFamily: fonts.serif.extra },
+  jobsText: { fontSize: 11, fontFamily: fonts.sans.regular },
 
-  section: {
+  researchBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
     marginHorizontal: 16,
     marginTop: 14,
-    borderRadius: 18,
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: 16,
   },
+  researchTitle: { fontSize: 12, fontFamily: fonts.sans.bold, marginBottom: 3 },
+  researchSub: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 16 },
+
+  section: { marginHorizontal: 16, marginTop: 14, borderRadius: 18, borderWidth: 1, padding: 16 },
   sectionTitle: { fontSize: 15, fontFamily: fonts.serif.extra, marginBottom: 10 },
   bio: { fontSize: 13, fontFamily: fonts.sans.regular, lineHeight: 19 },
   statsRow: { flexDirection: "row", gap: 8, paddingHorizontal: 16, marginTop: 14 },
@@ -319,9 +407,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
     height: 52,
     borderRadius: 16,
   },
-  ctaText: { color: "#fff", fontSize: 14, fontFamily: fonts.sans.extra },
+  ctaText: { fontSize: 14, fontFamily: fonts.sans.extra },
+  peerActionRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  peerTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  peerTagText: { fontSize: 11, fontFamily: fonts.sans.bold },
 });

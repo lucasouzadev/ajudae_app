@@ -1,0 +1,531 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ajudaê — Máquina de Estados do Pedido</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #0f1923;
+      color: #e8f0f7;
+      min-height: 100vh;
+      padding: 32px 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #4fa3e0;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    header p {
+      font-size: 13px;
+      color: #6b8aa8;
+    }
+
+    .diagram {
+      max-width: 960px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* ---- FLOW TRACK ---- */
+    .main-track {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 20px;
+    }
+
+    .node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .node-box {
+      border-radius: 12px;
+      padding: 14px 20px;
+      text-align: center;
+      min-width: 110px;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .node-box:hover, .node-box.active {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    .node-icon {
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+
+    .node-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .node-sub {
+      font-size: 10px;
+      opacity: 0.75;
+      margin-top: 3px;
+    }
+
+    /* Status colors */
+    .status-requested  { background: #1a3a5c; border-color: #2e6da4; color: #7ec8f0; }
+    .status-accepted   { background: #1a3d2b; border-color: #2e8a52; color: #6fcf97; }
+    .status-enroute    { background: #1a3d2b; border-color: #27ae60; color: #6fcf97; }
+    .status-progress   { background: #2d2a10; border-color: #c9a227; color: #f0d060; }
+    .status-completed  { background: #1a3d2b; border-color: #16a085; color: #48cfad; }
+    .status-cancelled  { background: #3a1a1a; border-color: #c0392b; color: #f1948a; }
+    .status-expired    { background: #2a2a2a; border-color: #7f8c8d; color: #bdc3c7; }
+    .status-disputed   { background: #2d1a38; border-color: #8e44ad; color: #c39bd3; }
+
+    /* Arrows */
+    .arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 60px;
+    }
+
+    .arrow-line {
+      height: 2px;
+      width: 100%;
+      background: #2e4a6a;
+      position: relative;
+    }
+
+    .arrow-line::after {
+      content: '▶';
+      position: absolute;
+      right: -8px;
+      top: -8px;
+      color: #2e4a6a;
+      font-size: 12px;
+    }
+
+    .arrow-label {
+      font-size: 9px;
+      color: #4a7a9b;
+      margin-top: 4px;
+      text-align: center;
+      max-width: 60px;
+    }
+
+    /* ---- SIDE EXITS ---- */
+    .side-exits {
+      display: flex;
+      justify-content: space-between;
+      max-width: 960px;
+      margin: 0 auto 40px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .exit-group {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .exit-group-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #4a7a9b;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #1e3448;
+      padding-bottom: 6px;
+    }
+
+    .exit-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #131f2b;
+      border: 1px solid #1e3448;
+      transition: all 0.2s;
+    }
+
+    .exit-item:hover { border-color: #2e4a6a; }
+
+    .exit-from {
+      font-size: 10px;
+      color: #6b8aa8;
+      min-width: 80px;
+    }
+
+    .exit-arrow { color: #2e4a6a; font-size: 12px; }
+
+    .exit-to {
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .exit-who {
+      margin-left: auto;
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: #1e3448;
+      color: #6b8aa8;
+    }
+
+    /* ---- DETAIL PANEL ---- */
+    .detail-panel {
+      max-width: 960px;
+      margin: 0 auto 40px;
+      background: #131f2b;
+      border: 1px solid #1e3448;
+      border-radius: 14px;
+      padding: 24px;
+      min-height: 120px;
+      transition: all 0.3s;
+    }
+
+    .detail-panel h3 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    .detail-item label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #4a7a9b;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .detail-item p {
+      font-size: 12px;
+      color: #c8dde8;
+      line-height: 1.5;
+    }
+
+    .default-msg {
+      color: #4a7a9b;
+      font-size: 13px;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    /* ---- LEGEND ---- */
+    .legend {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #6b8aa8;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    @media (max-width: 700px) {
+      .main-track { flex-wrap: wrap; gap: 8px; }
+      .arrow { min-width: 30px; }
+      .detail-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Ajudaê</h1>
+  <p>Máquina de Estados do Pedido — clique em um estado para ver detalhes</p>
+</header>
+
+<div class="diagram">
+
+  <!-- MAIN FLOW -->
+  <div class="main-track">
+
+    <div class="node" onclick="showDetail('requested')">
+      <div class="node-box status-requested" id="node-requested">
+        <div class="node-icon">📋</div>
+        <div class="node-label">Solicitado</div>
+        <div class="node-sub">requested</div>
+      </div>
+    </div>
+
+    <div class="arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-label">prestador aceita</div>
+    </div>
+
+    <div class="node" onclick="showDetail('accepted')">
+      <div class="node-box status-accepted" id="node-accepted">
+        <div class="node-icon">✅</div>
+        <div class="node-label">Aceito</div>
+        <div class="node-sub">accepted</div>
+      </div>
+    </div>
+
+    <div class="arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-label">saindo</div>
+    </div>
+
+    <div class="node" onclick="showDetail('en_route')">
+      <div class="node-box status-enroute" id="node-en_route">
+        <div class="node-icon">🚗</div>
+        <div class="node-label">A Caminho</div>
+        <div class="node-sub">en_route</div>
+      </div>
+    </div>
+
+    <div class="arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-label">chegou</div>
+    </div>
+
+    <div class="node" onclick="showDetail('in_progress')">
+      <div class="node-box status-progress" id="node-in_progress">
+        <div class="node-icon">⚙️</div>
+        <div class="node-label">Em Execução</div>
+        <div class="node-sub">in_progress</div>
+      </div>
+    </div>
+
+    <div class="arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-label">OTP válido</div>
+    </div>
+
+    <div class="node" onclick="showDetail('completed')">
+      <div class="node-box status-completed" id="node-completed">
+        <div class="node-icon">🎉</div>
+        <div class="node-label">Concluído</div>
+        <div class="node-sub">completed</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SIDE EXITS -->
+  <div class="side-exits">
+
+    <div class="exit-group">
+      <div class="exit-group-title">⏱ Expiração automática</div>
+      <div class="exit-item" onclick="showDetail('expired')">
+        <span class="exit-from">requested</span>
+        <span class="exit-arrow">→</span>
+        <span class="exit-to" style="color:#bdc3c7">⏰ expired</span>
+        <span class="exit-who">sistema</span>
+      </div>
+    </div>
+
+    <div class="exit-group">
+      <div class="exit-group-title">❌ Cancelamento</div>
+      <div class="exit-item" onclick="showDetail('cancelled')">
+        <span class="exit-from">requested</span>
+        <span class="exit-arrow">→</span>
+        <span class="exit-to" style="color:#f1948a">cancelled</span>
+        <span class="exit-who">cliente / admin</span>
+      </div>
+      <div class="exit-item" onclick="showDetail('cancelled')">
+        <span class="exit-from">accepted</span>
+        <span class="exit-arrow">→</span>
+        <span class="exit-to" style="color:#f1948a">cancelled</span>
+        <span class="exit-who">prestador / admin</span>
+      </div>
+    </div>
+
+    <div class="exit-group">
+      <div class="exit-group-title">⚠️ Disputa</div>
+      <div class="exit-item" onclick="showDetail('disputed')">
+        <span class="exit-from">qualquer*</span>
+        <span class="exit-arrow">→</span>
+        <span class="exit-to" style="color:#c39bd3">disputed</span>
+        <span class="exit-who">cliente / admin</span>
+      </div>
+      <div class="exit-item" onclick="showDetail('disputed')">
+        <span class="exit-from">in_progress</span>
+        <span class="exit-arrow">→</span>
+        <span class="exit-to" style="color:#c39bd3">disputed</span>
+        <span class="exit-who">5x OTP errado</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DETAIL PANEL -->
+  <div class="detail-panel" id="detail-panel">
+    <p class="default-msg">👆 Clique em qualquer estado para ver os detalhes</p>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#2e6da4"></div> Estado de espera</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2e8a52"></div> Estado ativo</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c9a227"></div> Em execução</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#16a085"></div> Estado final (sucesso)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c0392b"></div> Estado final (cancelado)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div> Em disputa (operação resolve)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7f8c8d"></div> Expirado (sem ação)</div>
+  </div>
+
+</div>
+
+<script>
+const details = {
+  requested: {
+    icon: '📋', label: 'Solicitado', color: '#4fa3e0',
+    descricao: 'Pedido criado pelo cliente. Aguardando aceite de um prestador disponível.',
+    quemMuda: 'Sistema (expira em 30 min) ou Prestador (aceita)',
+    proximoEstado: 'accepted → ou → expired → ou → cancelled',
+    edgeFunction: 'request_create',
+    regras: 'Cliente não pode ter mais de 3 pedidos simultâneos neste status. OTP gerado e entregue ao cliente neste momento — única vez.',
+    antifraude: 'OTP gerado com hash bcrypt. Nunca armazenado em texto plano.'
+  },
+  accepted: {
+    icon: '✅', label: 'Aceito', color: '#6fcf97',
+    descricao: 'Prestador verificado aceitou o pedido. Cliente é notificado. Prestador deve sair a caminho.',
+    quemMuda: 'Prestador (muda para en_route) ou Admin (cancelamento ou disputa)',
+    proximoEstado: 'en_route → ou → cancelled → ou → disputed',
+    edgeFunction: 'request_accept + request_update_status',
+    regras: 'Apenas prestadores com verified=true e active=true podem aceitar. Prestador só pode ter 1 pedido ativo por vez no MVP.',
+    antifraude: 'Race condition tratado: se 2 prestadores tentam aceitar ao mesmo tempo, apenas o primeiro é registrado.'
+  },
+  en_route: {
+    icon: '🚗', label: 'A Caminho', color: '#6fcf97',
+    descricao: 'Prestador confirmou que está se deslocando até o endereço de origem do cliente.',
+    quemMuda: 'Prestador (ao chegar, muda para in_progress)',
+    proximoEstado: 'in_progress → ou → cancelled (apenas admin)',
+    edgeFunction: 'request_update_status',
+    regras: 'Transição: accepted → en_route → in_progress. Não pode pular etapas. Cliente recebe push notification.',
+    antifraude: 'Localização do prestador pode ser verificada no log se houver disputa.'
+  },
+  in_progress: {
+    icon: '⚙️', label: 'Em Execução', color: '#f0d060',
+    descricao: 'Prestador chegou ao local e o serviço está sendo executado. Não pode ser cancelado normalmente neste ponto.',
+    quemMuda: 'Prestador (com OTP válido → completed) ou Cliente/Admin (→ disputed)',
+    proximoEstado: 'completed → ou → disputed',
+    edgeFunction: 'request_complete_with_otp ou ticket_open',
+    regras: 'Cancelamento não disponível para o cliente neste status. Apenas disputa. Conclusão exige OTP de 6 dígitos válido e não expirado.',
+    antifraude: 'Máximo 5 tentativas de OTP. Após 5 erros, pedido vai automaticamente para disputed.'
+  },
+  completed: {
+    icon: '🎉', label: 'Concluído', color: '#48cfad',
+    descricao: 'Serviço finalizado com sucesso. OTP validado. Repasse ao prestador enfileirado (D+1). Cliente pode avaliar.',
+    quemMuda: 'Estado final — nenhuma transição possível',
+    proximoEstado: 'Nenhum (estado terminal)',
+    edgeFunction: 'request_complete_with_otp',
+    regras: 'Comissão calculada (15%). Avaliação desbloqueada para o cliente. Repasse programado para D+1 útil.',
+    antifraude: 'OTP confirmado com bcrypt. Evento gravado em request_events com hash do OTP (nunca o código real).'
+  },
+  cancelled: {
+    icon: '❌', label: 'Cancelado', color: '#f1948a',
+    descricao: 'Pedido cancelado com motivo registrado. Histórico preservado em request_events para análise.',
+    quemMuda: 'Estado final — nenhuma transição possível',
+    proximoEstado: 'Nenhum (estado terminal)',
+    edgeFunction: 'request_update_status',
+    regras: 'Motivo de cancelamento é obrigatório. Se prestador cancelou após aceite: advertência registrada. Se reincidente: bloqueio. Cliente pode criar novo pedido normalmente.',
+    antifraude: 'Cancelamentos frequentes por prestador geram alerta operacional automático (via PostHog).'
+  },
+  expired: {
+    icon: '⏰', label: 'Expirado', color: '#bdc3c7',
+    descricao: 'Nenhum prestador aceitou o pedido dentro do prazo de 30 minutos. Pedido encerrado automaticamente.',
+    quemMuda: 'Sistema (cron job ou verificação automática)',
+    proximoEstado: 'Nenhum (estado terminal)',
+    edgeFunction: 'Cron job / verificação no request_create',
+    regras: 'Cliente recebe notificação de expiração com opção de tentar novamente. Nenhuma cobrança. Sem penalidade.',
+    antifraude: 'Pedidos expirados frequentes em uma categoria/região indicam falta de oferta — sinal para o Growth recrutar prestadores.'
+  },
+  disputed: {
+    icon: '⚠️', label: 'Em Disputa', color: '#c39bd3',
+    descricao: 'Ticket aberto. Pagamento suspenso até resolução. Equipe de operações analisa evidências e decide.',
+    quemMuda: 'Admin (pode mover para cancelled ou completed após resolução)',
+    proximoEstado: 'Admin decide: cancelled ou completed (excepcional)',
+    edgeFunction: 'ticket_open',
+    regras: 'Repasse ao prestador BLOQUEADO enquanto em disputed. COO tem até 24h para resolver. Resolução documentada no ticket (notes_admin).',
+    antifraude: 'Evidências coletadas: fotos, timeline de request_events, localização registrada, mensagens rápidas.'
+  }
+};
+
+function showDetail(status) {
+  const d = details[status];
+  if (!d) return;
+
+  document.querySelectorAll('.node-box').forEach(n => n.classList.remove('active'));
+  const node = document.getElementById('node-' + status);
+  if (node) node.classList.add('active');
+
+  document.getElementById('detail-panel').innerHTML = `
+    <h3 style="color:${d.color}">${d.icon} ${d.label} <span style="font-size:10px;color:#4a7a9b;font-weight:400">(${status})</span></h3>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <label>Descrição</label>
+        <p>${d.descricao}</p>
+      </div>
+      <div class="detail-item">
+        <label>Quem muda este status</label>
+        <p>${d.quemMuda}</p>
+      </div>
+      <div class="detail-item">
+        <label>Próximo estado</label>
+        <p>${d.proximoEstado}</p>
+      </div>
+      <div class="detail-item">
+        <label>Edge Function</label>
+        <p style="color:#7ec8f0;font-family:monospace">${d.edgeFunction}</p>
+      </div>
+      <div class="detail-item">
+        <label>Regras de negócio</label>
+        <p>${d.regras}</p>
+      </div>
+      <div class="detail-item">
+        <label>Anti-fraude</label>
+        <p>${d.antifraude}</p>
+      </div>
+    </div>
+  `;
+}
+</script>
+
+</body>
+</html>
