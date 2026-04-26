@@ -10,6 +10,7 @@ import colors, { fonts, shadows } from "@/constants/colors";
 import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
+import { MarketMap, type MapPin } from "@/components/MarketMap";
 
 export default function MarketplaceScreen() {
   const { role, user } = useAuth();
@@ -26,6 +27,7 @@ function ClienteMarketplace() {
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [activePin, setActivePin] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list = filter === "Todos" ? MOCK_PROVIDERS : MOCK_PROVIDERS.filter((p) => p.cat === filter);
@@ -35,6 +37,21 @@ function ClienteMarketplace() {
     }
     return list;
   }, [filter, query]);
+
+  const onlinePins: MapPin[] = useMemo(
+    () =>
+      filtered
+        .filter((p) => p.isOnline)
+        .map((p) => ({ id: p.id, cat: p.cat, color: p.color, label: p.price, lat: p.lat, lng: p.lng })),
+    [filtered],
+  );
+
+  const sortedList = useMemo(() => {
+    if (!activePin) return filtered;
+    const pinned = filtered.find((p) => p.id === activePin);
+    if (!pinned) return filtered;
+    return [pinned, ...filtered.filter((p) => p.id !== activePin)];
+  }, [filtered, activePin]);
 
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
 
@@ -65,6 +82,16 @@ function ClienteMarketplace() {
           <Text style={styles.heroTitle}>Quem você quer perto?</Text>
           <Text style={styles.heroSub}>Compare prestadores, propostas e tempo de chegada.</Text>
         </LinearGradient>
+
+        {/* Live map */}
+        <MarketMap
+          pins={onlinePins}
+          activeId={activePin}
+          onPinPress={(id) => setActivePin(id === activePin ? null : id)}
+          title="Prestadores ao vivo"
+          subtitle={`${onlinePins.length} online · disponíveis agora`}
+          badgeColor={c.success}
+        />
 
         {/* Search */}
         <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
@@ -111,11 +138,15 @@ function ClienteMarketplace() {
         </ScrollView>
 
         {/* List */}
-        {filtered.map((p) => (
+        {sortedList.map((p) => (
           <Pressable
             key={p.id}
             onPress={() => router.push(`/provider/${p.id}`)}
-            style={[styles.providerCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+            style={[
+              styles.providerCard,
+              { backgroundColor: c.card, borderColor: activePin === p.id ? p.color : c.border, borderWidth: activePin === p.id ? 2 : 1 },
+              shadows.sm,
+            ]}
           >
             <LinearGradient
               colors={[p.color, `${p.color}AA`]}
@@ -185,9 +216,29 @@ function PrestadorMarketplace() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [activePin, setActivePin] = useState<string | null>(null);
 
   const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const filtered = filter === "Todos" ? MOCK_POSTINGS : MOCK_POSTINGS.filter((p) => p.cat === filter);
+
+  const postingPins: MapPin[] = useMemo(
+    () =>
+      filtered.map((p) => {
+        const color = p.cat === "Mudança" ? c.primary : p.cat === "Frete" ? c.blue : c.success;
+        return { id: p.id, cat: p.cat, color, label: p.budget, lat: p.lat, lng: p.lng, scheduled: p.scheduled };
+      }),
+    [filtered, c],
+  );
+
+  const sortedPostings = useMemo(() => {
+    if (!activePin) return filtered;
+    const pinned = filtered.find((p) => p.id === activePin);
+    if (!pinned) return filtered;
+    return [pinned, ...filtered.filter((p) => p.id !== activePin)];
+  }, [filtered, activePin]);
+
+  const scheduledCount = filtered.filter((p) => p.scheduled).length;
+  const liveCount = filtered.length - scheduledCount;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -214,8 +265,18 @@ function PrestadorMarketplace() {
         >
           <Text style={styles.heroEyebrow}>OPORTUNIDADES</Text>
           <Text style={styles.heroTitle}>Pulso do mercado</Text>
-          <Text style={styles.heroSub}>6 publicações novas próximas a você.</Text>
+          <Text style={styles.heroSub}>{filtered.length} publicações próximas — {liveCount} ao vivo · {scheduledCount} agendadas.</Text>
         </LinearGradient>
+
+        {/* Live map */}
+        <MarketMap
+          pins={postingPins}
+          activeId={activePin}
+          onPinPress={(id) => setActivePin(id === activePin ? null : id)}
+          title="Clientes na sua região"
+          subtitle={`${liveCount} ao vivo · ${scheduledCount} agendados`}
+          badgeColor={c.blue}
+        />
 
         {/* Pulse */}
         <View style={[styles.pulseRow]}>
@@ -261,12 +322,17 @@ function PrestadorMarketplace() {
         </ScrollView>
 
         {/* Postings */}
-        {filtered.map((post) => {
+        {sortedPostings.map((post) => {
           const catColor = post.cat === "Mudança" ? c.primary : post.cat === "Frete" ? c.blue : c.success;
+          const active = activePin === post.id;
           return (
             <View
               key={post.id}
-              style={[styles.postCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+              style={[
+                styles.postCard,
+                { backgroundColor: c.card, borderColor: active ? catColor : c.border, borderWidth: active ? 2 : 1 },
+                shadows.sm,
+              ]}
             >
               <View style={styles.postHead}>
                 <View style={{ flex: 1 }}>

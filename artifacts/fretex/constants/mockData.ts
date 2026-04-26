@@ -238,7 +238,10 @@ export const MOCK_FAQS = {
 };
 
 export const MOCK_POSTINGS = [
-  { id: "post-1", client: "Julia Nunes", route: "Tijuca → Centro", cat: "Frete" as Category, budget: "R$120", objects: "2 armários + 8 caixas", when: "Hoje · 14h", urgency: "Alta", providers: 3 },
-  { id: "post-2", client: "Marcelo T.", route: "Barra → Recreio", cat: "Mudança" as Category, budget: "R$260", objects: "Mudança de studio", when: "Amanhã · 09h", urgency: "Média", providers: 5 },
-  { id: "post-3", client: "Helena R.", route: "Botafogo → Humaitá", cat: "Entrega" as Category, budget: "R$48", objects: "Geladeira pequena", when: "Hoje · 19h", urgency: "Baixa", providers: 2 },
+  { id: "post-1", client: "Julia Nunes", ini: "JN", route: "Tijuca → Centro", cat: "Frete" as Category, budget: "R$120", objects: "2 armários + 8 caixas", when: "Hoje · 14h", urgency: "Alta" as const, providers: 3, scheduled: false, lat: 30, lng: 22 },
+  { id: "post-2", client: "Marcelo T.", ini: "MT", route: "Barra → Recreio", cat: "Mudança" as Category, budget: "R$260", objects: "Mudança de studio", when: "Amanhã · 09h", urgency: "Média" as const, providers: 5, scheduled: true, lat: 50, lng: 62 },
+  { id: "post-3", client: "Helena R.", ini: "HR", route: "Botafogo → Humaitá", cat: "Entrega" as Category, budget: "R$48", objects: "Geladeira pequena", when: "Hoje · 19h", urgency: "Baixa" as const, providers: 2, scheduled: false, lat: 35, lng: 78 },
+  { id: "post-4", client: "Ricardo A.", ini: "RA", route: "Tijuca → Barra", cat: "Mudança" as Category, budget: "R$165", objects: "Sofá + 4 caixas", when: "Hoje · 15h", urgency: "Alta" as const, providers: 1, scheduled: true, lat: 65, lng: 38 },
+  { id: "post-5", client: "Bruno F.", ini: "BF", route: "Centro → Lapa", cat: "Frete" as Category, budget: "R$95", objects: "Mesa + 2 cadeiras", when: "Amanhã · 11h", urgency: "Média" as const, providers: 2, scheduled: true, lat: 22, lng: 50 },
+  { id: "post-6", client: "Patricia V.", ini: "PV", route: "Flamengo → Tijuca", cat: "Entrega" as Category, budget: "R$38", objects: "Caixa média", when: "Hoje · 18h", urgency: "Baixa" as const, providers: 4, scheduled: false, lat: 78, lng: 70 },
 ];
