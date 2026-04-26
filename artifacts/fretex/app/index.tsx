@@ -358,27 +358,29 @@ function PrestadorHome() {
 
         {/* Demo button */}
         <Pressable
-          onPress={() => router.push("/request")}
+          onPress={() => router.push("/job")}
           style={[styles.demoBtn, { backgroundColor: c.primary }, shadows.md]}
         >
-          <Ionicons name="notifications" size={16} color="#fff" />
-          <Text style={styles.demoBtnText}>Ver solicitação de serviço (demo)</Text>
+          <Ionicons name="play-circle" size={16} color="#fff" />
+          <Text style={styles.demoBtnText}>Ver serviço em andamento (demo)</Text>
         </Pressable>
 
         {/* Active job */}
-        <LinearGradient
-          colors={[c.primary, c.primaryDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.jobCard}
-        >
-          <View style={styles.jobBadgeRow}>
-            <View style={styles.jobLiveDot} />
-            <Text style={styles.jobLiveText}>SERVIÇO EM ANDAMENTO — AO VIVO</Text>
-          </View>
-          <Text style={styles.jobTitle}>Mudança · Tijuca → Barra</Text>
-          <Text style={styles.jobSub}>12,4 km · Ver mapa →</Text>
-        </LinearGradient>
+        <Pressable onPress={() => router.push("/job")}>
+          <LinearGradient
+            colors={[c.primary, c.primaryDeep]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.jobCard}
+          >
+            <View style={styles.jobBadgeRow}>
+              <View style={styles.jobLiveDot} />
+              <Text style={styles.jobLiveText}>SERVIÇO EM ANDAMENTO — AO VIVO</Text>
+            </View>
+            <Text style={styles.jobTitle}>Mudança · Tijuca → Barra</Text>
+            <Text style={styles.jobSub}>12,4 km · Ver mapa →</Text>
+          </LinearGradient>
+        </Pressable>
 
         {/* Request card */}
         <View style={[styles.requestCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
@@ -397,7 +399,7 @@ function PrestadorHome() {
               <Text style={[styles.requestRefuseText, { color: c.sub }]}>Recusar</Text>
             </Pressable>
             <Pressable
-              onPress={() => router.push("/request")}
+              onPress={() => router.push("/request-details")}
               style={[styles.requestAccept, { backgroundColor: c.primary }]}
             >
               <Text style={styles.requestAcceptText}>Ver detalhes →</Text>
