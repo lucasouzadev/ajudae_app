@@ -5,6 +5,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
+import { useService } from "@/contexts/ServiceContext";
 import { MOCK_PROVIDERS, FILTERS, CATEGORY_COLORS, type Category, type Provider } from "@/constants/mockData";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { TopNav } from "@/components/TopNav";
@@ -65,6 +66,7 @@ function ClienteHome() {
   const c = colors.light;
   const router = useRouter();
   const { user } = useAuth();
+  const { active: activeService } = useService();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [active, setActive] = useState<Provider | null>(null);
@@ -173,10 +175,49 @@ function ClienteHome() {
         </View>
       ) : null}
 
+      {/* Active service tracking banner */}
+      {activeService && activeService.status !== "completed" && activeService.status !== "cancelled" ? (
+        <Pressable
+          onPress={() => router.push("/track")}
+          style={[
+            styles.trackBanner,
+            {
+              top: insets.top + 70,
+              backgroundColor:
+                activeService.category === "Mudança"
+                  ? c.primary
+                  : activeService.category === "Frete"
+                  ? c.blue
+                  : c.success,
+            },
+            shadows.md,
+          ]}
+        >
+          <View style={styles.trackPulse} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.trackEyebrow}>ACOMPANHAR PEDIDO · #{activeService.id.slice(-6).toUpperCase()}</Text>
+            <Text style={styles.trackTitle}>
+              {activeService.status === "requested"
+                ? "Aguardando prestador aceitar"
+                : activeService.status === "accepted"
+                ? `${activeService.providerName || "Prestador"} aceitou`
+                : activeService.status === "en_route"
+                ? `${activeService.providerName || "Prestador"} a caminho`
+                : activeService.status === "in_progress"
+                ? "Serviço em execução"
+                : activeService.status === "disputed"
+                ? "Em análise pela equipe"
+                : activeService.category}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#fff" />
+        </Pressable>
+      ) : null}
+
       {/* Chip buttons */}
       <View style={[styles.actionChipsWrap, { bottom: 198 + insets.bottom }]}>
         <ChipBar
-          onService={() => router.push("/request")}
+          onService={() => router.push(activeService && activeService.status !== "completed" && activeService.status !== "cancelled" ? "/track" : "/request")}
           onInbox={() => router.push("/inbox")}
           onMarketplace={() => router.push("/marketplace")}
         />
@@ -238,6 +279,7 @@ function PrestadorHome() {
   const c = colors.light;
   const router = useRouter();
   const { user } = useAuth();
+  const { active: activeService } = useService();
   const insets = useSafeAreaInsets();
   const [online, setOnline] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -247,6 +289,23 @@ function PrestadorHome() {
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
   const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const firstName = (user?.name || "Carlos").split(" ")[0];
+
+  const incoming = activeService && activeService.status === "requested" ? activeService : null;
+  const inProgress = activeService && ["accepted", "en_route", "in_progress"].includes(activeService.status) ? activeService : null;
+  const incomingAccent = incoming
+    ? incoming.category === "Mudança"
+      ? c.primary
+      : incoming.category === "Frete"
+      ? c.blue
+      : c.success
+    : c.primary;
+  const progressAccent = inProgress
+    ? inProgress.category === "Mudança"
+      ? c.primary
+      : inProgress.category === "Frete"
+      ? c.blue
+      : c.success
+    : c.primary;
 
   const stats = [
     { v: "R$247", l: "Hoje", color: c.success, bg: c.successLight },
@@ -327,56 +386,79 @@ function PrestadorHome() {
           </View>
         </View>
 
-        {/* Demo button */}
-        <Pressable
-          onPress={() => router.push("/job")}
-          style={[styles.demoBtn, { backgroundColor: c.primary }, shadows.md]}
-        >
-          <Ionicons name="play-circle" size={16} color="#fff" />
-          <Text style={styles.demoBtnText}>Ver serviço em andamento (demo)</Text>
-        </Pressable>
-
-        {/* Active job */}
-        <Pressable onPress={() => router.push("/job")}>
-          <LinearGradient
-            colors={[c.primary, c.primaryDeep]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.jobCard}
-          >
-            <View style={styles.jobBadgeRow}>
-              <View style={styles.jobLiveDot} />
-              <Text style={styles.jobLiveText}>SERVIÇO EM ANDAMENTO — AO VIVO</Text>
-            </View>
-            <Text style={styles.jobTitle}>Mudança · Tijuca → Barra</Text>
-            <Text style={styles.jobSub}>12,4 km · Ver mapa →</Text>
-          </LinearGradient>
-        </Pressable>
-
-        {/* Request card */}
-        <View style={[styles.requestCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-          <View style={styles.requestHead}>
-            <View>
-              <Text style={[styles.requestName, { color: c.text }]}>Ricardo A.</Text>
-              <Text style={[styles.requestMeta, { color: c.softMuted }]}>Mudança · 12.4 km</Text>
-            </View>
-            <View style={{ alignItems: "flex-end" }}>
-              <Text style={[styles.requestPrice, { color: c.success }]}>R$75,65</Text>
-              <Text style={[styles.requestSub, { color: c.softMuted }]}>líquido · Agora</Text>
-            </View>
-          </View>
-          <View style={styles.requestBtns}>
-            <Pressable style={[styles.requestRefuse, { backgroundColor: c.background, borderColor: c.border }]}>
-              <Text style={[styles.requestRefuseText, { color: c.sub }]}>Recusar</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => router.push("/request-details")}
-              style={[styles.requestAccept, { backgroundColor: c.primary }]}
+        {/* Active job — only when prestador has accepted/en_route/in_progress */}
+        {inProgress ? (
+          <Pressable onPress={() => router.push("/job")}>
+            <LinearGradient
+              colors={[progressAccent, progressAccent + "DD"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.jobCard}
             >
-              <Text style={styles.requestAcceptText}>Ver detalhes →</Text>
-            </Pressable>
+              <View style={styles.jobBadgeRow}>
+                <View style={styles.jobLiveDot} />
+                <Text style={styles.jobLiveText}>SERVIÇO EM ANDAMENTO — AO VIVO</Text>
+              </View>
+              <Text style={styles.jobTitle}>
+                {inProgress.category} · {inProgress.customerName}
+              </Text>
+              <Text style={styles.jobSub}>
+                {inProgress.status === "accepted"
+                  ? "Confirme que está saindo →"
+                  : inProgress.status === "en_route"
+                  ? "Você está a caminho →"
+                  : "Concluir e cobrar PIN →"}
+              </Text>
+            </LinearGradient>
+          </Pressable>
+        ) : null}
+
+        {/* Real incoming request */}
+        {incoming ? (
+          <View style={[styles.requestCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+            <View style={styles.requestHead}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.requestName, { color: c.text }]}>{incoming.customerName}</Text>
+                <Text style={[styles.requestMeta, { color: c.softMuted }]}>
+                  {incoming.category} · {incoming.scheduled ? "Agendado" : "Imediato"}
+                </Text>
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={[styles.requestPrice, { color: c.success }]}>R$ {(incoming.estimatedPrice * 0.85).toFixed(2)}</Text>
+                <Text style={[styles.requestSub, { color: c.softMuted }]}>líquido · Agora</Text>
+              </View>
+            </View>
+            <View style={styles.requestBtns}>
+              <Pressable
+                onPress={() => router.push("/request-details")}
+                style={[styles.requestRefuse, { backgroundColor: c.background, borderColor: c.border }]}
+              >
+                <Text style={[styles.requestRefuseText, { color: c.sub }]}>Recusar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push("/request-details")}
+                style={[styles.requestAccept, { backgroundColor: incomingAccent }]}
+              >
+                <Text style={styles.requestAcceptText}>Ver detalhes →</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        ) : !inProgress ? (
+          <View style={[styles.requestCard, { backgroundColor: c.card, borderColor: c.border, alignItems: "center" }, shadows.sm]}>
+            <View style={[styles.emptyIconWrap, { backgroundColor: c.background }]}>
+              <Ionicons name="hourglass" size={20} color={c.softMuted} />
+            </View>
+            <Text style={[styles.requestName, { color: c.text, marginTop: 10, textAlign: "center" }]}>
+              Aguardando solicitações
+            </Text>
+            <Text style={[styles.requestSub, { color: c.softMuted, textAlign: "center", marginTop: 4 }]}>
+              Quando alguém pedir um serviço perto de você, aparecerá aqui.
+            </Text>
+            <Text style={[styles.requestSub, { color: c.softMuted, textAlign: "center", marginTop: 8, fontStyle: "italic" }]}>
+              Para simular, troque para Cliente no menu lateral e crie um pedido.
+            </Text>
+          </View>
+        ) : null}
 
         {/* Chip bar */}
         <View style={{ marginTop: 14 }}>
@@ -473,16 +555,39 @@ const styles = StyleSheet.create({
   marketLabel: { fontSize: 11, fontFamily: fonts.sans.bold },
   marketValue: { fontSize: 16, fontFamily: fonts.serif.extra, marginTop: 4 },
   marketTrend: { fontSize: 10, fontFamily: fonts.sans.bold, marginTop: 4 },
-  demoBtn: {
-    height: 48,
-    borderRadius: 14,
+  trackBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 16,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    zIndex: 38,
   },
-  demoBtnText: { color: "#fff", fontSize: 14, fontFamily: fonts.sans.extra },
+  trackPulse: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.95)",
+  },
+  trackEyebrow: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 9,
+    fontFamily: fonts.sans.bold,
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  trackTitle: { color: "#fff", fontSize: 13, fontFamily: fonts.sans.extra },
+  emptyIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   jobCard: { borderRadius: 18, padding: 18, marginBottom: 16 },
   jobBadgeRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 5 },
   jobLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.9)" },

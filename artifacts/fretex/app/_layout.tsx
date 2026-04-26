@@ -25,6 +25,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { RequestsProvider } from "@/contexts/RequestsContext";
 import { PaymentsProvider } from "@/contexts/PaymentsContext";
 import { SupportProvider } from "@/contexts/SupportContext";
+import { ServiceProvider } from "@/contexts/ServiceContext";
 import { StatusBar } from "expo-status-bar";
 
 SplashScreen.preventAutoHideAsync();
@@ -59,7 +60,12 @@ function AuthGate() {
       <Stack.Screen name="payment" options={{ presentation: "modal" }} />
       <Stack.Screen name="request" options={{ presentation: "modal" }} />
       <Stack.Screen name="request-details" options={{ presentation: "modal" }} />
+      <Stack.Screen name="otp-modal" options={{ presentation: "modal", gestureEnabled: false }} />
+      <Stack.Screen name="track" options={{ headerShown: false }} />
+      <Stack.Screen name="rate" options={{ presentation: "modal" }} />
+      <Stack.Screen name="ticket" options={{ presentation: "modal" }} />
       <Stack.Screen name="job" options={{ headerShown: false }} />
+      <Stack.Screen name="job-otp" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
@@ -98,12 +104,14 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <RequestsProvider>
-                  <PaymentsProvider>
-                    <SupportProvider>
-                      <StatusBar style="dark" backgroundColor="#F7F5F2" />
-                      <AuthGate />
-                    </SupportProvider>
-                  </PaymentsProvider>
+                  <ServiceProvider>
+                    <PaymentsProvider>
+                      <SupportProvider>
+                        <StatusBar style="dark" backgroundColor="#F7F5F2" />
+                        <AuthGate />
+                      </SupportProvider>
+                    </PaymentsProvider>
+                  </ServiceProvider>
                 </RequestsProvider>
               </AuthProvider>
             </KeyboardProvider>
