@@ -117,7 +117,7 @@ export default function JobScreen() {
             <Text style={[styles.clientName, { color: c.text }]}>{active.customerName}</Text>
             <Text style={[styles.clientMeta, { color: c.softMuted }]}>Cliente Ajudaê! · {active.customerRating} ★</Text>
           </View>
-          <Pressable onPress={() => router.push("/inbox")} style={[styles.iconBtn, { backgroundColor: c.background, borderColor: c.border }]}>
+          <Pressable onPress={() => router.push({ pathname: "/inbox", params: { openName: active.customerName } })} style={[styles.iconBtn, { backgroundColor: c.background, borderColor: c.border }]}>
             <Ionicons name="chatbubble-ellipses" size={15} color={c.text} />
           </Pressable>
           <Pressable onPress={() => Linking.openURL("tel:+5521999998888").catch(() => {})} style={[styles.iconBtn, { backgroundColor: accent, borderColor: accent }]}>
