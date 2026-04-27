@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { View, Text, Pressable, StyleSheet, TextInput, Keyboard } from "react-native";
+import { View, Text, Pressable, StyleSheet, TextInput, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -73,7 +73,10 @@ export default function ConfirmStartPinScreen() {
   }
 
   return (
-    <View style={[styles.wrap, { backgroundColor: c.background }]}>
+    <KeyboardAvoidingView
+      style={[styles.wrap, { backgroundColor: c.background }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => router.back()} style={[styles.iconBtn, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -83,7 +86,11 @@ export default function ConfirmStartPinScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <LinearGradient
           colors={[accent, accent + "DD"]}
           start={{ x: 0, y: 0 }}
@@ -150,8 +157,8 @@ export default function ConfirmStartPinScreen() {
             {submitting ? "Confirmando..." : "Confirmar e iniciar serviço"}
           </Text>
         </Pressable>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -166,7 +173,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 14, fontFamily: fonts.sans.bold },
   iconBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  content: { flex: 1, padding: 24, alignItems: "center", justifyContent: "center" },
+  content: { flexGrow: 1, padding: 24, alignItems: "center", justifyContent: "center" },
   iconBig: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", marginBottom: 24 },
   title: { fontSize: 24, fontFamily: fonts.serif.extra, textAlign: "center", marginBottom: 8 },
   subtitle: { fontSize: 13, fontFamily: fonts.sans.regular, textAlign: "center", marginBottom: 28, lineHeight: 19, paddingHorizontal: 12 },

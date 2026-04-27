@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
 import colors, { fonts, shadows } from "@/constants/colors";
@@ -54,9 +54,12 @@ export default function InboxScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, role } = useAuth();
+  const { openName } = useLocalSearchParams<{ openName?: string }>();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [tab, setTab] = useState<"all" | "unread">("all");
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   if (!user) return null;
   const initials = (user.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
@@ -67,6 +70,17 @@ export default function InboxScreen() {
   const hubs = role === "cliente" ? SUPPORT_HUBS_CLIENTE : SUPPORT_HUBS_PRESTADOR;
   const filtered = tab === "unread" ? conversations.filter((m) => m.unread > 0) : conversations;
   const totalUnread = conversations.reduce((sum, m) => sum + m.unread, 0);
+
+  useEffect(() => {
+    if (!openName) return;
+    const match = conversations.find((c) =>
+      c.name.toLowerCase().includes((openName as string).toLowerCase().split(" ")[0])
+    );
+    if (match) {
+      setHighlightId(match.id);
+      setTimeout(() => scrollRef.current?.scrollTo({ y: conversations.indexOf(match) * 90, animated: true }), 300);
+    }
+  }, [openName]);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -82,6 +96,7 @@ export default function InboxScreen() {
       />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
@@ -170,7 +185,12 @@ export default function InboxScreen() {
           filtered.map((m) => (
             <Pressable
               key={m.id}
-              style={[styles.convoCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+              style={[
+                styles.convoCard,
+                { backgroundColor: c.card, borderColor: highlightId === m.id ? accent : c.border },
+                shadows.sm,
+                highlightId === m.id && { borderWidth: 2 },
+              ]}
             >
               <View style={styles.convoAvatarWrap}>
                 <LinearGradient

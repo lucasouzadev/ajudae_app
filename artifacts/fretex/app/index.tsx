@@ -1072,7 +1072,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   activeRequestText: { color: "#fff", fontSize: 13, fontFamily: fonts.sans.bold },
-  actionChipsWrap: { position: "absolute", right: 16, zIndex: 33 },
+  actionChipsWrap: { position: "absolute", right: 16, zIndex: 29 },
   filtersWrap: { position: "absolute", left: 0, right: 0, zIndex: 32, maxHeight: 40 },
   providerMiniCard: {
     width: 150,
