@@ -526,7 +526,26 @@ const pStyles = StyleSheet.create({
   reviewText: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 16 },
 });
 
-type TabKey = "inicio" | "pedidos" | "perfil";
+/* ─── HubCard — painel accordion para prestador home ───────────────────── */
+function HubCard({ icon, color, title, children }: { icon: any; color: string; title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const c = colors.light;
+  return (
+    <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: open ? 12 : 0 }}
+      >
+        <Ionicons name={icon} size={16} color={color} />
+        <Text style={[pStyles.cardTitle, { flex: 1, color: c.text }]}>{title}</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={c.softMuted} />
+      </Pressable>
+      {open ? children : null}
+    </View>
+  );
+}
+
+type TabKey = "inicio" | "pedidos" | "marketplace" | "inbox";
 
 export default function HomeScreen() {
   const { user, role } = useAuth();
@@ -536,33 +555,40 @@ export default function HomeScreen() {
 
 /* ─── Tab Wrappers ──────────────────────────────────────────────────────── */
 function ClienteTabsWrapper() {
-  const [tab, setTab] = useState<TabKey>("inicio");
+  const [tab, setTab] = useState<"inicio" | "pedidos">("inicio");
   const { active } = useService();
+  const router = useRouter();
   const hasBadge = !!(active && active.status !== "completed" && active.status !== "cancelled");
+  const handleTabPress = (key: string) => {
+    if (key === "marketplace") { router.push("/marketplace"); return; }
+    setTab(key as "inicio" | "pedidos");
+  };
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1, display: tab === "inicio" ? "flex" : "none" }}><ClienteHome /></View>
         <View style={{ flex: 1, display: tab === "pedidos" ? "flex" : "none" }}><PedidosTab onGoHome={() => setTab("inicio")} /></View>
-        <View style={{ flex: 1, display: tab === "perfil" ? "flex" : "none" }}><PerfilTab /></View>
       </View>
-      <BottomTabBar active={tab} role="cliente" hasBadge={hasBadge} onPress={setTab} />
+      <BottomTabBar active={tab} role="cliente" hasBadge={hasBadge} onPress={handleTabPress} />
     </View>
   );
 }
 
 function PrestadorTabsWrapper() {
-  const [tab, setTab] = useState<TabKey>("inicio");
+  const [tab] = useState<"inicio">("inicio");
   const { active } = useService();
+  const router = useRouter();
   const hasBadge = !!(active && ["requested", "accepted", "en_route", "in_progress"].includes(active.status ?? ""));
+  const handleTabPress = (key: string) => {
+    if (key === "inbox") { router.push("/inbox"); return; }
+    if (key === "marketplace") { router.push("/marketplace"); return; }
+  };
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
-        <View style={{ flex: 1, display: tab === "inicio" ? "flex" : "none" }}><PrestadorHome /></View>
-        <View style={{ flex: 1, display: tab === "pedidos" ? "flex" : "none" }}><HistoricoTab /></View>
-        <View style={{ flex: 1, display: tab === "perfil" ? "flex" : "none" }}><PerfilTab /></View>
+        <View style={{ flex: 1 }}><PrestadorHome /></View>
       </View>
-      <BottomTabBar active={tab} role="prestador" hasBadge={hasBadge} onPress={setTab} />
+      <BottomTabBar active={tab} role="prestador" hasBadge={hasBadge} onPress={handleTabPress} />
     </View>
   );
 }
@@ -587,12 +613,12 @@ function BottomTabBar({
       ? [
           { key: "inicio" as TabKey, label: "Início", icon: "home" as const, lib: "ion" as const },
           { key: "pedidos" as TabKey, label: "Pedidos", icon: "truck" as const, lib: "mc" as const, badge: hasBadge },
-          { key: "perfil" as TabKey, label: "Perfil", icon: "person" as const, lib: "ion" as const },
+          { key: "marketplace" as TabKey, label: "Explorar", icon: "storefront" as const, lib: "ion" as const },
         ]
       : [
-          { key: "inicio" as TabKey, label: "Home", icon: "home" as const, lib: "ion" as const },
-          { key: "pedidos" as TabKey, label: "Histórico", icon: "time" as const, lib: "ion" as const },
-          { key: "perfil" as TabKey, label: "Perfil", icon: "person" as const, lib: "ion" as const },
+          { key: "inicio" as TabKey, label: "Home", icon: "home" as const, lib: "ion" as const, badge: hasBadge },
+          { key: "inbox" as TabKey, label: "Mensagens", icon: "chatbubbles" as const, lib: "ion" as const },
+          { key: "marketplace" as TabKey, label: "Mercado", icon: "storefront" as const, lib: "ion" as const },
         ];
 
   return (
@@ -715,10 +741,10 @@ function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
 
         <View style={[pedidosStyles.quickRow]}>
           <Pressable
-            onPress={() => router.push("/marketplace")}
+            onPress={() => router.push("/request")}
             style={[pedidosStyles.quickBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
           >
-            <Ionicons name="cart" size={18} color={c.primary} />
+            <Ionicons name="add-circle" size={18} color={c.primary} />
             <Text style={[pedidosStyles.quickLabel, { color: c.text }]}>Nova solicitação</Text>
           </Pressable>
           <Pressable
@@ -1163,26 +1189,7 @@ function ClienteHome() {
         </Pressable>
       ) : null}
 
-      {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
-        style={[styles.filtersWrap, { bottom: 16 + insets.bottom }]}
-      >
-        {FILTERS.map((f) => (
-          <Chip
-            key={f}
-            label={f}
-            active={filter === f}
-            count={counts[f]}
-            category={f === "Todos" ? null : (f as Category)}
-            onPress={() => setFilter(f)}
-          />
-        ))}
-      </ScrollView>
-
-      {/* Bottom draggable sheet */}
+      {/* Bottom draggable sheet — filter chips embutidos no header */}
       <ProvidersSheet
         providers={filtered}
         active={active}
@@ -1193,6 +1200,10 @@ function ClienteHome() {
         onOpenProfile={(p) => router.push(`/provider/${p.id}`)}
         onSeeAll={() => router.push("/marketplace")}
         insetsBottom={insets.bottom}
+        filter={filter}
+        onFilterChange={setFilter}
+        filters={FILTERS as unknown as string[]}
+        counts={counts}
       />
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1310,7 +1321,7 @@ function PrestadorHome() {
           </View>
         </Pressable>
 
-        {/* Stats */}
+        {/* Stats rápidos */}
         {dataLoading ? (
           <View style={styles.statsGrid}>
             {[0, 1, 2].map((i) => (
@@ -1334,54 +1345,7 @@ function PrestadorHome() {
         {/* Hot area banner */}
         <HotAreaBanner onPress={() => router.push("/marketplace")} />
 
-        {/* Radar */}
-        {dataLoading ? (
-          <View style={[styles.radarCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-            <Skeleton width="50%" height={14} borderRadius={6} style={{ marginBottom: 8 }} />
-            <View style={styles.statsGrid}>
-              {[0, 1, 2].map((i) => (
-                <View key={i} style={[styles.marketCell, { backgroundColor: c.background }]}>
-                  <Skeleton width="70%" height={11} borderRadius={4} style={{ marginBottom: 4 }} />
-                  <Skeleton width="55%" height={16} borderRadius={5} style={{ marginBottom: 4 }} />
-                  <Skeleton width="35%" height={11} borderRadius={4} />
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : (
-          <View style={[styles.radarCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-            <View style={styles.radarHead}>
-              <Text style={[styles.radarTitle, { color: c.text }]}>Radar do mercado</Text>
-              <Text style={[styles.radarSub, { color: c.blue }]}>6 publicações perto</Text>
-            </View>
-            <View style={styles.statsGrid}>
-              {market.map((m) => (
-                <View key={m.label} style={[styles.marketCell, { backgroundColor: c.background }]}>
-                  <Text style={[styles.marketLabel, { color: c.text }]}>{m.label}</Text>
-                  <Text style={[styles.marketValue, { color: c.text }]}>{m.value}</Text>
-                  <Text style={[styles.marketTrend, { color: m.trend.startsWith("+") ? c.success : c.warning }]}>{m.trend}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Price suggestion */}
-        <PriceSuggestion />
-
-        {/* Demand forecast */}
-        <DemandForecast />
-
-        {/* Activity heatmap */}
-        <ActivityHeatmap />
-
-        {/* Monthly goals */}
-        <MonthlyGoals />
-
-        {/* Badges */}
-        <BadgeRow />
-
-        {/* Active job — only when prestador has accepted/en_route/in_progress */}
+        {/* Serviço ativo em andamento */}
         {inProgress ? (
           <Pressable onPress={() => router.push("/job")}>
             <LinearGradient
@@ -1394,21 +1358,17 @@ function PrestadorHome() {
                 <View style={styles.jobLiveDot} />
                 <Text style={styles.jobLiveText}>SERVIÇO EM ANDAMENTO — AO VIVO</Text>
               </View>
-              <Text style={styles.jobTitle}>
-                {inProgress.category} · {inProgress.customerName}
-              </Text>
+              <Text style={styles.jobTitle}>{inProgress.category} · {inProgress.customerName}</Text>
               <Text style={styles.jobSub}>
-                {inProgress.status === "accepted"
-                  ? "Confirme que está saindo →"
-                  : inProgress.status === "en_route"
-                  ? "Você está a caminho →"
+                {inProgress.status === "accepted" ? "Confirme que está saindo →"
+                  : inProgress.status === "en_route" ? "Você está a caminho →"
                   : "Concluir e cobrar PIN →"}
               </Text>
             </LinearGradient>
           </Pressable>
         ) : null}
 
-        {/* Real incoming request */}
+        {/* Solicitação recebida */}
         {incoming ? (
           <View style={[styles.requestCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
             <View style={styles.requestHead}>
@@ -1447,16 +1407,43 @@ function PrestadorHome() {
               Aguardando solicitações
             </Text>
             <Text style={[styles.requestSub, { color: c.softMuted, textAlign: "center", marginTop: 4 }]}>
-              Quando alguém pedir um serviço perto de você, aparecerá aqui.
-            </Text>
-            <Text style={[styles.requestSub, { color: c.softMuted, textAlign: "center", marginTop: 8, fontStyle: "italic" }]}>
-              Para simular, troque para Cliente no menu lateral e crie um pedido.
+              Quando alguém solicitar um serviço perto de você, aparecerá aqui.
             </Text>
           </View>
         ) : null}
 
-        {/* Recent reviews */}
-        <RecentReviews />
+        {/* Hub: Análise de mercado */}
+        <HubCard icon="trending-up" color={c.blue} title="Análise de mercado">
+          <View style={[styles.radarCard, { backgroundColor: c.background, borderColor: c.borderLight, marginBottom: 12 }]}>
+            <View style={styles.radarHead}>
+              <Text style={[styles.radarTitle, { color: c.text }]}>Radar do mercado</Text>
+              <Text style={[styles.radarSub, { color: c.blue }]}>6 publicações perto</Text>
+            </View>
+            <View style={styles.statsGrid}>
+              {market.map((m) => (
+                <View key={m.label} style={[styles.marketCell, { backgroundColor: c.card }]}>
+                  <Text style={[styles.marketLabel, { color: c.text }]}>{m.label}</Text>
+                  <Text style={[styles.marketValue, { color: c.text }]}>{m.value}</Text>
+                  <Text style={[styles.marketTrend, { color: m.trend.startsWith("+") ? c.success : c.warning }]}>{m.trend}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+          <PriceSuggestion />
+          <DemandForecast />
+        </HubCard>
+
+        {/* Hub: Minha performance */}
+        <HubCard icon="stats-chart" color={c.success} title="Minha performance">
+          <ActivityHeatmap />
+          <MonthlyGoals />
+        </HubCard>
+
+        {/* Hub: Conquistas & Avaliações */}
+        <HubCard icon="ribbon" color={c.warning} title="Conquistas & Avaliações">
+          <BadgeRow />
+          <RecentReviews />
+        </HubCard>
       </ScrollView>
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1481,7 +1468,7 @@ const styles = StyleSheet.create({
     right: 16,
     borderRadius: 18,
     padding: 14,
-    zIndex: 36,
+    zIndex: 50,
   },
   activeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
   activeIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
@@ -1597,7 +1584,7 @@ const styles = StyleSheet.create({
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
 const SCREEN_H = Dimensions.get("window").height;
-const COLLAPSED_H = 196;  // shows handle + subtitle + carousel
+const COLLAPSED_H = 228;  // handle + título + chips carousel + mini cards
 const EXPANDED_H = Math.min(SCREEN_H * 0.78, 640);
 
 function ProvidersSheet({
@@ -1607,6 +1594,10 @@ function ProvidersSheet({
   onOpenProfile,
   onSeeAll,
   insetsBottom,
+  filter,
+  onFilterChange,
+  filters,
+  counts,
 }: {
   providers: Provider[];
   active: Provider | null;
@@ -1614,6 +1605,10 @@ function ProvidersSheet({
   onOpenProfile: (p: Provider) => void;
   onSeeAll: () => void;
   insetsBottom: number;
+  filter: string;
+  onFilterChange: (f: string) => void;
+  filters: string[];
+  counts: Record<string, number>;
 }) {
   const c = colors.light;
   const heightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
@@ -1680,6 +1675,23 @@ function ProvidersSheet({
             <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={16} color={c.text} />
           </Pressable>
         </View>
+        {/* Filter chips carousel — sempre visível no header */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: 4, gap: 8 }}
+        >
+          {filters.map((f) => (
+            <Chip
+              key={f}
+              label={f}
+              active={filter === f}
+              count={counts[f]}
+              category={f === "Todos" ? null : (f as Category)}
+              onPress={() => onFilterChange(f)}
+            />
+          ))}
+        </ScrollView>
       </View>
 
       {/* Body — list when expanded, carousel when collapsed */}
