@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { IS_DEMO } from "@/constants/env";
 import {
   View,
   Text,
@@ -37,7 +38,10 @@ export default function AuthScreen() {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      await login(email || "ricardo@ajudae.app", senha || "123456");
+      await login(
+        IS_DEMO ? (email || "ricardo@ajudae.app") : email,
+        IS_DEMO ? (senha || "123456") : senha
+      );
     } catch (e) {
       console.error(e);
     } finally {
@@ -49,10 +53,10 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       await signup(
-        nome || "Novo Usuário",
-        email || "novo@ajudae.app",
-        telefone || "21999999999",
-        senha || "123456",
+        IS_DEMO ? (nome || "Novo Usuário") : nome,
+        IS_DEMO ? (email || "novo@ajudae.app") : email,
+        IS_DEMO ? (telefone || "21999999999") : telefone,
+        IS_DEMO ? (senha || "123456") : senha,
         role,
       );
     } catch (e) {
@@ -95,6 +99,14 @@ export default function AuthScreen() {
             <Text style={[s.lobbySecondaryText, { color: c.text }]}>Criar conta</Text>
           </Pressable>
         </View>
+
+        {IS_DEMO && (
+          <View style={[s.demoHint, { backgroundColor: "#FEF3C7", borderColor: "#FCD34D" }]}>
+            <Text style={[s.demoHintTxt, { color: "#92400E" }]}>
+              Demo — cliente@ajudae.com ou prestador@ajudae.com · senha: 123456
+            </Text>
+          </View>
+        )}
 
         {/* Providers */}
         <View style={s.dividerRow}>
@@ -505,4 +517,6 @@ const s = StyleSheet.create({
   },
   terms: { fontSize: 11, fontFamily: fonts.sans.regular, textAlign: "center", marginTop: 20, lineHeight: 17 },
   switchLink: { fontSize: 13, fontFamily: fonts.sans.regular },
+  demoHint: { marginTop: 16, padding: 10, borderRadius: 10, borderWidth: 1, alignItems: "center" },
+  demoHintTxt: { fontSize: 11, fontFamily: fonts.sans.medium, textAlign: "center" },
 });

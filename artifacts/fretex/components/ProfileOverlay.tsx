@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Modal, View, Text, Pressable, StyleSheet, Animated, ScrollView, Easing } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,12 +22,113 @@ const ITEMS_BASE = [
   { icon: "settings" as const, label: "Configurações", sub: "Notificações, privacidade" },
 ];
 
+function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Object.assign> }) {
+  if (label === "Métodos de Pagamento") {
+    return (
+      <View style={subStyles.container}>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.success}18` }]}>
+            <Ionicons name="qr-code" size={18} color={c.success} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Pix</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Chave: •••• 9768</Text>
+          </View>
+          <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
+            <Text style={[subStyles.badgeText, { color: c.success }]}>Ativo</Text>
+          </View>
+        </View>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.blue}18` }]}>
+            <Ionicons name="card" size={18} color={c.blue} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Cartão Crédito</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Visa •••• 4521</Text>
+          </View>
+          <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
+            <Text style={[subStyles.badgeText, { color: c.success }]}>Ativo</Text>
+          </View>
+        </View>
+        <Pressable style={[subStyles.addBtn, { borderColor: c.border }]} disabled>
+          <Ionicons name="add" size={15} color={c.softMuted} />
+          <Text style={[subStyles.addBtnText, { color: c.softMuted }]}>Adicionar método</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (label === "Meus Endereços") {
+    return (
+      <View style={subStyles.container}>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.primary}18` }]}>
+            <Ionicons name="home" size={18} color={c.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Casa</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Tijuca, Rio de Janeiro, RJ</Text>
+          </View>
+        </View>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.blue}18` }]}>
+            <Ionicons name="business" size={18} color={c.blue} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Trabalho</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Centro, Rio de Janeiro, RJ</Text>
+          </View>
+        </View>
+        <Pressable style={[subStyles.addBtn, { borderColor: c.border }]} disabled>
+          <Ionicons name="add" size={15} color={c.softMuted} />
+          <Text style={[subStyles.addBtnText, { color: c.softMuted }]}>Adicionar endereço</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (label === "Histórico de Pedidos") {
+    const orders = [
+      { title: "Mudança", price: "R$420", status: "Concluído", color: c.success },
+      { title: "Frete", price: "R$90", status: "Concluído", color: c.success },
+      { title: "Entrega", price: "R$45", status: "Cancelado", color: c.error ?? "#E53E3E" },
+    ];
+    return (
+      <View style={subStyles.container}>
+        {orders.map((o, i) => (
+          <View key={i} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+            <View style={[subStyles.iconBox, { backgroundColor: `${c.primary}18` }]}>
+              <Ionicons name="cube" size={18} color={c.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[subStyles.rowLabel, { color: c.text }]}>{o.title} · {o.price}</Text>
+            </View>
+            <View style={[subStyles.badge, { backgroundColor: `${o.color}18` }]}>
+              <Text style={[subStyles.badgeText, { color: o.color }]}>{o.status}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  return (
+    <View style={subStyles.container}>
+      <View style={[subStyles.comingSoon, { backgroundColor: c.background, borderColor: c.border }]}>
+        <Ionicons name="time-outline" size={28} color={c.softMuted} />
+        <Text style={[subStyles.comingSoonText, { color: c.softMuted }]}>Em breve</Text>
+      </View>
+    </View>
+  );
+}
+
 export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlayProps) {
   const c = colors.light;
   const insets = useSafeAreaInsets();
   const { role, switchRole, logout } = useAuth();
   const translateY = useRef(new Animated.Value(-1000)).current;
   const fade = useRef(new Animated.Value(0)).current;
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -36,6 +137,7 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
         Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }),
       ]).start();
     } else {
+      setActiveMenu(null);
       Animated.parallel([
         Animated.timing(translateY, { toValue: -1000, duration: 320, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
         Animated.timing(fade, { toValue: 0, duration: 260, useNativeDriver: true }),
@@ -85,45 +187,60 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
         </LinearGradient>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.list}>
-          {ITEMS_BASE.map((item, i) => (
-            <Pressable key={i} style={[styles.item, { borderBottomColor: c.borderLight }]}>
-              <View style={[styles.itemIcon, { backgroundColor: c.background }]}>
-                <Ionicons name={item.icon} size={18} color={c.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.itemLabel, { color: c.text }]}>{item.label}</Text>
-                <Text style={[styles.itemSub, { color: c.softMuted }]}>{item.sub}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
-            </Pressable>
-          ))}
+          {activeMenu !== null ? (
+            <>
+              <Pressable
+                onPress={() => setActiveMenu(null)}
+                style={[styles.backBtn, { borderBottomColor: c.borderLight }]}
+              >
+                <Ionicons name="arrow-back" size={18} color={c.text} />
+                <Text style={[styles.backBtnText, { color: c.text }]}>{activeMenu}</Text>
+              </Pressable>
+              <SubMenuContent label={activeMenu} c={c} />
+            </>
+          ) : (
+            <>
+              {ITEMS_BASE.map((item, i) => (
+                <Pressable key={i} onPress={() => setActiveMenu(item.label)} style={[styles.item, { borderBottomColor: c.borderLight }]}>
+                  <View style={[styles.itemIcon, { backgroundColor: c.background }]}>
+                    <Ionicons name={item.icon} size={18} color={c.text} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemLabel, { color: c.text }]}>{item.label}</Text>
+                    <Text style={[styles.itemSub, { color: c.softMuted }]}>{item.sub}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
+                </Pressable>
+              ))}
 
-          <Pressable
-            onPress={() => {
-              switchRole(otherRole as "cliente" | "prestador");
-              onClose();
-            }}
-            style={[styles.item, { borderBottomColor: c.borderLight }]}
-          >
-            <View style={[styles.itemIcon, { backgroundColor: c.primaryLight }]}>
-              <Ionicons name="swap-horizontal" size={18} color={c.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemLabel, { color: c.text }]}>Trocar para {otherLabel}</Text>
-              <Text style={[styles.itemSub, { color: c.softMuted }]}>Mude o tipo de conta</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
-          </Pressable>
+              <Pressable
+                onPress={() => {
+                  switchRole(otherRole as "cliente" | "prestador");
+                  onClose();
+                }}
+                style={[styles.item, { borderBottomColor: c.borderLight }]}
+              >
+                <View style={[styles.itemIcon, { backgroundColor: c.primaryLight }]}>
+                  <Ionicons name="swap-horizontal" size={18} color={c.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemLabel, { color: c.text }]}>Trocar para {otherLabel}</Text>
+                  <Text style={[styles.itemSub, { color: c.softMuted }]}>Mude o tipo de conta</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
+              </Pressable>
 
-          <Pressable
-            onPress={async () => {
-              await logout();
-              onClose();
-            }}
-            style={[styles.logoutBtn, { borderColor: c.border }]}
-          >
-            <Text style={[styles.logoutText, { color: c.sub }]}>Sair da conta</Text>
-          </Pressable>
+              <Pressable
+                onPress={async () => {
+                  await logout();
+                  onClose();
+                }}
+                style={[styles.logoutBtn, { borderColor: c.border }]}
+              >
+                <Text style={[styles.logoutText, { color: c.sub }]}>Sair da conta</Text>
+              </Pressable>
+            </>
+          )}
         </ScrollView>
       </Animated.View>
     </Modal>
@@ -207,4 +324,61 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutText: { fontSize: 14, fontFamily: fonts.sans.semibold },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    marginBottom: 16,
+  },
+  backBtnText: { fontSize: 16, fontFamily: fonts.sans.bold },
+});
+
+const subStyles = StyleSheet.create({
+  container: { gap: 10 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowLabel: { fontSize: 13, fontFamily: fonts.sans.semibold },
+  rowSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  badgeText: { fontSize: 11, fontFamily: fonts.sans.bold },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
+    opacity: 0.5,
+  },
+  addBtnText: { fontSize: 13, fontFamily: fonts.sans.semibold },
+  comingSoon: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  comingSoonText: { fontSize: 14, fontFamily: fonts.sans.semibold },
 });

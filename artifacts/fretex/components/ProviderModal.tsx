@@ -35,7 +35,7 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
   const accentText = provider.color === "#FFCC00" ? "#8B6F00" : provider.color;
 
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={styles.centerWrap} pointerEvents="box-none">
         <View style={[styles.card, { backgroundColor: c.card }, shadows.xl]}>

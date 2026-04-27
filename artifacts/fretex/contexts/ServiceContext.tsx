@@ -40,7 +40,7 @@ export interface ActiveService {
   // PIN system — both generated at service creation
   pin_start: string;          // 4 digits — provider displays, client enters at arrival
   pin_conclusion: string;     // 6 digits — client shows, provider enters at completion
-  commitment: string;         // djb2(id|pin_start|pin_conclusion) — offline verification
+  commitment: string;         // SHA-256(id|pin_start|pin_conclusion) — offline verification
   startPinAttempts: number;   // max 5 → disputed
   conclusionAttempts: number; // max 5 → disputed
   cancellationReason?: string;
@@ -113,13 +113,13 @@ function genPin(digits: number): string {
   return Math.floor(min + Math.random() * (max - min + 1)).toString();
 }
 
-function computeCommitment(serviceId: string, pinStart: string, pinConclusion: string): string {
+async function computeCommitment(serviceId: string, pinStart: string, pinConclusion: string): Promise<string> {
   const input = `${serviceId}|${pinStart}|${pinConclusion}`;
-  let h = 5381;
-  for (let i = 0; i < input.length; i++) {
-    h = (Math.imul(h, 31) + input.charCodeAt(i)) | 0;
-  }
-  return (h >>> 0).toString(16).padStart(8, "0");
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +137,9 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
       if (!stored) return;
       const parsed = JSON.parse(stored) as ActiveService;
-      // Discard data from old format that lacks the commitment field
-      if (!parsed.commitment) {
+      // Discard data from old format that lacks the commitment field,
+      // or uses the legacy djb2 hash (8 hex chars) instead of SHA-256 (64 hex chars)
+      if (!parsed.commitment || parsed.commitment.length < 16) {
         AsyncStorage.removeItem(STORAGE_KEY);
         return;
       }
@@ -157,7 +158,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     const id = `req-${Date.now()}`;
     const pin_start = genPin(4);
     const pin_conclusion = genPin(6);
-    const commitment = computeCommitment(id, pin_start, pin_conclusion);
+    const commitment = await computeCommitment(id, pin_start, pin_conclusion);
     const next: ActiveService = {
       ...payload,
       id,
@@ -223,7 +224,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     if (active.status !== "en_route") {
       return { ok: false };
     }
-    const match = computeCommitment(active.id, entered, active.pin_conclusion) === active.commitment;
+    const match = await computeCommitment(active.id, entered, active.pin_conclusion) === active.commitment;
     if (match) {
       const now = new Date().toISOString();
       await persist({
@@ -253,7 +254,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     if (active.status !== "in_progress") {
       return { ok: false };
     }
-    const match = computeCommitment(active.id, active.pin_start, entered) === active.commitment;
+    const match = await computeCommitment(active.id, active.pin_start, entered) === active.commitment;
     if (match) {
       const now = new Date().toISOString();
       await persist({
