@@ -9,6 +9,7 @@ import colors, { fonts, shadows } from "@/constants/colors";
 import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
+import { Skeleton } from "@/components/Skeleton";
 
 interface Conversation {
   id: string;
@@ -59,7 +60,13 @@ export default function InboxScreen() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [tab, setTab] = useState<"all" | "unread">("all");
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 700);
+    return () => clearTimeout(t);
+  }, []);
 
   if (!user) return null;
   const initials = (user.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
@@ -171,7 +178,21 @@ export default function InboxScreen() {
         </View>
 
         {/* Conversations */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          [0, 1, 2, 3].map((i) => (
+            <View key={i} style={[styles.convoCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Skeleton width={46} height={46} borderRadius={23} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Skeleton width="45%" height={13} borderRadius={5} />
+                  <Skeleton width="18%" height={11} borderRadius={4} />
+                </View>
+                <Skeleton width="30%" height={11} borderRadius={4} />
+                <Skeleton width="75%" height={11} borderRadius={4} />
+              </View>
+            </View>
+          ))
+        ) : filtered.length === 0 ? (
           <View style={[styles.empty, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={[styles.emptyIcon, { backgroundColor: c.background }]}>
               <Ionicons name="checkmark-done" size={20} color={c.success} />

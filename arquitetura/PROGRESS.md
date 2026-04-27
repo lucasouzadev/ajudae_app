@@ -18,8 +18,8 @@
 ## 🔴 Crítico
 
 ### 1. Navegação bottom tab
-**Status:** 🔶 Parcialmente implementado
-**Detalhe:** Existe um floating chip bar no `index.tsx` (linhas 737–754 cliente / 1014–1030 prestador), mas não é um TabNavigator real com persistência de estado. Não segue o spec do PRD (Início | Pedidos | Perfil / Home | Histórico | Perfil).
+**Status:** ✅ Implementado
+**Detalhe:** `BottomTabBar` fixo na base com 3 abas por role: **Cliente** — Início | Pedidos | Perfil; **Prestador** — Home | Histórico | Perfil. Abas mantidas montadas via `display: flex/none` para persistência de estado. Indicador amarelo na aba ativa, badge dinâmico em Pedidos/Home quando há serviço ativo. `ChipBar` flutuante removido. `PedidosTab` com histórico de pedidos e atalhos Marketplace + Inbox; `HistoricoTab` com resumo de ganhos e serviços concluídos; `PerfilTab` com menu completo e logout.
 **Arquivo:** `app/index.tsx`
 
 ---
@@ -71,9 +71,9 @@
 ## 🟡 Médio impacto
 
 ### 8. Skeleton/loading nos ScrollViews
-**Status:** 🔶 Parcialmente implementado
-**Detalhe:** Componente `Skeleton` criado com animação de pulso. Aplicado em `marketplace.tsx` (900ms de loading simulado antes de exibir lista de prestadores). Demais telas pendentes.
-**Arquivo:** `components/Skeleton.tsx` (novo), `app/marketplace.tsx`
+**Status:** ✅ Implementado
+**Detalhe:** Componente `Skeleton` com animação de pulso aplicado em todas as telas principais: `marketplace.tsx` (900ms, lista de prestadores), `index.tsx` PrestadorHome (900ms, stats grid + radar do mercado), `inbox.tsx` (700ms, cards de conversas), `support.tsx` (800ms, tickets + FAQs). Cada tela simula latência de rede com `setTimeout` e `setLoading`.
+**Arquivos:** `components/Skeleton.tsx`, `app/marketplace.tsx`, `app/index.tsx`, `app/inbox.tsx`, `app/support.tsx`
 
 ---
 
@@ -146,21 +146,13 @@
 
 | Status | Quantidade |
 |--------|-----------|
-| ✅ Implementado | 15 |
-| 🔶 Parcial | 1 |
-| ❌ Pendente | 1 |
+| ✅ Implementado | 17 |
+| 🔶 Parcial | 0 |
+| ❌ Pendente | 0 |
 | **Total** | **17** |
 
 ---
 
-## Próximos itens recomendados (por criticidade)
-
-1. **#1** — Bottom tab real (TabNavigator)
-2. **#5** — Toggle bloqueado para prestador não-verificado
-3. **#7** — Flag de ambiente para demo hints
-4. **#8** — Skeletons nos ScrollViews
-5. **#13** — Pull-to-refresh
-
 ---
 
-_Ajudaê — PROGRESS v1.2 — atualizado em 2026-04-27_
+_Ajudaê — PROGRESS v1.3 — atualizado em 2026-04-27 — **17/17 ✅ Todos os itens concluídos**_

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -15,6 +15,7 @@ import { MapSVG } from "@/components/MapSVG";
 import { ProviderPin } from "@/components/ProviderPin";
 import { Chip } from "@/components/Chip";
 import { ProviderModal } from "@/components/ProviderModal";
+import { Skeleton } from "@/components/Skeleton";
 
 /* ─── Activity Heatmap ───────────────────────────────────────────────── */
 const WEEKS = 12;
@@ -525,76 +526,475 @@ const pStyles = StyleSheet.create({
   reviewText: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 16 },
 });
 
+type TabKey = "inicio" | "pedidos" | "perfil";
+
 export default function HomeScreen() {
   const { user, role } = useAuth();
   if (!user) return null;
-  return role === "cliente" ? <ClienteHome /> : <PrestadorHome />;
+  return role === "cliente" ? <ClienteTabsWrapper /> : <PrestadorTabsWrapper />;
 }
 
-function ChipBar({
-  onService,
-  onInbox,
-  onMarketplace,
-  badgeColor = "#FF5500",
-  serviceLabel = "Serviço",
-  serviceActive = false,
-}: {
-  onService: () => void;
-  onInbox: () => void;
-  onMarketplace: () => void;
-  badgeColor?: string;
-  serviceLabel?: string;
-  serviceActive?: boolean;
-}) {
-  const c = colors.light;
+/* ─── Tab Wrappers ──────────────────────────────────────────────────────── */
+function ClienteTabsWrapper() {
+  const [tab, setTab] = useState<TabKey>("inicio");
+  const { active } = useService();
+  const hasBadge = !!(active && active.status !== "completed" && active.status !== "cancelled");
   return (
-    <View style={chipStyles.row}>
-      <Pressable
-        onPress={onService}
-        style={[
-          chipStyles.chip,
-          serviceActive
-            ? { backgroundColor: c.primary, borderColor: "#E8B400" }
-            : { backgroundColor: c.card, borderColor: c.border },
-          shadows.md,
-        ]}
-      >
-        <MaterialCommunityIcons name="truck" size={14} color={serviceActive ? "#1A1714" : c.text} />
-        <Text style={[chipStyles.label, { color: serviceActive ? "#1A1714" : "#1C1917" }]}>{serviceLabel}</Text>
-        {serviceActive && (
-          <View style={[chipStyles.activeDot, { backgroundColor: "#1A1714" }]} />
-        )}
-      </Pressable>
-      <Pressable onPress={onInbox} style={[chipStyles.chip, { backgroundColor: c.card, borderColor: c.border }, shadows.md]}>
-        <Ionicons name="chatbubbles" size={13} color={c.text} />
-        <Text style={chipStyles.label}>Inbox</Text>
-        <View style={[chipStyles.badge, { backgroundColor: badgeColor }]}>
-          <Text style={chipStyles.badgeText}>2</Text>
-        </View>
-      </Pressable>
-      <Pressable onPress={onMarketplace} style={[chipStyles.chip, { backgroundColor: c.card, borderColor: c.border }, shadows.md]}>
-        <Ionicons name="cart" size={13} color={c.text} />
-        <Text style={chipStyles.label}>Marketplace</Text>
-      </Pressable>
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, display: tab === "inicio" ? "flex" : "none" }}><ClienteHome /></View>
+        <View style={{ flex: 1, display: tab === "pedidos" ? "flex" : "none" }}><PedidosTab onGoHome={() => setTab("inicio")} /></View>
+        <View style={{ flex: 1, display: tab === "perfil" ? "flex" : "none" }}><PerfilTab /></View>
+      </View>
+      <BottomTabBar active={tab} role="cliente" hasBadge={hasBadge} onPress={setTab} />
     </View>
   );
 }
 
-const chipStyles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 8, justifyContent: "flex-end" },
-  chip: {
+function PrestadorTabsWrapper() {
+  const [tab, setTab] = useState<TabKey>("inicio");
+  const { active } = useService();
+  const hasBadge = !!(active && ["requested", "accepted", "en_route", "in_progress"].includes(active.status ?? ""));
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, display: tab === "inicio" ? "flex" : "none" }}><PrestadorHome /></View>
+        <View style={{ flex: 1, display: tab === "pedidos" ? "flex" : "none" }}><HistoricoTab /></View>
+        <View style={{ flex: 1, display: tab === "perfil" ? "flex" : "none" }}><PerfilTab /></View>
+      </View>
+      <BottomTabBar active={tab} role="prestador" hasBadge={hasBadge} onPress={setTab} />
+    </View>
+  );
+}
+
+/* ─── BottomTabBar ──────────────────────────────────────────────────────── */
+function BottomTabBar({
+  active,
+  role,
+  hasBadge,
+  onPress,
+}: {
+  active: TabKey;
+  role: "cliente" | "prestador";
+  hasBadge?: boolean;
+  onPress: (tab: TabKey) => void;
+}) {
+  const c = colors.light;
+  const insets = useSafeAreaInsets();
+
+  const tabs =
+    role === "cliente"
+      ? [
+          { key: "inicio" as TabKey, label: "Início", icon: "home" as const, lib: "ion" as const },
+          { key: "pedidos" as TabKey, label: "Pedidos", icon: "truck" as const, lib: "mc" as const, badge: hasBadge },
+          { key: "perfil" as TabKey, label: "Perfil", icon: "person" as const, lib: "ion" as const },
+        ]
+      : [
+          { key: "inicio" as TabKey, label: "Home", icon: "home" as const, lib: "ion" as const },
+          { key: "pedidos" as TabKey, label: "Histórico", icon: "time" as const, lib: "ion" as const },
+          { key: "perfil" as TabKey, label: "Perfil", icon: "person" as const, lib: "ion" as const },
+        ];
+
+  return (
+    <View
+      style={[
+        tabBarStyles.bar,
+        { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: insets.bottom || 8 },
+        shadows.sm,
+      ]}
+    >
+      {tabs.map((t) => {
+        const on = active === t.key;
+        return (
+          <Pressable key={t.key} onPress={() => onPress(t.key)} style={tabBarStyles.item}>
+            {on && <View style={[tabBarStyles.indicator, { backgroundColor: c.primary }]} />}
+            <View style={{ position: "relative" }}>
+              {t.lib === "mc" ? (
+                <MaterialCommunityIcons name={t.icon as any} size={22} color={on ? c.text : c.softMuted} />
+              ) : (
+                <Ionicons name={t.icon as any} size={22} color={on ? c.text : c.softMuted} />
+              )}
+              {t.badge && (
+                <View style={[tabBarStyles.dot, { backgroundColor: c.primary, borderColor: c.card }]} />
+              )}
+            </View>
+            <Text style={[tabBarStyles.label, { color: on ? c.text : c.softMuted }]}>{t.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const tabBarStyles = StyleSheet.create({
+  bar: {
     flexDirection: "row",
+    borderTopWidth: 1,
+    paddingTop: 8,
+  },
+  item: {
+    flex: 1,
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingBottom: 4,
+    gap: 3,
+    position: "relative",
+  },
+  indicator: {
+    position: "absolute",
+    top: -8,
+    width: 24,
+    height: 3,
+    borderRadius: 1.5,
+  },
+  label: { fontSize: 11, fontFamily: fonts.sans.bold },
+  dot: {
+    position: "absolute",
+    top: -1,
+    right: -3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderWidth: 1.5,
   },
-  label: { fontSize: 12, fontFamily: fonts.sans.bold, color: "#1C1917" },
-  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  badgeText: { color: "#fff", fontSize: 11, fontFamily: fonts.sans.extra },
-  activeDot: { width: 7, height: 7, borderRadius: 4 },
+});
+
+/* ─── PedidosTab (Cliente) ──────────────────────────────────────────────── */
+const MOCK_PEDIDOS = [
+  { id: "PD001", cat: "Mudança", provider: "Carlos Oliveira", status: "in_progress", price: "R$320", date: "Hoje, 14h30", color: "#FF5500" },
+  { id: "PD002", cat: "Frete", provider: "Marcos Frete", status: "completed", price: "R$120", date: "Ontem", color: "#2563EB" },
+  { id: "PD003", cat: "Entrega", provider: "Pedro Entrega", status: "completed", price: "R$52", date: "22 abr", color: "#9333EA" },
+  { id: "PD004", cat: "Frete", provider: "Rafael Carreto", status: "cancelled", price: "R$80", date: "19 abr", color: "#2563EB" },
+];
+
+const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
+  in_progress: { label: "Em andamento", bg: "#FEF3C7", fg: "#D97706" },
+  completed: { label: "Concluído", bg: "#DCFCE7", fg: "#16A34A" },
+  cancelled: { label: "Cancelado", bg: "#FEE2E2", fg: "#DC2626" },
+  requested: { label: "Aguardando", bg: "#DBEAFE", fg: "#2563EB" },
+};
+
+function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
+  const c = colors.light;
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { active } = useService();
+  const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const hasActive = !!(active && active.status !== "completed" && active.status !== "cancelled");
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      <TopNav
+        title="Meus Pedidos"
+        subtitle="Solicitações e histórico"
+        initials={initials}
+        badge={hasActive}
+        accentColor={c.primary}
+        onMenuOpen={() => setMenuOpen(true)}
+        onProfileOpen={() => setProfileOpen(true)}
+      />
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 24 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        {hasActive && active ? (
+          <Pressable
+            onPress={() => router.push("/track")}
+            style={[pedidosStyles.activeBanner, { backgroundColor: c.primary }, shadows.md]}
+          >
+            <View style={[pedidosStyles.pulseDot, { backgroundColor: "#1A1714" }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={pedidosStyles.activeBannerEye}>EM ANDAMENTO</Text>
+              <Text style={pedidosStyles.activeBannerTitle}>{active.category} · Acompanhar →</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#1A1714" />
+          </Pressable>
+        ) : null}
+
+        <View style={[pedidosStyles.quickRow]}>
+          <Pressable
+            onPress={() => router.push("/marketplace")}
+            style={[pedidosStyles.quickBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+          >
+            <Ionicons name="cart" size={18} color={c.primary} />
+            <Text style={[pedidosStyles.quickLabel, { color: c.text }]}>Nova solicitação</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/inbox")}
+            style={[pedidosStyles.quickBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+          >
+            <Ionicons name="chatbubbles" size={18} color={c.blue} />
+            <Text style={[pedidosStyles.quickLabel, { color: c.text }]}>Mensagens</Text>
+          </Pressable>
+        </View>
+
+        <Text style={[pedidosStyles.sectionTitle, { color: c.text }]}>Histórico</Text>
+        {MOCK_PEDIDOS.map((p) => {
+          const st = STATUS_LABEL[p.status] || STATUS_LABEL.requested;
+          return (
+            <View key={p.id} style={[pedidosStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+              <View style={[pedidosStyles.catDot, { backgroundColor: `${p.color}22` }]}>
+                {p.cat === "Mudança" ? (
+                  <Ionicons name="home" size={16} color={p.color} />
+                ) : p.cat === "Frete" ? (
+                  <MaterialCommunityIcons name="truck" size={16} color={p.color} />
+                ) : (
+                  <Ionicons name="cube" size={16} color={p.color} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[pedidosStyles.cardTitle, { color: c.text }]}>{p.cat} · {p.provider}</Text>
+                <Text style={[pedidosStyles.cardSub, { color: c.softMuted }]}>{p.date} · #{p.id}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end", gap: 4 }}>
+                <Text style={[pedidosStyles.cardPrice, { color: c.text }]}>{p.price}</Text>
+                <View style={[pedidosStyles.statusBadge, { backgroundColor: st.bg }]}>
+                  <Text style={[pedidosStyles.statusText, { color: st.fg }]}>{st.label}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+      <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Cliente"} initials={initials} />
+    </View>
+  );
+}
+
+const pedidosStyles = StyleSheet.create({
+  activeBanner: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 14, marginBottom: 14 },
+  pulseDot: { width: 8, height: 8, borderRadius: 4 },
+  activeBannerEye: { fontSize: 10, fontFamily: fonts.sans.bold, color: "#1A1714", opacity: 0.7, letterSpacing: 0.5 },
+  activeBannerTitle: { fontSize: 14, fontFamily: fonts.sans.bold, color: "#1A1714" },
+  quickRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  quickBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, borderWidth: 1, padding: 14 },
+  quickLabel: { fontSize: 13, fontFamily: fonts.sans.bold },
+  sectionTitle: { fontSize: 14, fontFamily: fonts.serif.extra, marginBottom: 10 },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8 },
+  catDot: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  cardTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
+  cardSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  cardPrice: { fontSize: 14, fontFamily: fonts.serif.extra },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  statusText: { fontSize: 11, fontFamily: fonts.sans.bold },
+});
+
+/* ─── HistoricoTab (Prestador) ──────────────────────────────────────────── */
+const MOCK_HISTORICO = [
+  { id: "SV001", cat: "Mudança", client: "Ricardo A.", status: "completed", earned: "R$272", date: "Hoje", color: "#FF5500" },
+  { id: "SV002", cat: "Frete", client: "Julia Nunes", status: "completed", earned: "R$102", date: "Ontem", color: "#2563EB" },
+  { id: "SV003", cat: "Entrega", client: "Marcelo T.", status: "completed", earned: "R$44", date: "22 abr", color: "#9333EA" },
+  { id: "SV004", cat: "Mudança", client: "Helena R.", status: "cancelled", earned: "—", date: "20 abr", color: "#FF5500" },
+];
+
+function HistoricoTab() {
+  const c = colors.light;
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const totalEarned = MOCK_HISTORICO.filter((h) => h.status === "completed")
+    .reduce((s, h) => s + parseFloat(h.earned.replace("R$", "") || "0"), 0);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      <TopNav
+        title="Histórico"
+        subtitle="Serviços realizados"
+        initials={initials}
+        accentColor={c.blue}
+        onMenuOpen={() => setMenuOpen(true)}
+        onProfileOpen={() => setProfileOpen(true)}
+      />
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 24 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[histStyles.summaryRow]}>
+          <View style={[histStyles.summaryCard, { backgroundColor: c.successLight, borderColor: `${c.success}33` }, shadows.sm]}>
+            <Text style={[histStyles.summaryVal, { color: c.success }]}>R${totalEarned.toFixed(2)}</Text>
+            <Text style={[histStyles.summaryLbl, { color: c.sub }]}>Total recebido</Text>
+          </View>
+          <View style={[histStyles.summaryCard, { backgroundColor: c.blueLight, borderColor: `${c.blue}33` }, shadows.sm]}>
+            <Text style={[histStyles.summaryVal, { color: c.blue }]}>{MOCK_HISTORICO.filter((h) => h.status === "completed").length}</Text>
+            <Text style={[histStyles.summaryLbl, { color: c.sub }]}>Concluídos</Text>
+          </View>
+        </View>
+
+        <View style={[histStyles.quickRow]}>
+          <Pressable
+            onPress={() => router.push("/inbox")}
+            style={[histStyles.quickBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+          >
+            <Ionicons name="chatbubbles" size={18} color={c.blue} />
+            <Text style={[histStyles.quickLabel, { color: c.text }]}>Mensagens</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/support")}
+            style={[histStyles.quickBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+          >
+            <Ionicons name="help-circle" size={18} color={c.softMuted} />
+            <Text style={[histStyles.quickLabel, { color: c.text }]}>Suporte</Text>
+          </Pressable>
+        </View>
+
+        <Text style={[histStyles.sectionTitle, { color: c.text }]}>Serviços recentes</Text>
+        {MOCK_HISTORICO.map((h) => {
+          const st = STATUS_LABEL[h.status] || STATUS_LABEL.completed;
+          return (
+            <View key={h.id} style={[histStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+              <View style={[histStyles.catDot, { backgroundColor: `${h.color}22` }]}>
+                {h.cat === "Mudança" ? (
+                  <Ionicons name="home" size={16} color={h.color} />
+                ) : h.cat === "Frete" ? (
+                  <MaterialCommunityIcons name="truck" size={16} color={h.color} />
+                ) : (
+                  <Ionicons name="cube" size={16} color={h.color} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[histStyles.cardTitle, { color: c.text }]}>{h.cat} · {h.client}</Text>
+                <Text style={[histStyles.cardSub, { color: c.softMuted }]}>{h.date} · #{h.id}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end", gap: 4 }}>
+                <Text style={[histStyles.cardEarned, { color: h.status === "completed" ? c.success : c.softMuted }]}>{h.earned}</Text>
+                <View style={[histStyles.statusBadge, { backgroundColor: st.bg }]}>
+                  <Text style={[histStyles.statusText, { color: st.fg }]}>{st.label}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+      <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Prestador"} initials={initials} />
+    </View>
+  );
+}
+
+const histStyles = StyleSheet.create({
+  summaryRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
+  summaryCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 14, alignItems: "center" },
+  summaryVal: { fontSize: 18, fontFamily: fonts.serif.extra },
+  summaryLbl: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 3 },
+  quickRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  quickBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 14, borderWidth: 1, padding: 14 },
+  quickLabel: { fontSize: 13, fontFamily: fonts.sans.bold },
+  sectionTitle: { fontSize: 14, fontFamily: fonts.serif.extra, marginBottom: 10 },
+  card: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8 },
+  catDot: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  cardTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
+  cardSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  cardEarned: { fontSize: 14, fontFamily: fonts.serif.extra },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  statusText: { fontSize: 11, fontFamily: fonts.sans.bold },
+});
+
+/* ─── PerfilTab (Both roles) ────────────────────────────────────────────── */
+const PERFIL_ITEMS = [
+  { icon: "card" as const, label: "Métodos de Pagamento", sub: "Pix · Cartão •••• 9768", color: "#16A34A" },
+  { icon: "location" as const, label: "Meus Endereços", sub: "Tijuca, Rio de Janeiro", color: "#FF5500" },
+  { icon: "list" as const, label: "Histórico de Pedidos", sub: "12 pedidos realizados", color: "#2563EB" },
+  { icon: "star" as const, label: "Avaliações", sub: "Média 4.9 de 5", color: "#F59E0B" },
+  { icon: "lock-closed" as const, label: "Segurança", sub: "PIN e documentos", color: "#9333EA" },
+  { icon: "settings" as const, label: "Configurações", sub: "Notificações, privacidade", color: "#6B7280" },
+];
+
+function PerfilTab() {
+  const c = colors.light;
+  const { user, role, logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
+  const accent = role === "cliente" ? c.primary : c.blue;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      <TopNav
+        title="Perfil"
+        subtitle={role === "cliente" ? "Conta de cliente" : "Conta de prestador"}
+        initials={initials}
+        accentColor={accent}
+      />
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 24 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header card */}
+        <View style={[perfilStyles.headerCard, { backgroundColor: c.card, borderColor: c.border }, shadows.md]}>
+          <LinearGradient
+            colors={[accent, role === "cliente" ? "#FF8C5A" : "#60A5FA"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={perfilStyles.avatar}
+          >
+            <Text style={perfilStyles.avatarText}>{initials}</Text>
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={[perfilStyles.name, { color: c.text }]}>{user?.name || "Usuário"}</Text>
+            <Text style={[perfilStyles.role, { color: c.softMuted }]}>
+              {role === "cliente" ? "Cliente · Ajudaê" : "Prestador · Van · ★ 4.9"}
+            </Text>
+          </View>
+          {role === "prestador" && !user?.verified && (
+            <View style={[perfilStyles.verifyBadge, { backgroundColor: "#FEF3C7" }]}>
+              <Text style={[perfilStyles.verifyText, { color: "#D97706" }]}>Aguardando aprovação</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Menu items */}
+        {PERFIL_ITEMS.map((item) => (
+          <Pressable
+            key={item.label}
+            style={[perfilStyles.menuRow, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+          >
+            <View style={[perfilStyles.iconBox, { backgroundColor: `${item.color}18` }]}>
+              <Ionicons name={item.icon} size={18} color={item.color} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[perfilStyles.menuLabel, { color: c.text }]}>{item.label}</Text>
+              <Text style={[perfilStyles.menuSub, { color: c.softMuted }]}>{item.sub}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
+          </Pressable>
+        ))}
+
+        {/* Sign out */}
+        <Pressable
+          onPress={logout}
+          style={[perfilStyles.menuRow, { backgroundColor: "#FFF5F5", borderColor: "#FEE2E2", marginTop: 8 }, shadows.sm]}
+        >
+          <View style={[perfilStyles.iconBox, { backgroundColor: "#FEE2E2" }]}>
+            <Ionicons name="log-out" size={18} color="#DC2626" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[perfilStyles.menuLabel, { color: "#DC2626" }]}>Sair da conta</Text>
+            <Text style={[perfilStyles.menuSub, { color: "#EF444488" }]}>Encerrar sessão</Text>
+          </View>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
+const perfilStyles = StyleSheet.create({
+  headerCard: { flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 16 },
+  avatar: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#fff", fontSize: 18, fontFamily: fonts.serif.extra },
+  name: { fontSize: 16, fontFamily: fonts.serif.extra },
+  role: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  verifyBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  verifyText: { fontSize: 11, fontFamily: fonts.sans.bold },
+  menuRow: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 8 },
+  iconBox: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  menuLabel: { fontSize: 13, fontFamily: fonts.sans.bold },
+  menuSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
 });
 
 /* ─── ClienteHome ─────────────────────────────────────────────────────── */
@@ -678,7 +1078,7 @@ function ClienteHome() {
 
       {/* Active mini card */}
       {active ? (
-        <View style={[styles.activeCard, { backgroundColor: c.card, bottom: 248 + insets.bottom }, shadows.lg]}>
+        <View style={[styles.activeCard, { backgroundColor: c.card, bottom: 80 + insets.bottom }, shadows.lg]}>
           <View style={styles.activeRow}>
             <View style={[styles.activeIcon, { backgroundColor: `${active.color}18` }]}>
               {active.cat === "Mudança" ? (
@@ -763,32 +1163,12 @@ function ClienteHome() {
         </Pressable>
       ) : null}
 
-      {/* Chip buttons */}
-      <View style={[styles.actionChipsWrap, { bottom: 198 + insets.bottom }]}>
-        <ChipBar
-          serviceLabel="Pedidos"
-          serviceActive={!!(activeService && activeService.status !== "completed" && activeService.status !== "cancelled")}
-          onService={() => {
-            const hasActive = activeService && activeService.status !== "completed" && activeService.status !== "cancelled";
-            if (hasActive && activeService.status === "en_route" && activeService.pin_start) {
-              router.push("/confirm-start-pin");
-            } else if (hasActive) {
-              router.push("/track");
-            } else {
-              router.push("/request");
-            }
-          }}
-          onInbox={() => router.push("/inbox")}
-          onMarketplace={() => router.push("/marketplace")}
-        />
-      </View>
-
       {/* Filter chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16 }}
-        style={[styles.filtersWrap, { bottom: 152 + insets.bottom }]}
+        style={[styles.filtersWrap, { bottom: 16 + insets.bottom }]}
       >
         {FILTERS.map((f) => (
           <Chip
@@ -845,7 +1225,13 @@ function PrestadorHome() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
+
+  useEffect(() => {
+    const t = setTimeout(() => setDataLoading(false), 900);
+    return () => clearTimeout(t);
+  }, []);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
@@ -923,34 +1309,60 @@ function PrestadorHome() {
         </Pressable>
 
         {/* Stats */}
-        <View style={styles.statsGrid}>
-          {stats.map((s) => (
-            <View key={s.l} style={[styles.statCard, { backgroundColor: s.bg }]}>
-              <Text style={[styles.statValue, { color: s.color }]}>{s.v}</Text>
-              <Text style={[styles.statLabel, { color: c.sub }]}>{s.l}</Text>
-            </View>
-          ))}
-        </View>
+        {dataLoading ? (
+          <View style={styles.statsGrid}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={[styles.statCard, { backgroundColor: c.border }]}>
+                <Skeleton width="60%" height={20} borderRadius={6} style={{ marginBottom: 6 }} />
+                <Skeleton width="40%" height={11} borderRadius={4} />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.statsGrid}>
+            {stats.map((s) => (
+              <View key={s.l} style={[styles.statCard, { backgroundColor: s.bg }]}>
+                <Text style={[styles.statValue, { color: s.color }]}>{s.v}</Text>
+                <Text style={[styles.statLabel, { color: c.sub }]}>{s.l}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Hot area banner */}
         <HotAreaBanner onPress={() => router.push("/marketplace")} />
 
         {/* Radar */}
-        <View style={[styles.radarCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-          <View style={styles.radarHead}>
-            <Text style={[styles.radarTitle, { color: c.text }]}>Radar do mercado</Text>
-            <Text style={[styles.radarSub, { color: c.blue }]}>6 publicações perto</Text>
+        {dataLoading ? (
+          <View style={[styles.radarCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+            <Skeleton width="50%" height={14} borderRadius={6} style={{ marginBottom: 8 }} />
+            <View style={styles.statsGrid}>
+              {[0, 1, 2].map((i) => (
+                <View key={i} style={[styles.marketCell, { backgroundColor: c.background }]}>
+                  <Skeleton width="70%" height={11} borderRadius={4} style={{ marginBottom: 4 }} />
+                  <Skeleton width="55%" height={16} borderRadius={5} style={{ marginBottom: 4 }} />
+                  <Skeleton width="35%" height={11} borderRadius={4} />
+                </View>
+              ))}
+            </View>
           </View>
-          <View style={styles.statsGrid}>
-            {market.map((m) => (
-              <View key={m.label} style={[styles.marketCell, { backgroundColor: c.background }]}>
-                <Text style={[styles.marketLabel, { color: c.text }]}>{m.label}</Text>
-                <Text style={[styles.marketValue, { color: c.text }]}>{m.value}</Text>
-                <Text style={[styles.marketTrend, { color: m.trend.startsWith("+") ? c.success : c.warning }]}>{m.trend}</Text>
-              </View>
-            ))}
+        ) : (
+          <View style={[styles.radarCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+            <View style={styles.radarHead}>
+              <Text style={[styles.radarTitle, { color: c.text }]}>Radar do mercado</Text>
+              <Text style={[styles.radarSub, { color: c.blue }]}>6 publicações perto</Text>
+            </View>
+            <View style={styles.statsGrid}>
+              {market.map((m) => (
+                <View key={m.label} style={[styles.marketCell, { backgroundColor: c.background }]}>
+                  <Text style={[styles.marketLabel, { color: c.text }]}>{m.label}</Text>
+                  <Text style={[styles.marketValue, { color: c.text }]}>{m.value}</Text>
+                  <Text style={[styles.marketTrend, { color: m.trend.startsWith("+") ? c.success : c.warning }]}>{m.trend}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Price suggestion */}
         <PriceSuggestion />
@@ -1043,23 +1455,6 @@ function PrestadorHome() {
 
         {/* Recent reviews */}
         <RecentReviews />
-
-        {/* Chip bar */}
-        <View style={{ marginTop: 14 }}>
-          <ChipBar
-            onService={() =>
-              inProgress
-                ? router.push("/job")
-                : incoming
-                ? router.push("/request-details")
-                : router.push("/marketplace")
-            }
-            onInbox={() => router.push("/inbox")}
-            onMarketplace={() => router.push("/marketplace")}
-            badgeColor={c.blue}
-            serviceActive={!!(inProgress || incoming)}
-          />
-        </View>
       </ScrollView>
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1105,8 +1500,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   activeRequestText: { color: "#fff", fontSize: 13, fontFamily: fonts.sans.bold },
-  actionChipsWrap: { position: "absolute", right: 16, zIndex: 29 },
-  filtersWrap: { position: "absolute", left: 0, right: 0, zIndex: 32, maxHeight: 40 },
+
+  filtersWrap: { position: "absolute", left: 0, right: 0, zIndex: 30, maxHeight: 40 },
   providerMiniCard: {
     width: 150,
     borderRadius: 14,

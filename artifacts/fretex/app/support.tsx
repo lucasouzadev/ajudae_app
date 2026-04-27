@@ -11,6 +11,7 @@ import colors, { fonts, shadows } from "@/constants/colors";
 import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
+import { Skeleton } from "@/components/Skeleton";
 
 const QUICK = [
   { icon: "warning" as const, label: "Reportar problema", color: "#FF5500" },
@@ -34,6 +35,12 @@ export default function SupportScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 800);
+    return () => clearTimeout(t);
+  }, []);
 
   if (!user) return null;
   const initials = (user.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
@@ -88,10 +95,23 @@ export default function SupportScreen() {
         {/* Tickets */}
         <Text style={[styles.sectionTitle, { color: c.text }]}>Meus Tickets</Text>
         <Text style={[styles.sectionSub, { color: c.softMuted }]}>
-          {tickets.length === 0 ? "Você ainda não abriu tickets" : `${tickets.length} aberto(s)`}
+          {loading ? "Carregando..." : tickets.length === 0 ? "Você ainda não abriu tickets" : `${tickets.length} aberto(s)`}
         </Text>
 
-        {tickets.length === 0 ? (
+        {loading ? (
+          [0, 1].map((i) => (
+            <View key={i} style={[styles.ticketCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={styles.ticketHead}>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Skeleton width="65%" height={13} borderRadius={5} />
+                  <Skeleton width="40%" height={11} borderRadius={4} />
+                </View>
+                <Skeleton width={70} height={24} borderRadius={999} />
+              </View>
+              <Skeleton width="90%" height={11} borderRadius={4} style={{ marginTop: 6 }} />
+            </View>
+          ))
+        ) : tickets.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={[styles.emptyIcon, { backgroundColor: c.background }]}>
               <Ionicons name="ticket" size={20} color={c.softMuted} />
@@ -129,7 +149,18 @@ export default function SupportScreen() {
         <Text style={[styles.sectionTitle, { color: c.text, marginTop: 24 }]}>Perguntas Frequentes</Text>
         <Text style={[styles.sectionSub, { color: c.softMuted }]}>Respostas rápidas para dúvidas comuns</Text>
 
-        {faqs.map((faq, i) => (
+        {loading ? (
+          [0, 1, 2].map((i) => (
+            <View key={i} style={[styles.faqCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={[styles.faqHead, { paddingVertical: 12 }]}>
+                <Skeleton width={28} height={28} borderRadius={8} />
+                <Skeleton width="75%" height={13} borderRadius={5} />
+              </View>
+            </View>
+          ))
+        ) : null}
+
+        {!loading && faqs.map((faq, i) => (
           <View key={i} style={[styles.faqCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <Pressable onPress={() => setExpanded(expanded === i ? null : i)} style={styles.faqHead}>
               <View style={[styles.faqDot, { backgroundColor: c.background }]}>
