@@ -25,7 +25,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { RequestsProvider } from "@/contexts/RequestsContext";
 import { PaymentsProvider } from "@/contexts/PaymentsContext";
 import { SupportProvider } from "@/contexts/SupportContext";
-import { ServiceProvider } from "@/contexts/ServiceContext";
+import { ServiceProvider, useService } from "@/contexts/ServiceContext";
 import { StatusBar } from "expo-status-bar";
 
 SplashScreen.preventAutoHideAsync();
@@ -33,9 +33,12 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function AuthGate() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, role } = useAuth();
+  const { active } = useService();
   const segments = useSegments();
   const router = useRouter();
+
+  const terminalStatuses = ["completed", "cancelled", "disputed"];
 
   useEffect(() => {
     if (isLoading) return;
@@ -55,6 +58,25 @@ function AuthGate() {
       router.replace("/onboarding");
     }
   }, [isAuthenticated, isLoading, segments, user]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return;
+    if (!active || terminalStatuses.includes(active.status)) return;
+
+    const allowedClient = ["track", "confirm-start-pin", "otp-modal", "ticket", "rate", "inbox"];
+    const allowedProvider = ["job", "start-pin", "job-otp", "ticket", "inbox"];
+    const allowed = role === "prestador" ? allowedProvider : allowedClient;
+
+    const currentSegment = segments[segments.length - 1];
+
+    if (!allowed.includes(currentSegment)) {
+      if (role === "prestador") {
+        router.replace("/job");
+      } else {
+        router.replace("/track");
+      }
+    }
+  }, [isAuthenticated, isLoading, active, role, segments]);
 
   return (
     <Stack screenOptions={{ headerShown: false, headerBackTitle: "Voltar", contentStyle: { backgroundColor: "#F7F5F2" } }}>
