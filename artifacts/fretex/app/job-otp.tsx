@@ -11,15 +11,15 @@ import { useService } from "@/contexts/ServiceContext";
 export default function JobOtpScreen() {
   const c = colors.light;
   const insets = useSafeAreaInsets();
-  const { active, completeWithOtp } = useService();
-  const [digits, setDigits] = useState(["", "", "", ""]);
+  const { active, completeWithConclusion } = useService();
+  const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const inputs = useRef<(TextInput | null)[]>([]);
 
   const accent = active?.category === "Mudança" ? c.primary : active?.category === "Frete" ? c.blue : c.success;
   const code = digits.join("");
-  const complete = code.length === 4;
+  const complete = code.length === 6;
 
   const setDigitAt = (i: number, val: string) => {
     const cleaned = val.replace(/\D/g, "").slice(-1);
@@ -29,7 +29,7 @@ export default function JobOtpScreen() {
       next[i] = cleaned;
       return next;
     });
-    if (cleaned && i < 3) inputs.current[i + 1]?.focus();
+    if (cleaned && i < 5) inputs.current[i + 1]?.focus();
   };
 
   const handleKey = (i: number, key: string) => {
@@ -40,17 +40,17 @@ export default function JobOtpScreen() {
     if (!complete || submitting) return;
     setSubmitting(true);
     Keyboard.dismiss();
-    const result = await completeWithOtp(code);
+    const result = await completeWithConclusion(code);
     if (result.ok) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setTimeout(() => router.replace("/"), 600);
     } else if (result.disputed) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-      setError("Pedido em disputa após 5 tentativas. Entre em contato com o suporte.");
+      setError("Pedido em disputa. Entre em contato com o suporte.");
       setTimeout(() => router.replace("/"), 1800);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-      setError(`Código incorreto. Tente novamente.`);
+      setError(`Código incorreto. ${result.attemptsLeft} tentativa(s) restante(s).`);
       setDigits(["", "", "", "", "", ""]);
       inputs.current[0]?.focus();
       setSubmitting(false);
@@ -90,7 +90,7 @@ export default function JobOtpScreen() {
 
         <Text style={[styles.title, { color: c.text }]}>Peça o PIN ao cliente</Text>
         <Text style={[styles.subtitle, { color: c.softMuted }]}>
-          Digite o código de 4 dígitos que o cliente recebeu no início do pedido.
+          Digite o código de 6 dígitos que o cliente recebeu no início do pedido.
         </Text>
 
         <View style={styles.pinRow}>
@@ -140,7 +140,7 @@ export default function JobOtpScreen() {
         </Pressable>
 
         <Text style={[styles.hint, { color: c.softMuted }]}>
-          Tentativas usadas: {active.otpAttempts}/5
+          Após 5 tentativas erradas o pedido entra em disputa automaticamente.
         </Text>
       </View>
     </View>

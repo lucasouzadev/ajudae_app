@@ -199,7 +199,7 @@ export default function TrackScreen() {
         ) : null}
 
         {/* PIN de Início banner — shown when provider has arrived and generated the start PIN */}
-        {active.status === "en_route" && active.startPin ? (
+        {active.status === "en_route" && active.pin_start ? (
           <Pressable
             onPress={() => router.push("/confirm-start-pin")}
             style={[styles.startPinBanner, { backgroundColor: c.primary, borderColor: "#E8B400" }, shadows.md]}

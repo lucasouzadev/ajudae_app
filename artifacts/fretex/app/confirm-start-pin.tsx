@@ -46,15 +46,13 @@ export default function ConfirmStartPinScreen() {
     if (result.ok) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       router.replace("/track");
-    } else if (result.expired) {
+    } else if (result.disputed) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-      setError("Este PIN expirou. Peça ao prestador para gerar um novo.");
-      setDigits(["", "", "", ""]);
-      inputs.current[0]?.focus();
-      setSubmitting(false);
+      setError("Pedido em disputa. Entre em contato com o suporte.");
+      setTimeout(() => router.replace("/track"), 1800);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-      setError("Código incorreto. Confirme com o prestador e tente novamente.");
+      setError(`Código incorreto. ${result.attemptsLeft} tentativa(s) restante(s).`);
       setDigits(["", "", "", ""]);
       inputs.current[0]?.focus();
       setSubmitting(false);
