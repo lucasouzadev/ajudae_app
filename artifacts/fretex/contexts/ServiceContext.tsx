@@ -2,7 +2,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { Category } from "@/constants/mockData";
 
-export type ServiceStatus = "requested" | "accepted" | "en_route" | "in_progress" | "completed" | "cancelled" | "disputed";
+export type ServiceStatus =
+  | "requested"
+  | "accepted"
+  | "en_route"
+  | "in_progress"
+  | "completed"
+  | "cancelled"
+  | "disputed";
 
 export interface ActiveService {
   id: string;
@@ -30,14 +37,12 @@ export interface ActiveService {
   scheduledFor?: string;
   estimatedPrice: number;
   status: ServiceStatus;
-  // PIN de Conclusão — gerado na criação, digitado pelo prestador ao finalizar
-  otp: string;
-  otpAttempts: number;
-  // PIN de Início — gerado pelo prestador ao chegar, confirmado pelo cliente para iniciar
-  startPin?: string;
-  startPinAttempts: number;
-  startPinGeneratedAt?: string;
-  startPinGenCount: number;
+  // PIN system — both generated at service creation
+  pin_start: string;          // 4 digits — provider displays, client enters at arrival
+  pin_conclusion: string;     // 6 digits — client shows, provider enters at completion
+  commitment: string;         // djb2(id|pin_start|pin_conclusion) — offline verification
+  startPinAttempts: number;   // max 5 → disputed
+  conclusionAttempts: number; // max 5 → disputed
   cancellationReason?: string;
   ticketId?: string;
   createdAt: string;
@@ -51,12 +56,11 @@ interface ServiceContextType {
       ActiveService,
       | "id"
       | "status"
-      | "otp"
-      | "otpAttempts"
-      | "startPin"
+      | "pin_start"
+      | "pin_conclusion"
+      | "commitment"
       | "startPinAttempts"
-      | "startPinGeneratedAt"
-      | "startPinGenCount"
+      | "conclusionAttempts"
       | "providerId"
       | "providerName"
       | "providerInitials"
@@ -77,29 +81,68 @@ interface ServiceContextType {
     providerRating: number;
     providerKm: number;
   }) => Promise<void>;
-  advanceStatus: (next: ServiceStatus, note?: string) => Promise<void>;
-  cancelService: (reason: string) => Promise<void>;
-  completeWithOtp: (entered: string) => Promise<{ ok: boolean; disputed?: boolean; remaining?: number }>;
-  generateStartPin: () => Promise<{ pin: string; expiresAt: string; ok: boolean; limitReached?: boolean }>;
-  validateStartPin: (entered: string) => Promise<{ ok: boolean; expired?: boolean }>;
+  advanceStatus: (next: ServiceStatus, note?: string) => Promise<{ ok: boolean; error?: string }>;
+  cancelService: (reason: string) => Promise<{ ok: boolean; error?: string }>;
+  validateStartPin: (entered: string) => Promise<{ ok: boolean; attemptsLeft?: number; disputed?: boolean }>;
+  completeWithConclusion: (entered: string) => Promise<{ ok: boolean; attemptsLeft?: number; disputed?: boolean }>;
   openTicket: (ticketId: string) => Promise<void>;
   clear: () => Promise<void>;
 }
 
+// ---------------------------------------------------------------------------
+// Valid state machine transitions
+// ---------------------------------------------------------------------------
+
+const VALID_TRANSITIONS: Record<ServiceStatus, ServiceStatus[]> = {
+  requested:   ["accepted", "cancelled"],
+  accepted:    ["en_route", "cancelled", "disputed"],
+  en_route:    ["in_progress", "disputed"],
+  in_progress: ["completed", "disputed"],
+  completed:   [],
+  cancelled:   [],
+  disputed:    [],
+};
+
+// ---------------------------------------------------------------------------
+// Pure helpers
+// ---------------------------------------------------------------------------
+
+function genPin(digits: number): string {
+  const min = Math.pow(10, digits - 1);
+  const max = Math.pow(10, digits) - 1;
+  return Math.floor(min + Math.random() * (max - min + 1)).toString();
+}
+
+function computeCommitment(serviceId: string, pinStart: string, pinConclusion: string): string {
+  const input = `${serviceId}|${pinStart}|${pinConclusion}`;
+  let h = 5381;
+  for (let i = 0; i < input.length; i++) {
+    h = (Math.imul(h, 31) + input.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+// ---------------------------------------------------------------------------
+// Context
+// ---------------------------------------------------------------------------
+
 const ServiceContext = createContext<ServiceContextType | null>(null);
 
 const STORAGE_KEY = "@ajudae_active_service";
-
-function gen4Pin() {
-  return Math.floor(1000 + Math.random() * 9000).toString();
-}
 
 export function ServiceProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<ActiveService | null>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
-      if (stored) setActive(JSON.parse(stored));
+      if (!stored) return;
+      const parsed = JSON.parse(stored) as ActiveService;
+      // Discard data from old format that lacks the commitment field
+      if (!parsed.commitment) {
+        AsyncStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      setActive(parsed);
     });
   }, []);
 
@@ -111,14 +154,19 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
 
   const createService: ServiceContextType["createService"] = async (payload) => {
     const now = new Date().toISOString();
+    const id = `req-${Date.now()}`;
+    const pin_start = genPin(4);
+    const pin_conclusion = genPin(6);
+    const commitment = computeCommitment(id, pin_start, pin_conclusion);
     const next: ActiveService = {
       ...payload,
-      id: `req-${Date.now()}`,
+      id,
       status: "requested",
-      otp: gen4Pin(),
-      otpAttempts: 0,
+      pin_start,
+      pin_conclusion,
+      commitment,
       startPinAttempts: 0,
-      startPinGenCount: 0,
+      conclusionAttempts: 0,
       createdAt: now,
       events: [{ at: now, status: "requested", note: "Pedido criado" }],
     };
@@ -138,19 +186,27 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     await persist(next);
   };
 
-  const advanceStatus: ServiceContextType["advanceStatus"] = async (newStatus, note) => {
-    if (!active) return;
+  const advanceStatus: ServiceContextType["advanceStatus"] = async (next, note) => {
+    if (!active) return { ok: false, error: "Nenhum serviço ativo" };
+    const allowed = VALID_TRANSITIONS[active.status] ?? [];
+    if (!allowed.includes(next)) {
+      return { ok: false, error: "Transição inválida" };
+    }
     const now = new Date().toISOString();
-    const next: ActiveService = {
+    const updated: ActiveService = {
       ...active,
-      status: newStatus,
-      events: [...active.events, { at: now, status: newStatus, note }],
+      status: next,
+      events: [...active.events, { at: now, status: next, note }],
     };
-    await persist(next);
+    await persist(updated);
+    return { ok: true };
   };
 
   const cancelService: ServiceContextType["cancelService"] = async (reason) => {
-    if (!active) return;
+    if (!active) return { ok: false, error: "Nenhum serviço ativo" };
+    if (active.status !== "requested" && active.status !== "accepted") {
+      return { ok: false, error: "Cancelamento não permitido neste estado" };
+    }
     const now = new Date().toISOString();
     const next: ActiveService = {
       ...active,
@@ -159,85 +215,78 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       events: [...active.events, { at: now, status: "cancelled", note: reason }],
     };
     await persist(next);
-  };
-
-  const completeWithOtp: ServiceContextType["completeWithOtp"] = async (entered) => {
-    if (!active) return { ok: false };
-    if (entered === active.otp) {
-      const now = new Date().toISOString();
-      const next: ActiveService = {
-        ...active,
-        status: "completed",
-        events: [...active.events, { at: now, status: "completed", note: "PIN confirmado" }],
-      };
-      await persist(next);
-      return { ok: true };
-    }
-    const attempts = active.otpAttempts + 1;
-    if (attempts >= 5) {
-      const now = new Date().toISOString();
-      const next: ActiveService = {
-        ...active,
-        otpAttempts: attempts,
-        status: "disputed",
-        events: [...active.events, { at: now, status: "disputed", note: "PIN errado 5x" }],
-      };
-      await persist(next);
-      return { ok: false, disputed: true };
-    }
-    await persist({ ...active, otpAttempts: attempts });
-    return { ok: false, remaining: 5 - attempts };
-  };
-
-  const generateStartPin: ServiceContextType["generateStartPin"] = async () => {
-    if (!active) return { pin: "", expiresAt: "", ok: false };
-    if (active.startPinGenCount >= 3) return { pin: "", expiresAt: "", ok: false, limitReached: true };
-    const pin = gen4Pin();
-    const now = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-    const next: ActiveService = {
-      ...active,
-      startPin: pin,
-      startPinGeneratedAt: now,
-      startPinGenCount: active.startPinGenCount + 1,
-    };
-    await persist(next);
-    return { pin, expiresAt, ok: true };
+    return { ok: true };
   };
 
   const validateStartPin: ServiceContextType["validateStartPin"] = async (entered) => {
-    if (!active || !active.startPin) return { ok: false };
-    // Check expiry (10 min)
-    if (active.startPinGeneratedAt) {
-      const generatedMs = new Date(active.startPinGeneratedAt).getTime();
-      if (Date.now() - generatedMs > 10 * 60 * 1000) {
-        return { ok: false, expired: true };
-      }
+    if (!active) return { ok: false };
+    if (active.status !== "en_route") {
+      return { ok: false };
     }
-    if (entered === active.startPin) {
+    const match = computeCommitment(active.id, entered, active.pin_conclusion) === active.commitment;
+    if (match) {
       const now = new Date().toISOString();
-      const next: ActiveService = {
+      await persist({
         ...active,
         status: "in_progress",
-        events: [...active.events, { at: now, status: "in_progress", note: "PIN de Início confirmado pelo cliente" }],
-      };
-      await persist(next);
+        events: [...active.events, { at: now, status: "in_progress", note: "PIN de início confirmado pelo cliente" }],
+      });
       return { ok: true };
     }
-    await persist({ ...active, startPinAttempts: active.startPinAttempts + 1 });
-    return { ok: false };
+    const attempts = active.startPinAttempts + 1;
+    if (attempts >= 5) {
+      const now = new Date().toISOString();
+      await persist({
+        ...active,
+        startPinAttempts: attempts,
+        status: "disputed",
+        events: [...active.events, { at: now, status: "disputed", note: "PIN de início errado 5x" }],
+      });
+      return { ok: false, disputed: true };
+    }
+    await persist({ ...active, startPinAttempts: attempts });
+    return { ok: false, attemptsLeft: 5 - attempts };
+  };
+
+  const completeWithConclusion: ServiceContextType["completeWithConclusion"] = async (entered) => {
+    if (!active) return { ok: false };
+    if (active.status !== "in_progress") {
+      return { ok: false };
+    }
+    const match = computeCommitment(active.id, active.pin_start, entered) === active.commitment;
+    if (match) {
+      const now = new Date().toISOString();
+      await persist({
+        ...active,
+        status: "completed",
+        events: [...active.events, { at: now, status: "completed", note: "PIN de conclusão confirmado" }],
+      });
+      return { ok: true };
+    }
+    const attempts = active.conclusionAttempts + 1;
+    if (attempts >= 5) {
+      const now = new Date().toISOString();
+      await persist({
+        ...active,
+        conclusionAttempts: attempts,
+        status: "disputed",
+        events: [...active.events, { at: now, status: "disputed", note: "PIN de conclusão errado 5x" }],
+      });
+      return { ok: false, disputed: true };
+    }
+    await persist({ ...active, conclusionAttempts: attempts });
+    return { ok: false, attemptsLeft: 5 - attempts };
   };
 
   const openTicket: ServiceContextType["openTicket"] = async (ticketId) => {
     if (!active) return;
     const now = new Date().toISOString();
-    const next: ActiveService = {
+    await persist({
       ...active,
       status: "disputed",
       ticketId,
       events: [...active.events, { at: now, status: "disputed", note: `Ticket ${ticketId} aberto` }],
-    };
-    await persist(next);
+    });
   };
 
   const clear = async () => {
@@ -246,7 +295,17 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ServiceContext.Provider
-      value={{ active, createService, assignProvider, advanceStatus, cancelService, completeWithOtp, generateStartPin, validateStartPin, openTicket, clear }}
+      value={{
+        active,
+        createService,
+        assignProvider,
+        advanceStatus,
+        cancelService,
+        validateStartPin,
+        completeWithConclusion,
+        openTicket,
+        clear,
+      }}
     >
       {children}
     </ServiceContext.Provider>
