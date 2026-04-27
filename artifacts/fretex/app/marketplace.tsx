@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { MOCK_PROVIDERS, MOCK_POSTINGS, FILTERS, CATEGORIES, type Category } from "@/constants/mockData";
 import colors, { fonts, shadows } from "@/constants/colors";
+import { Skeleton } from "@/components/Skeleton";
 import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
@@ -252,6 +253,11 @@ function ClienteMarketplace() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [activePin, setActivePin] = useState<string | null>(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 900);
+    return () => clearTimeout(t);
+  }, []);
 
   const filtered = useMemo(() => {
     let list = filter === "Todos" ? MOCK_PROVIDERS : MOCK_PROVIDERS.filter((p) => p.cat === filter);
@@ -375,7 +381,18 @@ function ClienteMarketplace() {
         </ScrollView>
 
         {/* Provider list */}
-        {sortedList.map((p) => (
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <View key={i} style={[styles.providerCard, { backgroundColor: c.card, borderColor: c.border }, { flexDirection: "row", gap: 12 }]}>
+              <Skeleton width={50} height={50} borderRadius={25} />
+              <View style={{ flex: 1, gap: 8, justifyContent: "center" }}>
+                <Skeleton width="55%" height={13} />
+                <Skeleton width="38%" height={11} />
+                <Skeleton width="75%" height={11} />
+              </View>
+            </View>
+          ))
+        ) : sortedList.map((p) => (
           <Pressable
             key={p.id}
             onPress={() => router.push(`/provider/${p.id}`)}
@@ -431,7 +448,7 @@ function ClienteMarketplace() {
           </Pressable>
         ))}
 
-        {filtered.length === 0 ? (
+        {!loading && filtered.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="search" size={28} color={c.softMuted} />
             <Text style={[styles.emptyText, { color: c.sub }]}>Nenhum prestador encontrado</Text>

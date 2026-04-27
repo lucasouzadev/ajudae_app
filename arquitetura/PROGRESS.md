@@ -48,9 +48,9 @@
 ---
 
 ### 5. Toggle online bloqueado para prestador não-verificado
-**Status:** ❌ Não implementado
-**Detalhe:** O toggle existe mas não verifica o campo `verified` do `AuthContext`. Nenhum badge "Aguardando aprovação" é exibido. O `AuthContext` já possui o campo `verified` — basta consumir.
-**Arquivo:** `app/index.tsx` (linhas 868–890)
+**Status:** ✅ Implementado
+**Detalhe:** Toggle desabilitado quando `user.verified === false`. Badge amarelo "Aguardando aprovação" substituí o subtexto normal. O Pressable ignora toque quando não verificado.
+**Arquivo:** `app/index.tsx`
 
 ---
 
@@ -62,31 +62,32 @@
 ---
 
 ### 7. Hints de demo controlados por flag de ambiente
-**Status:** ❌ Não implementado
-**Detalhe:** Dados de demo hardcoded em `mockData.ts` e credenciais fixas em `auth.tsx`. Nenhuma flag de ambiente controla a exibição de conteúdo demo.
-**Arquivos:** `app/auth.tsx` (linha 40), `mockData.ts`
+**Status:** ✅ Implementado
+**Detalhe:** `constants/env.ts` exporta `IS_DEMO` via `Constants.expoConfig?.extra?.appEnv`. Em `__DEV__` é sempre `true`. Credenciais auto-fill em `auth.tsx` só quando `IS_DEMO`. Banner de credenciais demo visível na lobby apenas quando `IS_DEMO`.
+**Arquivos:** `constants/env.ts` (novo), `app/auth.tsx`
 
 ---
 
 ## 🟡 Médio impacto
 
 ### 8. Skeleton/loading nos ScrollViews
-**Status:** ❌ Não implementado
-**Detalhe:** Todos os ScrollViews exibem conteúdo direto sem placeholder de skeleton enquanto carregam.
+**Status:** 🔶 Parcialmente implementado
+**Detalhe:** Componente `Skeleton` criado com animação de pulso. Aplicado em `marketplace.tsx` (900ms de loading simulado antes de exibir lista de prestadores). Demais telas pendentes.
+**Arquivo:** `components/Skeleton.tsx` (novo), `app/marketplace.tsx`
 
 ---
 
 ### 9. Quick messages com botão de cancelamento explícito
-**Status:** 🔶 Parcialmente implementado
-**Detalhe:** Modal de mensagens rápidas existe em `job.tsx` (linhas 222–244), mas o fechamento é só por tap no backdrop. Falta botão "Cancelar" explícito e separado dentro do modal.
+**Status:** ✅ Implementado
+**Detalhe:** Botão "Cancelar" explícito adicionado ao rodapé do modal de mensagens rápidas em `job.tsx`. Fecha com haptic feedback.
 **Arquivo:** `app/job.tsx`
 
 ---
 
 ### 10. ProviderModal com animação slide
-**Status:** ❌ Não implementado
-**Detalhe:** `ProviderModal.tsx` usa `animationType="fade"` (linha 38). Trocar para `"slide"`.
-**Arquivo:** `components/ProviderModal.tsx` (linha 38)
+**Status:** ✅ Implementado
+**Detalhe:** `animationType="fade"` → `"slide"` em `ProviderModal.tsx`.
+**Arquivo:** `components/ProviderModal.tsx`
 
 ---
 
@@ -98,23 +99,24 @@
 ---
 
 ### 12. ProfileOverlay com mocks nos sub-menus
-**Status:** 🔶 Parcialmente implementado
-**Detalhe:** Itens existem com subtexto mockado estático (ex: "Pix · Cartão •••• 9768", "12 pedidos realizados"). Não há navegação funcional para as sub-telas — apenas exibição de texto.
-**Arquivo:** `components/ProfileOverlay.tsx` (linhas 16–23)
+**Status:** ✅ Implementado
+**Detalhe:** Sub-menus funcionais para Pagamentos (Pix + cartão), Endereços (Casa/Trabalho), Histórico de Pedidos (3 itens mock) e placeholder "Em breve" para demais. Navegação com `activeMenu` state e botão de voltar dentro do overlay.
+**Arquivo:** `components/ProfileOverlay.tsx`
 
 ---
 
 ### 13. Pull-to-refresh
-**Status:** ❌ Não implementado
-**Detalhe:** Nenhum `RefreshControl` encontrado em qualquer ScrollView do app.
+**Status:** ✅ Implementado
+**Detalhe:** `RefreshControl` adicionado ao ScrollView principal de `PrestadorHome` (tintColor azul). `ClienteHome` usa sheet draggável sem ScrollView principal vertical. Simula 1.2s de refresh.
+**Arquivo:** `app/index.tsx`
 
 ---
 
 ## 🔵 Refinamentos de polimento
 
 ### 14. Tipografia mínima 11px nos labels
-**Status:** 🔶 Parcialmente implementado
-**Detalhe:** Maioria dos labels respeita o mínimo. Violações encontradas: label de seção em 10px (linha 214) e labels de barras em gráficos em 8px (linha 465).
+**Status:** ✅ Implementado
+**Detalhe:** Todos os labels abaixo de 11px em `app/index.tsx` corrigidos: `statLbl`, `barLabel`, `cardBadge`, `badgeLabel`, `badgeProgress`, `reviewWhen`, `legendText`, `hourCatText`, `catTxt`, `listPriceSub`, `badgeText` — todos elevados para 11.
 **Arquivo:** `app/index.tsx`
 
 ---
@@ -134,9 +136,9 @@
 ---
 
 ### 17. Heatmap com legenda de dias/meses
-**Status:** 🔶 Parcialmente implementado
-**Detalhe:** Heatmap exibe legenda de intensidade ("Menos → Mais"), mas sem labels de dia da semana nas linhas nem indicadores de mês nas colunas.
-**Arquivo:** `app/index.tsx` (linhas 48–140)
+**Status:** ✅ Implementado
+**Detalhe:** Labels de dia da semana (Dom–Sáb) à esquerda do grid. Labels de mês (Jan–Dez) acima de cada coluna onde há mudança de mês. Ambos renderizados dentro do ScrollView horizontal para permanecer sincronizados.
+**Arquivo:** `app/index.tsx`
 
 ---
 
@@ -144,9 +146,9 @@
 
 | Status | Quantidade |
 |--------|-----------|
-| ✅ Implementado | 7 |
-| 🔶 Parcial | 6 |
-| ❌ Pendente | 4 |
+| ✅ Implementado | 15 |
+| 🔶 Parcial | 1 |
+| ❌ Pendente | 1 |
 | **Total** | **17** |
 
 ---
@@ -161,4 +163,4 @@
 
 ---
 
-_Ajudaê — PROGRESS v1.1 — atualizado em 2026-04-27_
+_Ajudaê — PROGRESS v1.2 — atualizado em 2026-04-27_
