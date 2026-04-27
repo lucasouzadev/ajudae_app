@@ -609,6 +609,11 @@ function ClienteHome() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [modalProvider, setModalProvider] = useState<Provider | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1200);
+  };
 
   const filtered = useMemo(
     () => (filter === "Todos" ? MOCK_PROVIDERS : MOCK_PROVIDERS.filter((p) => p.cat === filter)),
@@ -714,13 +719,13 @@ function ClienteHome() {
       {/* Active service tracking banner */}
       {activeService && activeService.status !== "completed" && activeService.status !== "cancelled" ? (
         <Pressable
-          onPress={() => router.push(activeService.status === "en_route" && activeService.startPin ? "/confirm-start-pin" : "/track")}
+          onPress={() => router.push(activeService.status === "en_route" && activeService.pin_start ? "/confirm-start-pin" : "/track")}
           style={[
             styles.trackBanner,
             {
               top: insets.top + 70,
               backgroundColor:
-                activeService.status === "en_route" && activeService.startPin
+                activeService.status === "en_route" && activeService.pin_start
                   ? c.primary
                   : activeService.category === "Mudança"
                   ? c.primary
@@ -733,13 +738,13 @@ function ClienteHome() {
         >
           <View style={styles.trackPulse} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.trackEyebrow, { color: activeService.status === "en_route" && activeService.startPin ? "#1A1714" : "#fff", opacity: 0.75 }]}>
-              {activeService.status === "en_route" && activeService.startPin
+            <Text style={[styles.trackEyebrow, { color: activeService.status === "en_route" && activeService.pin_start ? "#1A1714" : "#fff", opacity: 0.75 }]}>
+              {activeService.status === "en_route" && activeService.pin_start
                 ? "AÇÃO NECESSÁRIA"
                 : `ACOMPANHAR · #${activeService.id.slice(-6).toUpperCase()}`}
             </Text>
-            <Text style={[styles.trackTitle, { color: activeService.status === "en_route" && activeService.startPin ? "#1A1714" : "#fff" }]}>
-              {activeService.status === "en_route" && activeService.startPin
+            <Text style={[styles.trackTitle, { color: activeService.status === "en_route" && activeService.pin_start ? "#1A1714" : "#fff" }]}>
+              {activeService.status === "en_route" && activeService.pin_start
                 ? "Prestador chegou! Confirme o PIN →"
                 : activeService.status === "requested"
                 ? "Aguardando prestador aceitar"
@@ -754,7 +759,7 @@ function ClienteHome() {
                 : activeService.category}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color={activeService.status === "en_route" && activeService.startPin ? "#1A1714" : "#fff"} />
+          <Ionicons name="chevron-forward" size={16} color={activeService.status === "en_route" && activeService.pin_start ? "#1A1714" : "#fff"} />
         </Pressable>
       ) : null}
 
@@ -765,7 +770,7 @@ function ClienteHome() {
           serviceActive={!!(activeService && activeService.status !== "completed" && activeService.status !== "cancelled")}
           onService={() => {
             const hasActive = activeService && activeService.status !== "completed" && activeService.status !== "cancelled";
-            if (hasActive && activeService.status === "en_route" && activeService.startPin) {
+            if (hasActive && activeService.status === "en_route" && activeService.pin_start) {
               router.push("/confirm-start-pin");
             } else if (hasActive) {
               router.push("/track");
@@ -839,6 +844,8 @@ function PrestadorHome() {
   const [online, setOnline] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
@@ -888,6 +895,7 @@ function PrestadorHome() {
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.blue} />}
       >
         {/* Online toggle */}
         <Pressable
