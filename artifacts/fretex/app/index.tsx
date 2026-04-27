@@ -1032,6 +1032,7 @@ function ClienteHome() {
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [active, setActive] = useState<Provider | null>(null);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [modalProvider, setModalProvider] = useState<Provider | null>(null);
@@ -1150,8 +1151,8 @@ function ClienteHome() {
         </Pressable>
       ) : null}
 
-      {/* Floating filter chips — above the sheet */}
-      <ScrollView
+      {/* Floating filter chips + activeCard — hidden when sheet is expanded */}
+      {!sheetExpanded && <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
@@ -1176,10 +1177,10 @@ function ClienteHome() {
             onPress={() => setFilter(f as typeof filter)}
           />
         ))}
-      </ScrollView>
+      </ScrollView>}
 
       {/* Active provider card — above chips, below modal layer */}
-      {active ? (
+      {!sheetExpanded && active ? (
         <View
           style={[
             styles.activeCard,
@@ -1235,6 +1236,7 @@ function ClienteHome() {
         onOpenProfile={(p) => router.push(`/provider/${p.id}`)}
         onSeeAll={() => router.push("/marketplace")}
         insetsBottom={insets.bottom}
+        onExpandChange={setSheetExpanded}
       />
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1626,6 +1628,7 @@ function ProvidersSheet({
   onOpenProfile,
   onSeeAll,
   insetsBottom,
+  onExpandChange,
 }: {
   providers: Provider[];
   active: Provider | null;
@@ -1633,6 +1636,7 @@ function ProvidersSheet({
   onOpenProfile: (p: Provider) => void;
   onSeeAll: () => void;
   insetsBottom: number;
+  onExpandChange?: (expanded: boolean) => void;
 }) {
   const c = colors.light;
   const heightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
@@ -1647,7 +1651,9 @@ function ProvidersSheet({
       useNativeDriver: false,
     }).start();
     startH.current = target;
-    setExpanded(target === EXPANDED_H);
+    const isExpanded = target === EXPANDED_H;
+    setExpanded(isExpanded);
+    onExpandChange?.(isExpanded);
   };
 
   const responder = useRef(
