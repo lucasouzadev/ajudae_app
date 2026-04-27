@@ -510,8 +510,8 @@ const pStyles = StyleSheet.create({
     position: "relative",
   },
   badgeEmoji: { fontSize: 22 },
-  badgeLabel: { fontSize: 9, fontFamily: fonts.sans.bold, textAlign: "center" },
-  badgeProgress: { fontSize: 8, fontFamily: fonts.sans.regular },
+  badgeLabel: { fontSize: 11, fontFamily: fonts.sans.bold, textAlign: "center" },
+  badgeProgress: { fontSize: 11, fontFamily: fonts.sans.regular },
   badgeCheck: { position: "absolute", top: 6, right: 6, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 
   /* Reviews */
@@ -520,7 +520,7 @@ const pStyles = StyleSheet.create({
   reviewAvatar: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   reviewIni: { fontSize: 11, fontFamily: fonts.serif.extra },
   reviewAuthor: { fontSize: 12, fontFamily: fonts.sans.bold },
-  reviewWhen: { fontSize: 9, fontFamily: fonts.sans.regular, marginTop: 1 },
+  reviewWhen: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 1 },
   reviewStars: { flexDirection: "row", gap: 1 },
   reviewText: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 16 },
 });
@@ -593,7 +593,7 @@ const chipStyles = StyleSheet.create({
   },
   label: { fontSize: 12, fontFamily: fonts.sans.bold, color: "#1C1917" },
   badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  badgeText: { color: "#fff", fontSize: 9, fontFamily: fonts.sans.extra },
+  badgeText: { color: "#fff", fontSize: 11, fontFamily: fonts.sans.extra },
   activeDot: { width: 7, height: 7, borderRadius: 4 },
 });
 
@@ -1417,10 +1417,10 @@ const sheetStyles = StyleSheet.create({
   onlineDot: { width: 7, height: 7, borderRadius: 4 },
   listMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap" },
   catTag: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999 },
-  catTxt: { fontSize: 9, fontFamily: fonts.sans.bold },
+  catTxt: { fontSize: 11, fontFamily: fonts.sans.bold },
   metaTxt: { fontSize: 10, fontFamily: fonts.sans.semibold },
   listPrice: { fontSize: 14, fontFamily: fonts.serif.extra },
-  listPriceSub: { fontSize: 9, fontFamily: fonts.sans.regular, marginTop: 1 },
+  listPriceSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 1 },
 
   seeAll: {
     flexDirection: "row",

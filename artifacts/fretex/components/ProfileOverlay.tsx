@@ -137,6 +137,7 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
         Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }),
       ]).start();
     } else {
+      setActiveMenu(null);
       Animated.parallel([
         Animated.timing(translateY, { toValue: -1000, duration: 320, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
         Animated.timing(fade, { toValue: 0, duration: 260, useNativeDriver: true }),
@@ -186,45 +187,60 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
         </LinearGradient>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.list}>
-          {ITEMS_BASE.map((item, i) => (
-            <Pressable key={i} style={[styles.item, { borderBottomColor: c.borderLight }]}>
-              <View style={[styles.itemIcon, { backgroundColor: c.background }]}>
-                <Ionicons name={item.icon} size={18} color={c.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.itemLabel, { color: c.text }]}>{item.label}</Text>
-                <Text style={[styles.itemSub, { color: c.softMuted }]}>{item.sub}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
-            </Pressable>
-          ))}
+          {activeMenu !== null ? (
+            <>
+              <Pressable
+                onPress={() => setActiveMenu(null)}
+                style={[styles.backBtn, { borderBottomColor: c.borderLight }]}
+              >
+                <Ionicons name="arrow-back" size={18} color={c.text} />
+                <Text style={[styles.backBtnText, { color: c.text }]}>{activeMenu}</Text>
+              </Pressable>
+              <SubMenuContent label={activeMenu} c={c} />
+            </>
+          ) : (
+            <>
+              {ITEMS_BASE.map((item, i) => (
+                <Pressable key={i} onPress={() => setActiveMenu(item.label)} style={[styles.item, { borderBottomColor: c.borderLight }]}>
+                  <View style={[styles.itemIcon, { backgroundColor: c.background }]}>
+                    <Ionicons name={item.icon} size={18} color={c.text} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemLabel, { color: c.text }]}>{item.label}</Text>
+                    <Text style={[styles.itemSub, { color: c.softMuted }]}>{item.sub}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
+                </Pressable>
+              ))}
 
-          <Pressable
-            onPress={() => {
-              switchRole(otherRole as "cliente" | "prestador");
-              onClose();
-            }}
-            style={[styles.item, { borderBottomColor: c.borderLight }]}
-          >
-            <View style={[styles.itemIcon, { backgroundColor: c.primaryLight }]}>
-              <Ionicons name="swap-horizontal" size={18} color={c.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.itemLabel, { color: c.text }]}>Trocar para {otherLabel}</Text>
-              <Text style={[styles.itemSub, { color: c.softMuted }]}>Mude o tipo de conta</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
-          </Pressable>
+              <Pressable
+                onPress={() => {
+                  switchRole(otherRole as "cliente" | "prestador");
+                  onClose();
+                }}
+                style={[styles.item, { borderBottomColor: c.borderLight }]}
+              >
+                <View style={[styles.itemIcon, { backgroundColor: c.primaryLight }]}>
+                  <Ionicons name="swap-horizontal" size={18} color={c.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemLabel, { color: c.text }]}>Trocar para {otherLabel}</Text>
+                  <Text style={[styles.itemSub, { color: c.softMuted }]}>Mude o tipo de conta</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
+              </Pressable>
 
-          <Pressable
-            onPress={async () => {
-              await logout();
-              onClose();
-            }}
-            style={[styles.logoutBtn, { borderColor: c.border }]}
-          >
-            <Text style={[styles.logoutText, { color: c.sub }]}>Sair da conta</Text>
-          </Pressable>
+              <Pressable
+                onPress={async () => {
+                  await logout();
+                  onClose();
+                }}
+                style={[styles.logoutBtn, { borderColor: c.border }]}
+              >
+                <Text style={[styles.logoutText, { color: c.sub }]}>Sair da conta</Text>
+              </Pressable>
+            </>
+          )}
         </ScrollView>
       </Animated.View>
     </Modal>
@@ -308,4 +324,61 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutText: { fontSize: 14, fontFamily: fonts.sans.semibold },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    marginBottom: 16,
+  },
+  backBtnText: { fontSize: 16, fontFamily: fonts.sans.bold },
+});
+
+const subStyles = StyleSheet.create({
+  container: { gap: 10 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowLabel: { fontSize: 13, fontFamily: fonts.sans.semibold },
+  rowSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  badgeText: { fontSize: 11, fontFamily: fonts.sans.bold },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
+    opacity: 0.5,
+  },
+  addBtnText: { fontSize: 13, fontFamily: fonts.sans.semibold },
+  comingSoon: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  comingSoonText: { fontSize: 14, fontFamily: fonts.sans.semibold },
 });
