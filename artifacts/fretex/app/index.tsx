@@ -1067,7 +1067,7 @@ function ClienteHome() {
           <View style={[styles.userDot, { backgroundColor: c.blue, borderColor: c.card }]} />
         </View>
 
-        {/* Pins */}
+        {/* Pins — tap abre ProviderModal diretamente */}
         {filtered.map((p) => {
           const topPct = 14 + (p.lat / 100) * 40;
           return (
@@ -1086,7 +1086,11 @@ function ClienteHome() {
                 price={p.price}
                 color={p.color}
                 active={active?.id === p.id}
-                onPress={() => setActive(active?.id === p.id ? null : p)}
+                onPress={() => {
+                  const next = active?.id === p.id ? null : p;
+                  setActive(next);
+                  setModalProvider(next);
+                }}
               />
             </View>
           );
@@ -1102,45 +1106,6 @@ function ClienteHome() {
         onProfileOpen={() => setProfileOpen(true)}
       />
 
-      {/* Active mini card */}
-      {active ? (
-        <View style={[styles.activeCard, { backgroundColor: c.card, bottom: 80 + insets.bottom }, shadows.lg]}>
-          <View style={styles.activeRow}>
-            <View style={[styles.activeIcon, { backgroundColor: `${active.color}18` }]}>
-              {active.cat === "Mudança" ? (
-                <Ionicons name="home" size={17} color={active.color} />
-              ) : active.cat === "Frete" ? (
-                <MaterialCommunityIcons name="truck" size={18} color={active.color} />
-              ) : (
-                <Ionicons name="cube" size={17} color={active.color} />
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.activeName, { color: c.text }]}>{active.name}</Text>
-              <Text style={[styles.activeSub, { color: c.softMuted }]}>★ {active.rating} · {active.vehicle}</Text>
-            </View>
-            <Pressable
-              onPress={() => setActive(null)}
-              style={[styles.activeClose, { backgroundColor: c.background }]}
-            >
-              <Ionicons name="close" size={13} color={c.softMuted} />
-            </Pressable>
-          </View>
-          <View style={styles.activeBtns}>
-            <View style={[styles.activePrice, { backgroundColor: c.background }]}>
-              <Text style={[styles.activePriceText, { color: c.text }]}>{active.price}</Text>
-              <Text style={[styles.activePriceSub, { color: c.softMuted }]}>estimado</Text>
-            </View>
-            <Pressable
-              onPress={() => setModalProvider(active)}
-              style={[styles.activeRequestBtn, { backgroundColor: active.color }]}
-            >
-              <Text style={styles.activeRequestText}>Solicitar</Text>
-              <Ionicons name="arrow-forward" size={14} color="#fff" />
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
 
       {/* Active service tracking banner */}
       {activeService && activeService.status !== "completed" && activeService.status !== "cancelled" ? (
@@ -1584,7 +1549,7 @@ const styles = StyleSheet.create({
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
 const SCREEN_H = Dimensions.get("window").height;
-const COLLAPSED_H = 228;  // handle + título + chips carousel + mini cards
+const COLLAPSED_H = 244;  // handle + título + chips row + mini cards carousel
 const EXPANDED_H = Math.min(SCREEN_H * 0.78, 640);
 
 function ProvidersSheet({
@@ -1659,8 +1624,8 @@ function ProvidersSheet({
         shadows.xl,
       ]}
     >
-      {/* Drag header */}
-      <View {...responder.panHandlers} style={sheetStyles.header}>
+      {/* Área de arrasto — SOMENTE handle + título, sem ScrollView */}
+      <View {...responder.panHandlers} style={sheetStyles.dragArea}>
         <View style={[sheetStyles.handle, { backgroundColor: "#D6D3D1" }]} />
         <View style={sheetStyles.headerRow}>
           <View style={{ flex: 1 }}>
@@ -1675,24 +1640,26 @@ function ProvidersSheet({
             <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={16} color={c.text} />
           </Pressable>
         </View>
-        {/* Filter chips carousel — sempre visível no header */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 8, paddingBottom: 4, gap: 8 }}
-        >
-          {filters.map((f) => (
-            <Chip
-              key={f}
-              label={f}
-              active={filter === f}
-              count={counts[f]}
-              category={f === "Todos" ? null : (f as Category)}
-              onPress={() => onFilterChange(f)}
-            />
-          ))}
-        </ScrollView>
       </View>
+
+      {/* Chips — fora do panHandlers, scroll horizontal livre */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}
+        style={sheetStyles.chipsRow}
+      >
+        {filters.map((f) => (
+          <Chip
+            key={f}
+            label={f}
+            active={filter === f}
+            count={counts[f]}
+            category={f === "Todos" ? null : (f as Category)}
+            onPress={() => onFilterChange(f)}
+          />
+        ))}
+      </ScrollView>
 
       {/* Body — list when expanded, carousel when collapsed */}
       {expanded ? (
@@ -1812,7 +1779,8 @@ const sheetStyles = StyleSheet.create({
     zIndex: 31,
     overflow: "hidden",
   },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
+  dragArea: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 },
+  chipsRow: { paddingTop: 0 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 8 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   headerTitle: { fontSize: 14, fontFamily: fonts.sans.bold },

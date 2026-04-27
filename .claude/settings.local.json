@@ -5,7 +5,9 @@
       "Bash(git commit -m 'feat: bloquear toggle prestador não-verificado + CPO assessment *)",
       "Bash(npx tsc *)",
       "Bash(node_modules/.bin/tsc --noEmit)",
-      "Bash(git commit -m 'refactor: tab-bar, filtros no sheet, hubs no prestador, nova solicitação *)"
+      "Bash(git commit -m 'refactor: tab-bar, filtros no sheet, hubs no prestador, nova solicitação *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix: drag do sheet, activeCard removido, chips separados do panHandlers *)"
     ]
   }
 }
