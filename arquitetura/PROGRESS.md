@@ -26,8 +26,8 @@
 
 ### 2. Dual-PIN no fluxo do prestador
 **Status:** ✅ Implementado
-**Detalhe:** PIN de início em `start-pin.tsx` (4 dígitos, expira em 10 min, máx 3 regenerações). Confirmação pelo cliente em `confirm-start-pin.tsx`. PIN de conclusão gerado no `ServiceContext` e validado em `job-otp.tsx` com limite de 5 tentativas antes de abrir disputa.
-**Arquivos:** `app/start-pin.tsx`, `app/confirm-start-pin.tsx`, `app/job-otp.tsx`, `contexts/ServiceContext.tsx`
+**Detalhe:** Sistema complementar offline-first. `pin_start` (4 dígitos) pré-gerado na criação do pedido — prestador exibe, cliente digita em `confirm-start-pin.tsx`. `pin_conclusion` (6 dígitos) — cliente exibe via `otp-modal.tsx`, prestador digita em `job-otp.tsx`. Verificação via commitment hash djb2 sem rede. Max 5 tentativas em cada PIN → `disputed` automático. UI blocking total durante serviço ativo (padrão Uber/99).
+**Arquivos:** `app/start-pin.tsx`, `app/confirm-start-pin.tsx`, `app/otp-modal.tsx`, `app/job-otp.tsx`, `app/track.tsx`, `app/_layout.tsx`, `contexts/ServiceContext.tsx`
 
 ---
 
@@ -144,9 +144,9 @@
 
 | Status | Quantidade |
 |--------|-----------|
-| ✅ Implementado | 6 |
+| ✅ Implementado | 7 |
 | 🔶 Parcial | 6 |
-| ❌ Pendente | 5 |
+| ❌ Pendente | 4 |
 | **Total** | **17** |
 
 ---
@@ -161,4 +161,4 @@
 
 ---
 
-_Ajudaê — PROGRESS v1.0 — atualizado em 2026-04-26_
+_Ajudaê — PROGRESS v1.1 — atualizado em 2026-04-27_
