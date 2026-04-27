@@ -1032,7 +1032,7 @@ function ClienteHome() {
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [active, setActive] = useState<Provider | null>(null);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [modalProvider, setModalProvider] = useState<Provider | null>(null);
@@ -1151,11 +1151,9 @@ function ClienteHome() {
         </Pressable>
       ) : null}
 
-      {/* Floating filter chips + activeCard — hidden when sheet is expanded */}
-      {!sheetExpanded && <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+      {/* Floating filter chips — fades out as sheet rises */}
+      <Animated.View
+        pointerEvents={active ? "none" : "box-none"}
         style={{
           position: "absolute",
           bottom: COLLAPSED_H + 8,
@@ -1163,31 +1161,51 @@ function ClienteHome() {
           right: 0,
           zIndex: 32,
           height: CHIP_ROW_H,
-          paddingVertical: 10,
+          opacity: sheetHeightAnim.interpolate({
+            inputRange: [COLLAPSED_H, COLLAPSED_H + 60],
+            outputRange: [1, 0],
+            extrapolate: "clamp",
+          }),
         }}
-        pointerEvents="box-none"
       >
-        {(FILTERS as string[]).map((f) => (
-          <Chip
-            key={f}
-            label={f}
-            active={filter === f}
-            count={counts[f]}
-            category={f === "Todos" ? null : (f as Category)}
-            onPress={() => setFilter(f as typeof filter)}
-          />
-        ))}
-      </ScrollView>}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}
+        >
+          {(FILTERS as string[]).map((f) => (
+            <Chip
+              key={f}
+              label={f}
+              active={filter === f}
+              count={counts[f]}
+              category={f === "Todos" ? null : (f as Category)}
+              onPress={() => setFilter(f as typeof filter)}
+            />
+          ))}
+        </ScrollView>
+      </Animated.View>
 
-      {/* Active provider card — above chips, below modal layer */}
-      {!sheetExpanded && active ? (
+      {/* Active provider card — fades out as sheet rises */}
+      {active ? (
+        <Animated.View
+          style={{
+            opacity: sheetHeightAnim.interpolate({
+              inputRange: [COLLAPSED_H, COLLAPSED_H + 60],
+              outputRange: [1, 0],
+              extrapolate: "clamp",
+            }),
+            position: "absolute",
+            bottom: COLLAPSED_H + CHIP_ROW_H + 8,
+            left: 0,
+            right: 0,
+            zIndex: 50,
+          }}
+        >
         <View
           style={[
             styles.activeCard,
-            {
-              bottom: COLLAPSED_H + CHIP_ROW_H + 8,
-              backgroundColor: active.color,
-            },
+            { backgroundColor: active.color },
             shadows.lg,
           ]}
         >
@@ -1226,6 +1244,7 @@ function ClienteHome() {
             </Pressable>
           </View>
         </View>
+        </Animated.View>
       ) : null}
 
       {/* Bottom draggable sheet */}
@@ -1236,7 +1255,7 @@ function ClienteHome() {
         onOpenProfile={(p) => router.push(`/provider/${p.id}`)}
         onSeeAll={() => router.push("/marketplace")}
         insetsBottom={insets.bottom}
-        onExpandChange={setSheetExpanded}
+        heightAnim={sheetHeightAnim}
       />
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1496,12 +1515,9 @@ const styles = StyleSheet.create({
   userPulse: { position: "absolute", width: 28, height: 28, borderRadius: 14 },
   userDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 3 },
   activeCard: {
-    position: "absolute",
-    left: 16,
-    right: 16,
+    marginHorizontal: 16,
     borderRadius: 18,
     padding: 14,
-    zIndex: 50,
   },
   activeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
   activeIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
@@ -1628,7 +1644,7 @@ function ProvidersSheet({
   onOpenProfile,
   onSeeAll,
   insetsBottom,
-  onExpandChange,
+  heightAnim,
 }: {
   providers: Provider[];
   active: Provider | null;
@@ -1636,10 +1652,9 @@ function ProvidersSheet({
   onOpenProfile: (p: Provider) => void;
   onSeeAll: () => void;
   insetsBottom: number;
-  onExpandChange?: (expanded: boolean) => void;
+  heightAnim: Animated.Value;
 }) {
   const c = colors.light;
-  const heightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
   const startH = useRef(COLLAPSED_H);
   const [expanded, setExpanded] = useState(false);
 
@@ -1651,9 +1666,7 @@ function ProvidersSheet({
       useNativeDriver: false,
     }).start();
     startH.current = target;
-    const isExpanded = target === EXPANDED_H;
-    setExpanded(isExpanded);
-    onExpandChange?.(isExpanded);
+    setExpanded(target === EXPANDED_H);
   };
 
   const responder = useRef(
