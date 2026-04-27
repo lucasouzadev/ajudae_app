@@ -83,7 +83,7 @@ export function InfoSheet({
   if (!visible) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents="box-none">
       {/* Backdrop */}
       <Animated.View
         style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.4)", opacity: backdropAnim }]}

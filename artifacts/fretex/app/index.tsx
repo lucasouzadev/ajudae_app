@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl, Modal } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -1277,18 +1277,11 @@ function ClienteHome() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      {/* Map area — encolhe conforme o sheet sobe */}
-      <Animated.View
+      {/* Map area — ocupa tela inteira; sheet se posiciona na frente */}
+      <View
         style={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: sheetHeightAnim.interpolate({
-            inputRange: [COLLAPSED_H, EXPANDED_H],
-            outputRange: [0, EXPANDED_H - 240],
-            extrapolate: "clamp",
-          }),
+          top: 0, left: 0, right: 0, bottom: 0,
           overflow: "hidden",
         }}
       >
@@ -1344,7 +1337,7 @@ function ClienteHome() {
             <Ionicons name="locate" size={20} color={c.blue} />
           </Pressable>
         </Animated.View>
-      </Animated.View>
+      </View>
 
       <TopNav
         title="Ajudaê!"
@@ -1899,7 +1892,7 @@ const SCREEN_H = Dimensions.get("window").height;
 const COLLAPSED_H = 164;  // handle + título + mini cards carousel (sem padding extra)
 const CHIP_ROW_H  = 52;   // altura da faixa flutuante de filtros
 const MINI_CARD_H = 82;   // altura fixa dos mini cards no carrossel
-const EXPANDED_H = Math.min(SCREEN_H * 0.78, 640);
+const EXPANDED_H = Math.min(SCREEN_H * 0.63, 540);
 
 function ProvidersSheet({
   providers,
@@ -2050,7 +2043,7 @@ function ProvidersSheet({
         }}
       >
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
           showsVerticalScrollIndicator={false}
         >
           {providers.map((p) => (
