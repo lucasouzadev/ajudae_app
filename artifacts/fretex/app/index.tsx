@@ -1059,8 +1059,21 @@ function ClienteHome() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      {/* Map area */}
-      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+      {/* Map area — encolhe conforme o sheet sobe */}
+      <Animated.View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: sheetHeightAnim.interpolate({
+            inputRange: [COLLAPSED_H, EXPANDED_H],
+            outputRange: [0, EXPANDED_H - 160],
+            extrapolate: "clamp",
+          }),
+          overflow: "hidden",
+        }}
+      >
         <MapSVG />
         {/* User location */}
         <View style={[styles.userLocWrap, { top: "32%" }]} pointerEvents="none">
@@ -1068,7 +1081,7 @@ function ClienteHome() {
           <View style={[styles.userDot, { backgroundColor: c.blue, borderColor: c.card }]} />
         </View>
 
-        {/* Pins — tap abre ProviderModal diretamente */}
+        {/* Pins — tap seleciona provider */}
         {filtered.map((p) => {
           const topPct = 14 + (p.lat / 100) * 40;
           return (
@@ -1092,7 +1105,28 @@ function ClienteHome() {
             </View>
           );
         })}
-      </View>
+
+        {/* Botão de localização — canto inferior direito do mapa */}
+        <Animated.View
+          style={{
+            position: "absolute",
+            right: 16,
+            bottom: sheetHeightAnim.interpolate({
+              inputRange: [COLLAPSED_H, EXPANDED_H],
+              outputRange: [COLLAPSED_H + CHIP_ROW_H + 16, 16],
+              extrapolate: "clamp",
+            }),
+            zIndex: 25,
+          }}
+        >
+          <Pressable
+            style={[styles.locateBtn, { backgroundColor: c.card }, shadows.md]}
+            onPress={() => { /* TODO: centralizar no GPS real */ }}
+          >
+            <Ionicons name="locate" size={20} color={c.blue} />
+          </Pressable>
+        </Animated.View>
+      </Animated.View>
 
       <TopNav
         title="Ajudaê!"
@@ -1518,6 +1552,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 18,
     padding: 14,
+  },
+  locateBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
   },
   activeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
   activeIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },

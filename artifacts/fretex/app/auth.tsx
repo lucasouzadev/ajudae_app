@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { IS_DEMO } from "@/constants/env";
 import {
   View,
@@ -11,12 +11,161 @@ import {
   Keyboard,
   Platform,
   ScrollView,
+  Animated,
+  Linking,
 } from "react-native";
 import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/contexts/AuthContext";
 import colors, { fonts, shadows } from "@/constants/colors";
 
+const LGPD_KEY = "ajudae_lgpd_accepted";
+
+/* ─── LGPD Bottom Sheet ──────────────────────────────────────────────── */
+function LGPDSheet({ onAccept, onDecline }: { onAccept: () => void; onDecline: () => void }) {
+  const c = colors.light;
+  const insets = useSafeAreaInsets();
+  const slideAnim = useRef(new Animated.Value(500)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 14, useNativeDriver: true }),
+      Animated.timing(backdropAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const dismiss = (cb: () => void) => {
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: 600, duration: 260, useNativeDriver: true }),
+      Animated.timing(backdropAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start(cb);
+  };
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      {/* Backdrop */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)", opacity: backdropAnim }]}
+        pointerEvents="none"
+      />
+
+      {/* Sheet */}
+      <Animated.View
+        style={[
+          lgpdStyles.sheet,
+          {
+            backgroundColor: c.card,
+            paddingBottom: insets.bottom + 16,
+            transform: [{ translateY: slideAnim }],
+          },
+          shadows.xl,
+        ]}
+      >
+        {/* Handle */}
+        <View style={[lgpdStyles.handle, { backgroundColor: c.border }]} />
+
+        {/* Icon */}
+        <View style={[lgpdStyles.iconWrap, { backgroundColor: `${c.primary}18` }]}>
+          <Ionicons name="shield-checkmark" size={26} color={c.primary} />
+        </View>
+
+        <Text style={[lgpdStyles.title, { color: c.text }]}>
+          Política de privacidade{"\n"}e Termos de Uso
+        </Text>
+
+        <ScrollView
+          style={lgpdStyles.bodyScroll}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 8 }}
+        >
+          <Text style={[lgpdStyles.body, { color: c.sub }]}>
+            Antes de usar o Ajudaê!, leia atentamente os{" "}
+            <Text style={{ fontFamily: fonts.sans.bold, color: c.text }}>Termos de Uso</Text>,
+            as regras da plataforma e a{" "}
+            <Text style={{ fontFamily: fonts.sans.bold, color: c.text }}>Política de Privacidade</Text>.
+            {"\n\n"}
+            Ao tocar em "Concordo", você confirma que leu, entendeu e concorda em agir de acordo com os termos.
+            {"\n\n"}
+            A Política de Privacidade aborda principalmente como coletamos e usamos informações pessoais, como seu número de telefone, nome, dados dos seus pedidos, localização, detalhes dos serviços e permissões do dispositivo — em conformidade com a{" "}
+            <Text style={{ fontFamily: fonts.sans.bold, color: c.text }}>LGPD (Lei 13.709/2018)</Text>.
+          </Text>
+
+          <Pressable onPress={() => Linking.openURL("https://ajudaeh.com.br/privacidade")} style={lgpdStyles.linkRow}>
+            <Text style={[lgpdStyles.link, { color: c.blue }]}>Política de Privacidade e Termos de Uso</Text>
+            <Ionicons name="open-outline" size={13} color={c.blue} />
+          </Pressable>
+        </ScrollView>
+
+        {/* Actions */}
+        <View style={lgpdStyles.actions}>
+          <Pressable
+            onPress={() => dismiss(onAccept)}
+            style={[lgpdStyles.acceptBtn, { backgroundColor: c.primary }, shadows.md, { shadowColor: c.primary, shadowOpacity: 0.3 }]}
+          >
+            <Ionicons name="checkmark-circle" size={18} color="#1A1714" />
+            <Text style={[lgpdStyles.acceptText, { color: "#1A1714" }]}>Concordo</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => dismiss(onDecline)}
+            style={[lgpdStyles.declineBtn, { backgroundColor: c.background }]}
+          >
+            <Text style={[lgpdStyles.declineText, { color: c.sub }]}>Sair</Text>
+          </Pressable>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+const lgpdStyles = StyleSheet.create({
+  sheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    maxHeight: "82%",
+  },
+  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  title: { fontSize: 22, fontFamily: fonts.serif.extra, lineHeight: 28, marginBottom: 14 },
+  bodyScroll: { maxHeight: 200, marginBottom: 20 },
+  body: { fontSize: 13, fontFamily: fonts.sans.regular, lineHeight: 20 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 14 },
+  link: { fontSize: 13, fontFamily: fonts.sans.semibold, textDecorationLine: "underline" },
+  actions: { gap: 10 },
+  acceptBtn: {
+    height: 56,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  acceptText: { fontSize: 16, fontFamily: fonts.sans.extra },
+  declineBtn: {
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  declineText: { fontSize: 15, fontFamily: fonts.sans.bold },
+});
+
+/* ─── Main Auth Screen ───────────────────────────────────────────────── */
 type Screen = "lobby" | "login" | "signup-role" | "signup-form";
 
 export default function AuthScreen() {
@@ -31,9 +180,28 @@ export default function AuthScreen() {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lgpdChecked, setLgpdChecked] = useState(false);
+  const [showLGPD, setShowLGPD] = useState(false);
 
   const accent = role === "cliente" ? c.primary : c.blue;
   const accentText = role === "cliente" ? "#1A1714" : "#fff";
+
+  useEffect(() => {
+    AsyncStorage.getItem(LGPD_KEY).then((val) => {
+      if (!val) setShowLGPD(true);
+      setLgpdChecked(true);
+    });
+  }, []);
+
+  const handleLGPDAccept = async () => {
+    await AsyncStorage.setItem(LGPD_KEY, "1");
+    setShowLGPD(false);
+  };
+
+  const handleLGPDDecline = () => {
+    // Em produção: fechar o app. Em demo: apenas fecha o sheet.
+    setShowLGPD(false);
+  };
 
   const handleLogin = async () => {
     setLoading(true);
@@ -65,6 +233,8 @@ export default function AuthScreen() {
       setLoading(false);
     }
   };
+
+  if (!lgpdChecked) return null;
 
   /* ── Lobby ── */
   if (screen === "lobby") {
@@ -131,6 +301,10 @@ export default function AuthScreen() {
           <Text style={{ color: c.sub }}>Termos de Uso</Text> e a{" "}
           <Text style={{ color: c.sub }}>Política de Privacidade</Text>.
         </Text>
+
+        {showLGPD && (
+          <LGPDSheet onAccept={handleLGPDAccept} onDecline={handleLGPDDecline} />
+        )}
       </View>
     );
   }
