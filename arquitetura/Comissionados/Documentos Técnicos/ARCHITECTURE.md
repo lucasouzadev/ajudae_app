@@ -239,6 +239,94 @@ Camada 5: Auditoria
 
 ---
 
+## ADR-006: Sistema de PIN Complementar Offline-First
+
+**Decisão:** Substituir PINs sequenciais independentes por um sistema de PIN complementar baseado em commitment hash, operável 100% offline após a criação do pedido.
+
+**Motivo:** Usuários urbanos frequentemente operam com conectividade instável (interior de edifícios, elevadores, garagens subterrâneas). A verificação de PIN não deve depender de rede disponível no momento da chegada ou conclusão do serviço.
+
+### Geração dos PINs (requer rede — momento da criação)
+
+Na criação do pedido (`request_create`), a Edge Function gera:
+
+- `pin_start` — 4 dígitos aleatórios (10.000 combinações); entregue ao prestador no momento da aceitação
+- `pin_conclusion` — 6 dígitos aleatórios (1.000.000 combinações); exibido ao cliente uma única vez no modal 4B
+- `commitment` — hash de verificação: `djb2_hash(serviceId + "|" + pin_start + "|" + pin_conclusion)`
+
+O `commitment` é armazenado na tabela `requests` e sincronizado em ambos os dispositivos. **Os PINs brutos nunca são armazenados no servidor após a distribuição inicial.**
+
+Total de combinações do par: 10.000 × 1.000.000 = **10 bilhões** (par único por pedido).
+
+### Função de commitment (MVP)
+
+```typescript
+function djb2Hash(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+    hash = hash >>> 0; // força uint32
+  }
+  return hash;
+}
+
+function computeCommitment(serviceId: string, pinStart: string, pinConclusion: string): string {
+  return djb2Hash(`${serviceId}|${pinStart}|${pinConclusion}`).toString(16);
+}
+```
+
+> **Produção:** substituir djb2 por HMAC-SHA256 via Supabase Edge Function com chave secreta server-side. O `commitment` é armazenado na coluna `requests.commitment`; os PINs brutos nunca são armazenados server-side após a distribuição.
+
+### Verificação offline
+
+A verificação é uma computação local pura — sem chamada de rede:
+
+```
+Chegada (en_route → in_progress):
+  1. Prestador exibe pin_start na tela
+  2. Cliente digita pin_start
+  3. App recomputa: djb2(serviceId|inputPin|pin_conclusion_local)
+  4. Compara com commitment armazenado localmente
+  5. Match → avança status; No match → registra tentativa
+
+Conclusão (in_progress → completed):
+  1. Cliente exibe pin_conclusion
+  2. Prestador digita pin_conclusion
+  3. App recomputa: djb2(serviceId|pin_start_local|inputPin)
+  4. Compara com commitment armazenado localmente
+  5. Match → avança status; No match → registra tentativa
+```
+
+### Máquina de estados — transições válidas
+
+| De           | Para         | Gatilho                                      | Requer PIN |
+|--------------|--------------|----------------------------------------------|------------|
+| `requested`  | `accepted`   | Prestador aceita (`request_accept`)           | Não        |
+| `accepted`   | `en_route`   | Prestador clica "Estou a caminho"             | Não        |
+| `en_route`   | `in_progress`| Cliente valida `pin_start`                   | **pin_start** |
+| `in_progress`| `completed`  | Prestador valida `pin_conclusion`             | **pin_conclusion** |
+| `requested`  | `cancelled`  | Cliente cancela                               | Não        |
+| `accepted`   | `cancelled`  | Cancelamento tardio (aviso de taxa)           | Não        |
+| qualquer     | `disputed`   | Ticket aberto ou 5 tentativas erradas         | Não        |
+
+Transições não listadas são **bloqueadas** no backend (`request_update_status`).
+
+### Propriedades de segurança
+
+| Propriedade | Detalhe |
+|---|---|
+| Autenticação mútua | Ambas as partes precisam estar fisicamente presentes (pin_start na chegada, pin_conclusion na conclusão) |
+| Nenhum PIN em trânsito | Após distribuição inicial, nenhum PIN circula pela plataforma |
+| Combinações | 10 bilhões por par de serviço — impraticável por força bruta |
+| Lockout | 5 tentativas erradas em qualquer PIN → `disputed` automático |
+| Offline | Verificação é hash local — zero dependência de rede |
+| Auditoria | Toda tentativa registrada em `request_events` |
+
+### Operação — perda de PIN
+
+Se o cliente perder o `pin_conclusion`: apenas o Admin pode regenerar. A operação substitui **ambos** os PINs e gera um novo `commitment`, sincronizado em ambos os dispositivos na próxima conexão de rede. Os PINs antigos são invalidados imediatamente no servidor.
+
+---
+
 ## Observabilidade
 
 | Ferramenta           | O que monitora                        | Quem usa |
