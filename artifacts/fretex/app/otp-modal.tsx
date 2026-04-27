@@ -25,7 +25,7 @@ export default function OtpModalScreen() {
   }
 
   const accent = active.category === "Mudança" ? c.primary : active.category === "Frete" ? c.blue : c.success;
-  const digits = active.otp.split("");
+  const digits = active.pin_conclusion.split("");
 
   const acknowledge = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -45,7 +45,7 @@ export default function OtpModalScreen() {
 
           <Text style={[styles.title, { color: c.text }]}>Guarde este código!</Text>
           <Text style={[styles.subtitle, { color: c.softMuted }]}>
-            O prestador vai pedir este PIN no final do serviço para confirmar a conclusão.
+            Guarde este código. O prestador vai pedir estes 6 dígitos ao final do serviço para confirmar a conclusão.
           </Text>
 
           <LinearGradient
@@ -54,7 +54,7 @@ export default function OtpModalScreen() {
             end={{ x: 1, y: 1 }}
             style={[styles.pinBox, { borderColor: `${accent}55` }]}
           >
-            <Text style={[styles.pinLabel, { color: accent }]}>SEU PIN DE CONCLUSÃO</Text>
+            <Text style={[styles.pinLabel, { color: accent }]}>SEU PIN DE CONCLUSÃO (6 DÍGITOS)</Text>
             <View style={styles.pinDigits}>
               {digits.map((d, i) => (
                 <View key={i} style={[styles.pinSlot, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   pinBox: { width: "100%", padding: 18, borderRadius: 18, borderWidth: 1.5, alignItems: "center", marginBottom: 18 },
   pinLabel: { fontSize: 10, fontFamily: fonts.sans.bold, letterSpacing: 1.4, marginBottom: 12 },
   pinDigits: { flexDirection: "row", gap: 8 },
-  pinSlot: { width: 38, height: 50, borderRadius: 10, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  pinSlot: { width: 32, height: 44, borderRadius: 10, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   pinDigit: { fontSize: 22, fontFamily: fonts.serif.extra },
   warnBox: { flexDirection: "row", gap: 10, alignItems: "flex-start", padding: 12, borderRadius: 12, borderWidth: 1, width: "100%", marginBottom: 18 },
   warnText: { flex: 1, fontSize: 11, fontFamily: fonts.sans.medium, lineHeight: 15 },

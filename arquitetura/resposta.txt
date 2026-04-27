@@ -6,7 +6,7 @@ Anotando aqui o que fica no PRD e no que estamos criando agora.
 
 1. Sem navegação bottom tab : Pode adicionar um atalho para o hub de pedidos na tela do cliente. E no prestador já possuimos um espaço para historico de pedidos. Porem, claro, trabalhe o necessario para que ambos saibam que possui um serviço em andamento. Ja temos algo parecido, porem verifique.
 
-2. PIN de Início ausente no fluxo do prestador : Documente a nova regra aprovada de dual-PIN.
+2. PIN Complementar implementado: Sistema dual-PIN com commitment hash. pin_start (4 dígitos, prestador→cliente) + pin_conclusion (6 dígitos, cliente→prestador). Verificação offline via hash local. 5 tentativas → disputa automática. Estado: ✅ Implementado e documentado.
 
 3. Onboarding inexistente : Aprovado, pode criar e implementar seguindo os fluxos da documentação.
 
