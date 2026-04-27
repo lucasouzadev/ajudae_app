@@ -24,6 +24,7 @@ import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { MarketMap, type MapPin } from "@/components/MarketMap";
+import { InfoSheet, type InfoItem } from "@/components/InfoSheet";
 
 export default function MarketplaceScreen() {
   const { role, user } = useAuth();
@@ -253,6 +254,7 @@ function ClienteMarketplace() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [activePin, setActivePin] = useState<string | null>(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 900);
@@ -295,6 +297,7 @@ function ClienteMarketplace() {
         onMenuOpen={() => setMenuOpen(true)}
         onProfileOpen={() => setProfileOpen(true)}
         onBack={() => router.back()}
+        onInfo={() => setInfoOpen(true)}
       />
 
       <ScrollView
@@ -303,7 +306,7 @@ function ClienteMarketplace() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Search — agora no topo */}
-        <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+        <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border, marginBottom: 12 }, shadows.sm]}>
           <Ionicons name="search" size={16} color={c.softMuted} />
           <TextInput
             value={query}
@@ -447,6 +450,14 @@ function ClienteMarketplace() {
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
       <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Cliente"} initials={initials} />
       <CustomOrderModal visible={orderModalOpen} onClose={() => setOrderModalOpen(false)} />
+      <InfoSheet
+        storageKey="ajudae_info_marketplace_cliente"
+        title="Bem-vindo ao Marketplace"
+        subtitle="Veja como encontrar o melhor profissional para seu serviço"
+        items={CLIENTE_MARKET_INFO}
+        forceOpen={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </View>
   );
 }
@@ -462,6 +473,7 @@ function PrestadorMarketplace() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [activePin, setActivePin] = useState<string | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
 
@@ -504,6 +516,7 @@ function PrestadorMarketplace() {
         onMenuOpen={() => setMenuOpen(true)}
         onProfileOpen={() => setProfileOpen(true)}
         onBack={() => router.back()}
+        onInfo={() => setInfoOpen(true)}
       />
 
       <ScrollView
@@ -511,22 +524,30 @@ function PrestadorMarketplace() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Hero */}
-        <LinearGradient
-          colors={[c.blue, "#60A5FA"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <Text style={styles.heroEyebrow}>PESQUISA DE MERCADO</Text>
-          <Text style={styles.heroTitle}>Conheça a concorrência</Text>
-          <Text style={styles.heroSub}>Analise preços, avaliações e portfólio dos colegas de plataforma.</Text>
-          {/* Read-only notice */}
-          <View style={styles.readonlyBadge}>
-            <Ionicons name="eye" size={12} color="rgba(255,255,255,0.9)" />
-            <Text style={styles.readonlyText}>Apenas visualização · solicitações só pelo cliente</Text>
-          </View>
-        </LinearGradient>
+        {/* Search — topo */}
+        <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border, marginBottom: 12 }, shadows.sm]}>
+          <Ionicons name="search" size={16} color={c.softMuted} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Buscar por nome ou bairro..."
+            placeholderTextColor={c.softMuted}
+            style={[styles.searchInput, { color: c.text }]}
+            returnKeyType="search"
+            onSubmitEditing={Keyboard.dismiss}
+          />
+          {query ? (
+            <Pressable onPress={() => { setQuery(""); Keyboard.dismiss(); }}>
+              <Ionicons name="close-circle" size={16} color={c.softMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Read-only notice compacta */}
+        <View style={[styles.readonlyRow, { backgroundColor: c.blueLight, borderColor: `${c.blue}33` }]}>
+          <Ionicons name="eye" size={13} color={c.blue} />
+          <Text style={[styles.readonlyRowText, { color: c.blue }]}>Apenas visualização · solicitações só pelo cliente</Text>
+        </View>
 
         {/* Pulse metrics */}
         <View style={styles.pulseRow}>
@@ -553,25 +574,6 @@ function PrestadorMarketplace() {
           subtitle={`${peerPins.length} online agora`}
           badgeColor={c.blue}
         />
-
-        {/* Search */}
-        <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-          <Ionicons name="search" size={16} color={c.softMuted} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Buscar por nome ou bairro..."
-            placeholderTextColor={c.softMuted}
-            style={[styles.searchInput, { color: c.text }]}
-            returnKeyType="search"
-            onSubmitEditing={Keyboard.dismiss}
-          />
-          {query ? (
-            <Pressable onPress={() => { setQuery(""); Keyboard.dismiss(); }}>
-              <Ionicons name="close-circle" size={16} color={c.softMuted} />
-            </Pressable>
-          ) : null}
-        </View>
 
         {/* Filters */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12, marginBottom: 6 }}>
@@ -671,9 +673,32 @@ function PrestadorMarketplace() {
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
       <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Prestador"} initials={initials} />
+      <InfoSheet
+        storageKey="ajudae_info_marketplace_prestador"
+        title="Pesquisa de Mercado"
+        subtitle="Entenda como usar esta tela para se destacar na concorrência"
+        accentColor={colors.light.blue}
+        items={PRESTADOR_MARKET_INFO}
+        forceOpen={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </View>
   );
 }
+
+const CLIENTE_MARKET_INFO: InfoItem[] = [
+  { icon: "search-outline", color: "#2563EB", title: "Busca inteligente", description: "Filtre por categoria, nome ou área de atuação para encontrar o profissional ideal." },
+  { icon: "map-outline", color: "#16A34A", title: "Mapa interativo", description: "Veja os prestadores online em tempo real no mapa e toque em um pin para ver detalhes." },
+  { icon: "document-text-outline", color: "#D97706", title: "Criar pedido", description: "Não encontrou o que procura? Crie um pedido customizado e receba propostas dos prestadores." },
+  { icon: "star-outline", color: "#9333EA", title: "Avaliações", description: "Confira as notas e comentários de outros clientes antes de contratar." },
+];
+
+const PRESTADOR_MARKET_INFO: InfoItem[] = [
+  { icon: "eye-outline", color: "#2563EB", title: "Visão da concorrência", description: "Veja onde seus concorrentes estão atuando e quais preços estão praticando." },
+  { icon: "trending-up-outline", color: "#16A34A", title: "Métricas de mercado", description: "Acompanhe o preço médio e demanda por categoria na sua região." },
+  { icon: "map-outline", color: "#D97706", title: "Mapa de prestadores", description: "Identifique áreas com menos concorrência para expandir sua atuação." },
+  { icon: "lock-closed-outline", color: "#6B7280", title: "Somente leitura", description: "Esta tela é para análise — para receber pedidos, fique online na tela principal." },
+];
 
 const styles = StyleSheet.create({
   hero: { borderRadius: 22, padding: 20, marginBottom: 16, gap: 4 },
@@ -702,6 +727,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   readonlyText: { color: "rgba(255,255,255,0.9)", fontSize: 10, fontFamily: fonts.sans.medium },
+  readonlyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  readonlyRowText: { fontSize: 12, fontFamily: fonts.sans.medium, flex: 1 },
   search: {
     flexDirection: "row",
     alignItems: "center",

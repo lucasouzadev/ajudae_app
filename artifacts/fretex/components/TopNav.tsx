@@ -14,9 +14,11 @@ interface TopNavProps {
   onProfileOpen?: () => void;
   onBack?: () => void;
   accentColor?: string;
+  /** Exibe ícone ℹ e chama este callback ao pressionar */
+  onInfo?: () => void;
 }
 
-export function TopNav({ title, subtitle, initials, badge, onMenuOpen, onProfileOpen, onBack, accentColor }: TopNavProps) {
+export function TopNav({ title, subtitle, initials, badge, onMenuOpen, onProfileOpen, onBack, accentColor, onInfo }: TopNavProps) {
   const c = colors.light;
   const insets = useSafeAreaInsets();
   const accent = accentColor || c.primary;
@@ -59,6 +61,17 @@ export function TopNav({ title, subtitle, initials, badge, onMenuOpen, onProfile
           </Text>
         ) : null}
       </View>
+
+      {/* Botão de info — aparece quando onInfo é passado */}
+      {onInfo ? (
+        <Pressable
+          onPress={onInfo}
+          style={[styles.iconBtn, { backgroundColor: c.background, borderColor: c.border }, shadows.sm]}
+          accessibilityLabel="Informações desta tela"
+        >
+          <Ionicons name="information-circle-outline" size={20} color={c.sub} />
+        </Pressable>
+      ) : null}
 
       {initials ? (
         <Pressable onPress={onProfileOpen} accessibilityLabel="Abrir perfil">

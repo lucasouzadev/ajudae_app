@@ -16,6 +16,7 @@ import { ProviderPin } from "@/components/ProviderPin";
 import { Chip } from "@/components/Chip";
 import { ProviderModal } from "@/components/ProviderModal";
 import { Skeleton } from "@/components/Skeleton";
+import { InfoSheet, type InfoItem } from "@/components/InfoSheet";
 
 /* ─── Activity Heatmap ───────────────────────────────────────────────── */
 const WEEKS = 12;
@@ -526,6 +527,134 @@ const pStyles = StyleSheet.create({
   reviewText: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 16 },
 });
 
+/* ─── PrestadorHubSheet — modal sheet para cada seção do hub ───────────── */
+function PrestadorHubSheet({
+  tab,
+  onClose,
+  market,
+}: {
+  tab: HubTabKey | null;
+  onClose: () => void;
+  market: { label: string; val: string; sub: string }[];
+}) {
+  const c = colors.light;
+  const insets = useSafeAreaInsets();
+  if (!tab) return null;
+  const def = HUB_TABS.find((t) => t.key === tab)!;
+  return (
+    <Modal visible={!!tab} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: c.background }}>
+        {/* Header */}
+        <View style={[hubSheetStyles.header, { backgroundColor: c.card, borderBottomColor: c.border, paddingTop: insets.top + 8 }]}>
+          <View style={[hubSheetStyles.iconWrap, { backgroundColor: `${def.color}18` }]}>
+            <Ionicons name={def.icon} size={16} color={def.color} />
+          </View>
+          <Text style={[hubSheetStyles.title, { color: c.text }]}>{def.label}</Text>
+          <Pressable onPress={onClose} style={[hubSheetStyles.closeBtn, { backgroundColor: c.background }]}>
+            <Ionicons name="close" size={18} color={c.text} />
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          {tab === "analise" && (
+            <>
+              <View style={[hubStyles.section, { backgroundColor: c.card, borderColor: c.border }]}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+                  <Text style={[hubStyles.sectionTitle, { color: c.text }]}>Radar do mercado</Text>
+                  <Text style={[hubStyles.sectionBadge, { color: def.color }]}>6 publicações perto</Text>
+                </View>
+                <View style={pStyles.statsGrid}>
+                  {market.map((m) => (
+                    <View key={m.label} style={[pStyles.statCard, { backgroundColor: c.background }]}>
+                      <Text style={[pStyles.statVal, { color: c.text }]}>{m.val}</Text>
+                      <Text style={[pStyles.statLbl, { color: c.softMuted }]}>{m.label}</Text>
+                      <Text style={[pStyles.statSub, { color: m.sub.startsWith("+") ? c.success : c.warning }]}>{m.sub}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              <PriceSuggestion />
+              <DemandForecast />
+            </>
+          )}
+          {tab === "performance" && (
+            <>
+              <ActivityHeatmap />
+              <MonthlyGoals />
+            </>
+          )}
+          {tab === "conquistas" && (
+            <>
+              <BadgeRow />
+              <RecentReviews />
+            </>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+const hubSheetStyles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  iconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  title: { flex: 1, fontSize: 16, fontFamily: fonts.sans.bold },
+  closeBtn: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+});
+
+/* ─── PrestadorHubNav — barra compacta acima do bottom-bar ─────────────── */
+function PrestadorHubNav({
+  onSelect,
+}: {
+  onSelect: (tab: HubTabKey) => void;
+}) {
+  const c = colors.light;
+  return (
+    <View style={[hubNavStyles.nav, { backgroundColor: c.card, borderTopColor: c.borderLight }]}>
+      {HUB_TABS.map((t) => (
+        <Pressable key={t.key} onPress={() => onSelect(t.key)} style={hubNavStyles.pill}>
+          <View style={[hubNavStyles.pillIcon, { backgroundColor: `${t.color}18` }]}>
+            <Ionicons name={t.icon} size={14} color={t.color} />
+          </View>
+          <Text style={[hubNavStyles.pillLabel, { color: c.sub }]}>{t.label}</Text>
+          <Ionicons name="chevron-up" size={11} color={c.softMuted} />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+const hubNavStyles = StyleSheet.create({
+  nav: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  pill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.04)",
+  },
+  pillIcon: { width: 22, height: 22, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  pillLabel: { fontSize: 11, fontFamily: fonts.sans.bold, flex: 1 },
+  bar: {},
+});
+
+/* ─── PrestadorHub — usado internamente (mantido para compatibilidade) ─── */
 /* ─── PrestadorHub — tab switcher substituindo accordions ──────────────── */
 const HUB_TABS = [
   { key: "analise",      label: "Análise",     icon: "trending-up" as const,  color: "#2563EB" },
@@ -651,8 +780,15 @@ function ClienteTabsWrapper() {
   );
 }
 
+const MARKET_DATA = [
+  { label: "Frete", val: "R$120", sub: "+8%" },
+  { label: "Mudança", val: "R$214", sub: "+4%" },
+  { label: "Entrega", val: "R$52", sub: "-2%" },
+];
+
 function PrestadorTabsWrapper() {
   const [tab] = useState<"inicio">("inicio");
+  const [hubTab, setHubTab] = useState<HubTabKey | null>(null);
   const { active } = useService();
   const router = useRouter();
   const hasBadge = !!(active && ["requested", "accepted", "en_route", "in_progress"].includes(active.status ?? ""));
@@ -665,7 +801,11 @@ function PrestadorTabsWrapper() {
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1 }}><PrestadorHome /></View>
       </View>
+      {/* Hub nav compacto acima do bottom bar */}
+      <PrestadorHubNav onSelect={setHubTab} />
       <BottomTabBar active={tab} role="prestador" hasBadge={hasBadge} onPress={handleTabPress} />
+      {/* Sheet do hub — abre como modal pageSheet */}
+      <PrestadorHubSheet tab={hubTab} onClose={() => setHubTab(null)} market={MARKET_DATA} />
     </View>
   );
 }
@@ -1112,6 +1252,7 @@ function ClienteHome() {
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [modalProvider, setModalProvider] = useState<Provider | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = () => {
@@ -1145,7 +1286,7 @@ function ClienteHome() {
           right: 0,
           bottom: sheetHeightAnim.interpolate({
             inputRange: [COLLAPSED_H, EXPANDED_H],
-            outputRange: [0, EXPANDED_H - 160],
+            outputRange: [0, EXPANDED_H - 240],
             extrapolate: "clamp",
           }),
           overflow: "hidden",
@@ -1212,6 +1353,7 @@ function ClienteHome() {
         badge
         onMenuOpen={() => setMenuOpen(true)}
         onProfileOpen={() => setProfileOpen(true)}
+        onInfo={() => setInfoOpen(true)}
       />
 
 
@@ -1384,6 +1526,14 @@ function ClienteHome() {
           router.push(`/provider/${p.id}`);
         }}
       />
+      <InfoSheet
+        storageKey="ajudae_info_home_cliente"
+        title="Como funciona o Ajudaê"
+        subtitle="Tudo que você precisa para contratar um serviço"
+        items={CLIENTE_HOME_INFO}
+        forceOpen={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </View>
   );
 }
@@ -1398,6 +1548,7 @@ function PrestadorHome() {
   const [online, setOnline] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
@@ -1450,6 +1601,7 @@ function PrestadorHome() {
         accentColor={c.blue}
         onMenuOpen={() => setMenuOpen(true)}
         onProfileOpen={() => setProfileOpen(true)}
+        onInfo={() => setInfoOpen(true)}
       />
 
       <ScrollView
@@ -1575,11 +1727,6 @@ function PrestadorHome() {
           </View>
         ) : null}
 
-        {/* Divisor */}
-        <View style={[hubStyles.divider, { backgroundColor: c.borderLight }]} />
-
-        {/* Hub de abas: Análise · Performance · Conquistas */}
-        <PrestadorHub market={market.map((m) => ({ label: m.label, val: m.value, sub: m.trend }))} />
       </ScrollView>
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1589,9 +1736,32 @@ function PrestadorHome() {
         name={user?.name || "Prestador"}
         initials={initials}
       />
+      <InfoSheet
+        storageKey="ajudae_info_home_prestador"
+        title="Sua central de serviços"
+        subtitle="Entenda como maximizar seus ganhos no Ajudaê"
+        accentColor={colors.light.blue}
+        items={PRESTADOR_HOME_INFO}
+        forceOpen={infoOpen}
+        onClose={() => setInfoOpen(false)}
+      />
     </View>
   );
 }
+
+const CLIENTE_HOME_INFO: InfoItem[] = [
+  { icon: "map-outline", color: "#2563EB", title: "Mapa ao vivo", description: "Veja os prestadores disponíveis no mapa. Toque em um pin para ver detalhes e solicitar o serviço." },
+  { icon: "filter-outline", color: "#D97706", title: "Filtros rápidos", description: "Use as pills abaixo do mapa para filtrar por Frete, Mudança ou Entrega." },
+  { icon: "car-outline", color: "#16A34A", title: "Solicite um serviço", description: "Selecione um prestador e toque em 'Solicitar' para iniciar o atendimento." },
+  { icon: "location-outline", color: "#9333EA", title: "Sua localização", description: "O mapa mostra prestadores próximos a você. Mantenha a localização ativada para melhores resultados." },
+];
+
+const PRESTADOR_HOME_INFO: InfoItem[] = [
+  { icon: "power-outline", color: "#2563EB", title: "Fique online", description: "Ative o toggle para ficar visível no mapa e receber solicitações de clientes." },
+  { icon: "notifications-outline", color: "#16A34A", title: "Solicitações", description: "Quando um cliente solicitar seu serviço, você verá o card aqui para aceitar ou recusar." },
+  { icon: "trending-up-outline", color: "#D97706", title: "Acompanhe seus ganhos", description: "Use o hub de Análise e Performance acima do menu para ver suas métricas." },
+  { icon: "ribbon-outline", color: "#9333EA", title: "Conquistas", description: "Complete serviços para desbloquear conquistas e aumentar sua visibilidade no marketplace." },
+];
 
 const styles = StyleSheet.create({
   /* Cliente */
@@ -1814,12 +1984,13 @@ function ProvidersSheet({
         </View>
       </View>
 
-      {/* Body — carrossel (collapsed) fade-out / lista (expanded) fade-in */}
+      {/* Body — carrossel e lista em posição absoluta dentro do sheet, sem overflow */}
+      <View style={{ flex: 1, position: "relative" }}>
       <Animated.View
         pointerEvents={expanded ? "none" : "auto"}
         style={{
           position: "absolute",
-          left: 0, right: 0, bottom: insetsBottom,
+          left: 0, right: 0, top: 0,
           height: MINI_CARD_H + 22,
           opacity: heightAnim.interpolate({
             inputRange: [COLLAPSED_H, COLLAPSED_H + 50],
@@ -1869,7 +2040,8 @@ function ProvidersSheet({
       <Animated.View
         pointerEvents={expanded ? "auto" : "none"}
         style={{
-          flex: 1,
+          position: "absolute",
+          top: 0, left: 0, right: 0, bottom: 0,
           opacity: heightAnim.interpolate({
             inputRange: [COLLAPSED_H + 50, COLLAPSED_H + 120],
             outputRange: [0, 1],
@@ -1943,6 +2115,7 @@ function ProvidersSheet({
           </Pressable>
         </ScrollView>
       </Animated.View>
+      </View>
     </Animated.View>
   );
 }
