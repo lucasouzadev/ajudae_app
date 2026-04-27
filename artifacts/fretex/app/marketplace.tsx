@@ -302,39 +302,7 @@ function ClienteMarketplace() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Hero */}
-        <LinearGradient
-          colors={[c.primary, c.primaryDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <Text style={[styles.heroEyebrow, { color: "rgba(26,23,20,0.65)" }]}>MARKETPLACE</Text>
-          <Text style={[styles.heroTitle, { color: "#1A1714" }]}>Quem você quer perto?</Text>
-          <Text style={[styles.heroSub, { color: "rgba(26,23,20,0.75)" }]}>Compare prestadores, propostas e tempo de chegada.</Text>
-        </LinearGradient>
-
-        {/* Live map */}
-        <MarketMap
-          pins={onlinePins}
-          activeId={activePin}
-          onPinPress={(id) => setActivePin(id === activePin ? null : id)}
-          title="Prestadores ao vivo"
-          subtitle={`${onlinePins.length} online · disponíveis agora`}
-          badgeColor={c.success}
-        />
-
-        {/* Compact custom order button */}
-        <Pressable
-          onPress={() => setOrderModalOpen(true)}
-          style={[styles.orderBtn, { backgroundColor: c.text }]}
-        >
-          <Ionicons name="add" size={15} color={c.primary} />
-          <Text style={[styles.orderBtnText, { color: c.primary }]}>Criar pedido customizado</Text>
-          <Ionicons name="chevron-forward" size={13} color={`${c.primary}99`} />
-        </Pressable>
-
-        {/* Search */}
+        {/* Search — agora no topo */}
         <View style={[styles.search, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <Ionicons name="search" size={16} color={c.softMuted} />
           <TextInput
@@ -352,6 +320,26 @@ function ClienteMarketplace() {
             </Pressable>
           ) : null}
         </View>
+
+        {/* Live map */}
+        <MarketMap
+          pins={onlinePins}
+          activeId={activePin}
+          onPinPress={(id) => setActivePin(id === activePin ? null : id)}
+          title="Prestadores ao vivo"
+          subtitle={`${onlinePins.length} online · disponíveis agora`}
+          badgeColor={c.success}
+        />
+
+        {/* Criar pedido customizado — abaixo do mapa */}
+        <Pressable
+          onPress={() => setOrderModalOpen(true)}
+          style={[styles.orderBtn, { backgroundColor: c.text }]}
+        >
+          <Ionicons name="add" size={15} color={c.primary} />
+          <Text style={[styles.orderBtnText, { color: c.primary }]}>Criar pedido customizado</Text>
+          <Ionicons name="chevron-forward" size={13} color={`${c.primary}99`} />
+        </Pressable>
 
         {/* Filters */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12, marginBottom: 6 }}>

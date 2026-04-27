@@ -526,24 +526,101 @@ const pStyles = StyleSheet.create({
   reviewText: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 16 },
 });
 
-/* ─── HubCard — painel accordion para prestador home ───────────────────── */
-function HubCard({ icon, color, title, children }: { icon: any; color: string; title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+/* ─── PrestadorHub — tab switcher substituindo accordions ──────────────── */
+const HUB_TABS = [
+  { key: "analise",      label: "Análise",     icon: "trending-up" as const,  color: "#2563EB" },
+  { key: "performance",  label: "Performance", icon: "stats-chart" as const,  color: "#16A34A" },
+  { key: "conquistas",   label: "Conquistas",  icon: "ribbon" as const,       color: "#D97706" },
+] as const;
+type HubTabKey = typeof HUB_TABS[number]["key"];
+
+function PrestadorHub({ market }: { market: { label: string; val: string; sub: string }[] }) {
+  const [activeTab, setActiveTab] = useState<HubTabKey>("analise");
   const c = colors.light;
+  const tab = HUB_TABS.find((t) => t.key === activeTab)!;
+
   return (
-    <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-      <Pressable
-        onPress={() => setOpen((v) => !v)}
-        style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: open ? 12 : 0 }}
-      >
-        <Ionicons name={icon} size={16} color={color} />
-        <Text style={[pStyles.cardTitle, { flex: 1, color: c.text }]}>{title}</Text>
-        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={c.softMuted} />
-      </Pressable>
-      {open ? children : null}
+    <View style={[hubStyles.wrap, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+      {/* Tab bar */}
+      <View style={[hubStyles.tabBar, { borderBottomColor: c.borderLight }]}>
+        {HUB_TABS.map((t) => {
+          const active = activeTab === t.key;
+          return (
+            <Pressable
+              key={t.key}
+              onPress={() => setActiveTab(t.key)}
+              style={[hubStyles.tab, active && { borderBottomColor: t.color, borderBottomWidth: 2 }]}
+            >
+              <Ionicons name={t.icon} size={14} color={active ? t.color : c.softMuted} />
+              <Text style={[hubStyles.tabLabel, { color: active ? t.color : c.softMuted }]}>{t.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* Tab content */}
+      <View style={hubStyles.content}>
+        {activeTab === "analise" && (
+          <>
+            <View style={[hubStyles.section, { backgroundColor: c.background, borderColor: c.borderLight }]}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+                <Text style={[hubStyles.sectionTitle, { color: c.text }]}>Radar do mercado</Text>
+                <Text style={[hubStyles.sectionBadge, { color: c.blue }]}>6 publicações perto</Text>
+              </View>
+              <View style={pStyles.statsGrid}>
+                {market.map((m) => (
+                  <View key={m.label} style={[pStyles.statCard, { backgroundColor: c.card }]}>
+                    <Text style={[pStyles.statVal, { color: c.text }]}>{m.val}</Text>
+                    <Text style={[pStyles.statLbl, { color: c.softMuted }]}>{m.label}</Text>
+                    <Text style={[pStyles.statSub, { color: c.sub }]}>{m.sub}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <PriceSuggestion />
+            <DemandForecast />
+          </>
+        )}
+        {activeTab === "performance" && (
+          <>
+            <ActivityHeatmap />
+            <MonthlyGoals />
+          </>
+        )}
+        {activeTab === "conquistas" && (
+          <>
+            <BadgeRow />
+            <RecentReviews />
+          </>
+        )}
+      </View>
     </View>
   );
 }
+
+const hubStyles = StyleSheet.create({
+  wrap: { borderRadius: 18, borderWidth: 1, marginBottom: 16, overflow: "hidden" },
+  tabBar: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabLabel: { fontSize: 12, fontFamily: fonts.sans.bold },
+  content: { padding: 14 },
+  section: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 12 },
+  sectionTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
+  sectionBadge: { fontSize: 11, fontFamily: fonts.sans.semibold },
+  divider: { height: 1, marginHorizontal: 0, marginVertical: 16 },
+});
 
 type TabKey = "inicio" | "pedidos" | "marketplace" | "inbox";
 
@@ -1498,38 +1575,11 @@ function PrestadorHome() {
           </View>
         ) : null}
 
-        {/* Hub: Análise de mercado */}
-        <HubCard icon="trending-up" color={c.blue} title="Análise de mercado">
-          <View style={[styles.radarCard, { backgroundColor: c.background, borderColor: c.borderLight, marginBottom: 12 }]}>
-            <View style={styles.radarHead}>
-              <Text style={[styles.radarTitle, { color: c.text }]}>Radar do mercado</Text>
-              <Text style={[styles.radarSub, { color: c.blue }]}>6 publicações perto</Text>
-            </View>
-            <View style={styles.statsGrid}>
-              {market.map((m) => (
-                <View key={m.label} style={[styles.marketCell, { backgroundColor: c.card }]}>
-                  <Text style={[styles.marketLabel, { color: c.text }]}>{m.label}</Text>
-                  <Text style={[styles.marketValue, { color: c.text }]}>{m.value}</Text>
-                  <Text style={[styles.marketTrend, { color: m.trend.startsWith("+") ? c.success : c.warning }]}>{m.trend}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-          <PriceSuggestion />
-          <DemandForecast />
-        </HubCard>
+        {/* Divisor */}
+        <View style={[hubStyles.divider, { backgroundColor: c.borderLight }]} />
 
-        {/* Hub: Minha performance */}
-        <HubCard icon="stats-chart" color={c.success} title="Minha performance">
-          <ActivityHeatmap />
-          <MonthlyGoals />
-        </HubCard>
-
-        {/* Hub: Conquistas & Avaliações */}
-        <HubCard icon="ribbon" color={c.warning} title="Conquistas & Avaliações">
-          <BadgeRow />
-          <RecentReviews />
-        </HubCard>
+        {/* Hub de abas: Análise · Performance · Conquistas */}
+        <PrestadorHub market={market.map((m) => ({ label: m.label, val: m.value, sub: m.trend }))} />
       </ScrollView>
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1583,9 +1633,11 @@ const styles = StyleSheet.create({
   filtersWrap: { position: "absolute", left: 0, right: 0, zIndex: 30, maxHeight: 40 },
   providerMiniCard: {
     width: 150,
+    height: MINI_CARD_H,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1.5,
+    justifyContent: "space-between",
   },
   providerMiniHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 },
   providerMiniIcon: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
@@ -1674,8 +1726,9 @@ const styles = StyleSheet.create({
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
 const SCREEN_H = Dimensions.get("window").height;
-const COLLAPSED_H = 196;  // handle + título + mini cards carousel
+const COLLAPSED_H = 164;  // handle + título + mini cards carousel (sem padding extra)
 const CHIP_ROW_H  = 52;   // altura da faixa flutuante de filtros
+const MINI_CARD_H = 82;   // altura fixa dos mini cards no carrossel
 const EXPANDED_H = Math.min(SCREEN_H * 0.78, 640);
 
 function ProvidersSheet({
@@ -1761,8 +1814,69 @@ function ProvidersSheet({
         </View>
       </View>
 
-      {/* Body — list when expanded, carousel when collapsed */}
-      {expanded ? (
+      {/* Body — carrossel (collapsed) fade-out / lista (expanded) fade-in */}
+      <Animated.View
+        pointerEvents={expanded ? "none" : "auto"}
+        style={{
+          position: "absolute",
+          left: 0, right: 0, bottom: insetsBottom,
+          height: MINI_CARD_H + 22,
+          opacity: heightAnim.interpolate({
+            inputRange: [COLLAPSED_H, COLLAPSED_H + 50],
+            outputRange: [1, 0],
+            extrapolate: "clamp",
+          }),
+        }}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 18, gap: 10 }}
+        >
+          {providers.map((p) => (
+            <Pressable
+              key={p.id}
+              onPress={() => onSelect(p)}
+              style={[
+                styles.providerMiniCard,
+                {
+                  backgroundColor: c.background,
+                  borderColor: active?.id === p.id ? p.color : c.borderLight,
+                },
+              ]}
+            >
+              <View style={styles.providerMiniHead}>
+                <View style={[styles.providerMiniIcon, { backgroundColor: `${p.color}18` }]}>
+                  {p.cat === "Mudança" ? (
+                    <Ionicons name="home" size={12} color={p.color} />
+                  ) : p.cat === "Frete" ? (
+                    <MaterialCommunityIcons name="truck" size={13} color={p.color} />
+                  ) : (
+                    <Ionicons name="cube" size={12} color={p.color} />
+                  )}
+                </View>
+                <Text style={[styles.providerMiniPrice, { color: p.color }]}>{p.price}</Text>
+              </View>
+              <View>
+                <Text style={[styles.providerMiniName, { color: c.text }]} numberOfLines={1}>{p.name}</Text>
+                <Text style={[styles.providerMiniMeta, { color: c.softMuted }]}>★ {p.rating} · {p.vehicle}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </Animated.View>
+
+      <Animated.View
+        pointerEvents={expanded ? "auto" : "none"}
+        style={{
+          flex: 1,
+          opacity: heightAnim.interpolate({
+            inputRange: [COLLAPSED_H + 50, COLLAPSED_H + 120],
+            outputRange: [0, 1],
+            extrapolate: "clamp",
+          }),
+        }}
+      >
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
@@ -1828,42 +1942,7 @@ function ProvidersSheet({
             <Ionicons name="arrow-forward" size={14} color={c.text} />
           </Pressable>
         </ScrollView>
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 18, gap: 10 }}
-        >
-          {providers.map((p) => (
-            <Pressable
-              key={p.id}
-              onPress={() => onSelect(p)}
-              style={[
-                styles.providerMiniCard,
-                {
-                  backgroundColor: c.background,
-                  borderColor: active?.id === p.id ? p.color : c.borderLight,
-                },
-              ]}
-            >
-              <View style={styles.providerMiniHead}>
-                <View style={[styles.providerMiniIcon, { backgroundColor: `${p.color}18` }]}>
-                  {p.cat === "Mudança" ? (
-                    <Ionicons name="home" size={12} color={p.color} />
-                  ) : p.cat === "Frete" ? (
-                    <MaterialCommunityIcons name="truck" size={13} color={p.color} />
-                  ) : (
-                    <Ionicons name="cube" size={12} color={p.color} />
-                  )}
-                </View>
-                <Text style={[styles.providerMiniPrice, { color: p.color }]}>{p.price}</Text>
-              </View>
-              <Text style={[styles.providerMiniName, { color: c.text }]} numberOfLines={1}>{p.name}</Text>
-              <Text style={[styles.providerMiniMeta, { color: c.softMuted }]}>★ {p.rating} · {p.vehicle}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      )}
+      </Animated.View>
     </Animated.View>
   );
 }
