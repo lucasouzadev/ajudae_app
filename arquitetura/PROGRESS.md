@@ -48,9 +48,9 @@
 ---
 
 ### 5. Toggle online bloqueado para prestador não-verificado
-**Status:** ✅ Implementado
-**Detalhe:** Toggle desabilitado quando `user.verified === false`. Badge amarelo "Aguardando aprovação" substituí o subtexto normal. O Pressable ignora toque quando não verificado.
-**Arquivo:** `app/index.tsx`
+**Status:** ✅ Implementado (corrigido em 2026-04-27)
+**Detalhe:** Toggle desabilitado quando `user.verified === false`. Badge amarelo "Aguardando aprovação" exibida como título. Subtexto mostra "Seu cadastro está em análise". O Pressable ignora toque quando não verificado (opacity 0.6, disabled flag).
+**Arquivo:** `app/index.tsx` (linhas 1287-1309)
 
 ---
 
@@ -155,4 +155,4 @@
 
 ---
 
-_Ajudaê — PROGRESS v1.3 — atualizado em 2026-04-27 — **17/17 ✅ Todos os itens concluídos**_
+_Ajudaê — PROGRESS v1.4 — atualizado em 2026-04-27 — **17/17 ✅ Todos os itens concluídos** (toggle bloqueado corrigido)_

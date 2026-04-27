@@ -1102,7 +1102,7 @@ function ClienteHome() {
           </View>
           <View style={styles.activeBtns}>
             <View style={[styles.activePrice, { backgroundColor: c.background }]}>
-              <Text style={[styles.activePriceText, { color: active.color }]}>{active.price}</Text>
+              <Text style={[styles.activePriceText, { color: c.text }]}>{active.price}</Text>
               <Text style={[styles.activePriceSub, { color: c.softMuted }]}>estimado</Text>
             </View>
             <Pressable
@@ -1285,26 +1285,28 @@ function PrestadorHome() {
       >
         {/* Online toggle */}
         <Pressable
-          onPress={() => setOnline((v) => !v)}
+          onPress={() => user?.verified && setOnline((v) => !v)}
+          disabled={!user?.verified}
           style={[
             styles.onlineRow,
             {
-              backgroundColor: online ? c.successLight : c.card,
-              borderColor: online ? "#BBF7D0" : c.border,
+              backgroundColor: user?.verified ? (online ? c.successLight : c.card) : c.card,
+              borderColor: user?.verified ? (online ? "#BBF7D0" : c.border) : c.border,
+              opacity: user?.verified ? 1 : 0.6,
             },
           ]}
         >
-          <View style={[styles.onlineDot, { backgroundColor: online ? c.success : c.softMuted }]} />
+          <View style={[styles.onlineDot, { backgroundColor: user?.verified ? (online ? c.success : c.softMuted) : c.warning }]} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.onlineTitle, { color: c.text }]}>
-              {online ? "Você está disponível" : "Você está offline"}
+              {user?.verified ? (online ? "Você está disponível" : "Você está offline") : "Aguardando aprovação"}
             </Text>
-            <Text style={[styles.onlineSub, { color: c.softMuted }]}>
-              {online ? "Visível no mapa" : "Toque para ativar"}
+            <Text style={[styles.onlineSub, { color: user?.verified ? c.softMuted : c.warning }]}>
+              {user?.verified ? (online ? "Visível no mapa" : "Toque para ativar") : "Seu cadastro está em análise"}
             </Text>
           </View>
-          <View style={[styles.toggle, { backgroundColor: online ? c.success : "#D4D0CB" }]}>
-            <View style={[styles.toggleDot, { left: online ? 23 : 3 }]} />
+          <View style={[styles.toggle, { backgroundColor: user?.verified ? (online ? c.success : "#D4D0CB") : "#FCD34D" }]}>
+            <View style={[styles.toggleDot, { left: user?.verified ? (online ? 23 : 3) : 3 }]} />
           </View>
         </Pressable>
 
