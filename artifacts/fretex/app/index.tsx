@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -89,27 +89,52 @@ function ActivityHeatmap() {
         </View>
       </View>
 
-      {/* Grid */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
-        <View style={{ flexDirection: "row", gap: CELL_GAP }}>
-          {Array.from({ length: WEEKS }).map((_, w) => (
-            <View key={w} style={{ flexDirection: "column", gap: CELL_GAP }}>
-              {Array.from({ length: DAYS }).map((_, d) => {
-                const cell = ACTIVITY_DATA[w * DAYS + d];
-                return (
-                  <View
-                    key={d}
-                    style={[
-                      heatStyles.cell,
-                      { backgroundColor: cellColor(cell?.count ?? 0), width: CELL, height: CELL },
-                    ]}
-                  />
-                );
-              })}
+      {/* Grid with day labels */}
+      {(() => {
+        const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+        const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+        return (
+          <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
+            {/* Day labels */}
+            <View style={{ flexDirection: "column", gap: CELL_GAP, paddingTop: 18, marginRight: 4 }}>
+              {DAY_LABELS.map((d, i) => (
+                <Text key={i} style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, width: 28, textAlign: "right", height: CELL, lineHeight: CELL }}>{d}</Text>
+              ))}
             </View>
-          ))}
-        </View>
-      </ScrollView>
+            {/* Grid with month labels */}
+            <View style={{ flex: 1 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", gap: CELL_GAP }}>
+                  {Array.from({ length: WEEKS }).map((_, w) => {
+                    const firstDay = ACTIVITY_DATA[w * DAYS];
+                    const prevFirstDay = w > 0 ? ACTIVITY_DATA[(w - 1) * DAYS] : null;
+                    const showMonth = !prevFirstDay || firstDay?.day.getMonth() !== prevFirstDay?.day.getMonth();
+                    return (
+                      <View key={w} style={{ flexDirection: "column", gap: CELL_GAP }}>
+                        <Text style={{ width: CELL, fontSize: 11, fontFamily: fonts.sans.regular, color: showMonth ? c.softMuted : "transparent", textAlign: "center", height: 14 }}>
+                          {showMonth ? monthNames[firstDay?.day.getMonth() ?? 0] : ""}
+                        </Text>
+                        {Array.from({ length: DAYS }).map((_, d) => {
+                          const cell = ACTIVITY_DATA[w * DAYS + d];
+                          return (
+                            <View
+                              key={d}
+                              style={[
+                                heatStyles.cell,
+                                { backgroundColor: cellColor(cell?.count ?? 0), width: CELL, height: CELL },
+                              ]}
+                            />
+                          );
+                        })}
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        );
+      })()}
 
       {/* Legend */}
       <View style={heatStyles.legend}>
@@ -147,10 +172,10 @@ const heatStyles = StyleSheet.create({
   statsRow: { flexDirection: "row", gap: 8 },
   statPill: { flex: 1, borderRadius: 12, padding: 8, alignItems: "center" },
   statVal: { fontSize: 15, fontFamily: fonts.serif.extra },
-  statLbl: { fontSize: 9, fontFamily: fonts.sans.regular, marginTop: 2 },
+  statLbl: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
   cell: { borderRadius: 3 },
   legend: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
-  legendText: { fontSize: 9, fontFamily: fonts.sans.regular },
+  legendText: { fontSize: 11, fontFamily: fonts.sans.regular },
   legendCell: { width: 10, height: 10, borderRadius: 2 },
   divider: { height: 1, marginVertical: 14 },
   reportTitle: { fontSize: 12, fontFamily: fonts.sans.bold, marginBottom: 10 },
@@ -160,7 +185,7 @@ const heatStyles = StyleSheet.create({
   hourFill: { height: 6, borderRadius: 3 },
   hourScore: { width: 34, fontSize: 11, fontFamily: fonts.sans.bold, textAlign: "right" },
   hourCat: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
-  hourCatText: { fontSize: 9, fontFamily: fonts.sans.bold },
+  hourCatText: { fontSize: 11, fontFamily: fonts.sans.bold },
 });
 
 /* ─── Provider home widgets ─────────────────────────────────────────── */
@@ -430,7 +455,7 @@ const pStyles = StyleSheet.create({
   card: { borderRadius: 18, borderWidth: 1, padding: 14, marginBottom: 14 },
   cardHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 12 },
   cardTitle: { flex: 1, fontSize: 13, fontFamily: fonts.serif.extra },
-  cardBadge: { fontSize: 9, fontFamily: fonts.sans.bold, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  cardBadge: { fontSize: 11, fontFamily: fonts.sans.bold, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
 
   /* Hot area banner */
   hotBanner: {
@@ -462,7 +487,7 @@ const pStyles = StyleSheet.create({
   barCol: { flex: 1, alignItems: "center", gap: 4 },
   barTrack: { flex: 1, width: "100%", borderRadius: 4, justifyContent: "flex-end", overflow: "hidden" },
   barFill: { borderRadius: 4, width: "100%" },
-  barLabel: { fontSize: 8, fontFamily: fonts.sans.regular },
+  barLabel: { fontSize: 11, fontFamily: fonts.sans.regular },
   chartHint: { fontSize: 10, fontFamily: fonts.sans.regular, marginTop: 8 },
 
   /* Goals */

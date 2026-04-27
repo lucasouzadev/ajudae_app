@@ -239,6 +239,16 @@ export default function JobScreen() {
                 <Ionicons name="arrow-forward" size={14} color={c.softMuted} />
               </Pressable>
             ))}
+            <Pressable
+              onPress={() => {
+                setQuickOpen(false);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              }}
+              style={[styles.cancelBtn, { backgroundColor: c.background, borderColor: c.border }]}
+            >
+              <Ionicons name="close" size={14} color={c.softMuted} />
+              <Text style={[styles.cancelTxt, { color: c.softMuted }]}>Cancelar</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -308,4 +318,6 @@ const styles = StyleSheet.create({
   sheetSub: { fontSize: 12, fontFamily: fonts.sans.regular, marginTop: 4, marginBottom: 8 },
   quickItem: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderRadius: 12, borderWidth: 1, marginTop: 8 },
   quickTxt: { fontSize: 13, fontFamily: fonts.sans.semibold, flex: 1 },
+  cancelBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 44, borderRadius: 12, borderWidth: 1, marginTop: 14 },
+  cancelTxt: { fontSize: 13, fontFamily: fonts.sans.semibold },
 });
