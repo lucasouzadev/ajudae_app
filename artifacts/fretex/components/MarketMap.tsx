@@ -26,9 +26,10 @@ interface MarketMapProps {
   badgeColor: string;
   height?: number;
   onExpand?: () => void;
+  headerTop?: number;
 }
 
-export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeColor, height = 260, onExpand }: MarketMapProps) {
+export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeColor, height = 260, onExpand, headerTop = 12 }: MarketMapProps) {
   const c = colors.light;
 
   return (
@@ -43,7 +44,7 @@ export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeCo
       />
 
       {/* Header card */}
-      <View style={[styles.headerCard, { backgroundColor: c.card, borderColor: c.borderLight }, shadows.sm]}>
+      <View style={[styles.headerCard, { backgroundColor: c.card, borderColor: c.borderLight, top: headerTop }, shadows.sm]}>
         <View style={[styles.headerDot, { backgroundColor: badgeColor }]} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: c.text }]}>{title}</Text>
@@ -128,7 +129,6 @@ const styles = StyleSheet.create({
   },
   headerCard: {
     position: "absolute",
-    top: 12,
     left: 12,
     right: 12,
     flexDirection: "row",

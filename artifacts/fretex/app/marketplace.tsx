@@ -286,6 +286,7 @@ function MapExpandModal({
             subtitle={`${pins.length} online · toque em um pin`}
             badgeColor={role === "cliente" ? c.success : c.blue}
             height={SCREEN_H_MKT - safeTop}
+            headerTop={64}
           />
         </View>
 
