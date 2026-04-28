@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl, Modal } from "react-native";
+import * as Haptics from "expo-haptics";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl, Modal, TextInput } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -771,7 +772,7 @@ const hubStyles = StyleSheet.create({
   divider: { height: 1, marginHorizontal: 0, marginVertical: 16 },
 });
 
-type TabKey = "inicio" | "pedidos" | "marketplace" | "inbox";
+type TabKey = "inicio" | "pedidos" | "marketplace" | "inbox" | "portfolio";
 
 export default function HomeScreen() {
   const { user, role } = useAuth();
@@ -809,12 +810,15 @@ const MARKET_DATA = [
 function PrestadorTabsWrapper() {
   const [tab] = useState<"inicio">("inicio");
   const [hubTab, setHubTab] = useState<HubTabKey | null>(null);
+  const [portfolioOpen, setPortfolioOpen] = useState(false);
   const { active } = useService();
   const router = useRouter();
   const hasBadge = !!(active && ["requested", "accepted", "en_route", "in_progress"].includes(active.status ?? ""));
   const handleTabPress = (key: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (key === "inbox") { router.push("/inbox"); return; }
     if (key === "marketplace") { router.push("/marketplace"); return; }
+    if (key === "portfolio") { setPortfolioOpen(true); return; }
   };
   return (
     <View style={{ flex: 1 }}>
@@ -822,10 +826,17 @@ function PrestadorTabsWrapper() {
         <View style={{ flex: 1 }}><PrestadorHome /></View>
       </View>
       {/* Hub nav compacto acima do bottom bar */}
-      <PrestadorHubNav onSelect={setHubTab} />
+      <PrestadorHubNav onSelect={(t) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        setHubTab(t);
+      }} />
       <BottomTabBar active={tab} role="prestador" hasBadge={hasBadge} onPress={handleTabPress} />
       {/* Sheet do hub — abre como modal pageSheet */}
       <PrestadorHubSheet tab={hubTab} onClose={() => setHubTab(null)} market={MARKET_DATA} />
+      {/* Portfólio — modal pageSheet */}
+      <Modal visible={portfolioOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPortfolioOpen(false)}>
+        <PortfolioSheet onClose={() => setPortfolioOpen(false)} />
+      </Modal>
     </View>
   );
 }
@@ -856,6 +867,7 @@ function BottomTabBar({
           { key: "inicio" as TabKey, label: "Home", icon: "home" as const, lib: "ion" as const, badge: hasBadge },
           { key: "inbox" as TabKey, label: "Mensagens", icon: "chatbubbles" as const, lib: "ion" as const },
           { key: "marketplace" as TabKey, label: "Mercado", icon: "storefront" as const, lib: "ion" as const },
+          { key: "portfolio" as TabKey, label: "Portfólio", icon: "briefcase" as const, lib: "ion" as const },
         ];
 
   return (
@@ -1272,6 +1284,16 @@ function ClienteHome() {
   const [pinCardVisible, setPinCardVisible] = useState(false);
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const id = sheetHeightAnim.addListener(({ value }) => {
+      if (value > COLLAPSED_H + 20 && pinCardVisible) {
+        setActive(null);
+        setPinCardVisible(false);
+      }
+    });
+    return () => sheetHeightAnim.removeListener(id);
+  }, [pinCardVisible]);
   const [profileOpen, setProfileOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [modalProvider, setModalProvider] = useState<Provider | null>(null);
@@ -1342,11 +1364,13 @@ function ClienteHome() {
                 onPress={() => {
                   if (active?.id === p.id) {
                     // 2º toque → abre modal
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                     setModalProvider(p);
                     setActive(null);
                     setPinCardVisible(false);
                   } else {
                     // 1º toque → foco no pin
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
                     setActive(p);
                     setPinCardVisible(true);
                   }
@@ -1465,7 +1489,7 @@ function ClienteHome() {
               active={filter === f}
               count={counts[f]}
               category={f === "Todos" ? null : (f as Category)}
-              onPress={() => setFilter(f as typeof filter)}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setFilter(f as typeof filter); }}
             />
           ))}
         </ScrollView>
@@ -1522,7 +1546,7 @@ function ClienteHome() {
             </View>
             {/* 2º toque no pin abre o modal; botão rápido também abre */}
             <Pressable
-              onPress={() => { setModalProvider(active); setActive(null); setPinCardVisible(false); }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setModalProvider(active); setActive(null); setPinCardVisible(false); }}
               style={[styles.activeRequestBtn, { backgroundColor: "#fff" }]}
             >
               <Ionicons name="person-outline" size={14} color={active.color} />
@@ -1600,7 +1624,19 @@ function PrestadorHome() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.06, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDataLoading(false), 900);
@@ -1658,75 +1694,112 @@ function PrestadorHome() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.blue} />}
       >
-        {/* Online toggle */}
+        {/* 1. Online toggle — forte e com cor */}
         <Pressable
-          onPress={() => user?.verified && setOnline((v) => !v)}
+          onPress={() => {
+            if (!user?.verified) return;
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            setOnline((v) => !v);
+          }}
           disabled={!user?.verified}
           style={[
             styles.onlineRow,
-            {
-              backgroundColor: user?.verified ? (online ? c.successLight : c.card) : c.card,
-              borderColor: user?.verified ? (online ? "#BBF7D0" : c.border) : c.border,
-              opacity: user?.verified ? 1 : 0.6,
-            },
+            online && user?.verified
+              ? { backgroundColor: c.success, borderColor: "#15803D" }
+              : { backgroundColor: c.card, borderColor: c.border },
+            { opacity: user?.verified ? 1 : 0.6 },
           ]}
         >
-          <View style={[styles.onlineDot, { backgroundColor: user?.verified ? (online ? c.success : c.softMuted) : c.warning }]} />
+          <View style={[styles.onlineDot, {
+            backgroundColor: user?.verified ? (online ? "#fff" : c.softMuted) : c.warning,
+            shadowColor: online ? "#fff" : "transparent",
+            shadowOpacity: 0.8,
+            shadowRadius: 6,
+          }]} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.onlineTitle, { color: c.text }]}>
+            <Text style={[styles.onlineTitle, { color: online && user?.verified ? "#fff" : c.text }]}>
               {user?.verified ? (online ? "Você está disponível" : "Você está offline") : "Aguardando aprovação"}
             </Text>
-            <Text style={[styles.onlineSub, { color: user?.verified ? c.softMuted : c.warning }]}>
-              {user?.verified ? (online ? "Visível no mapa" : "Toque para ativar") : "Seu cadastro está em análise"}
+            <Text style={[styles.onlineSub, { color: online && user?.verified ? "#D1FAE5" : (user?.verified ? c.softMuted : c.warning) }]}>
+              {user?.verified ? (online ? "Visível no mapa · recebendo pedidos" : "Toque para ativar") : "Seu cadastro está em análise"}
             </Text>
           </View>
-          <View style={[styles.toggle, { backgroundColor: user?.verified ? (online ? c.success : "#D4D0CB") : "#FCD34D" }]}>
-            <View style={[styles.toggleDot, { left: user?.verified ? (online ? 23 : 3) : 3 }]} />
+          <View style={[styles.toggle, { backgroundColor: user?.verified ? (online ? "#fff" : "#D4D0CB") : "#FCD34D" }]}>
+            <View style={[styles.toggleDot, {
+              left: user?.verified ? (online ? 23 : 3) : 3,
+              backgroundColor: online && user?.verified ? c.success : "#888",
+            }]} />
           </View>
         </Pressable>
 
-        {/* Stats rápidos */}
-        {dataLoading ? (
-          <View style={styles.statsGrid}>
-            {[0, 1, 2].map((i) => (
-              <View key={i} style={[styles.statCard, { backgroundColor: c.border }]}>
-                <Skeleton width="60%" height={20} borderRadius={6} style={{ marginBottom: 6 }} />
-                <Skeleton width="40%" height={11} borderRadius={4} />
+        {/* 2. Solicitação recebida / Aguardando (logo abaixo do toggle) */}
+        {incoming ? (
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <LinearGradient
+              colors={[incomingAccent, incomingAccent + "DD"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.requestCard, { borderColor: "transparent" }]}
+            >
+              <View style={styles.requestHead}>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#fff" }} />
+                    <Text style={{ fontSize: 9, fontFamily: fonts.sans.bold, color: "rgba(255,255,255,0.85)", letterSpacing: 0.8 }}>NOVA SOLICITAÇÃO</Text>
+                  </View>
+                  <Text style={[styles.requestName, { color: "#fff" }]}>{incoming.customerName}</Text>
+                  <Text style={[styles.requestMeta, { color: "rgba(255,255,255,0.75)" }]}>
+                    {incoming.category} · {incoming.scheduled ? "Agendado" : "Imediato"}
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={[styles.requestPrice, { color: "#fff" }]}>R$ {(incoming.estimatedPrice * 0.85).toFixed(2)}</Text>
+                  <Text style={[styles.requestSub, { color: "rgba(255,255,255,0.7)" }]}>líquido · Agora</Text>
+                </View>
               </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.statsGrid}>
-            {stats.map((s) => (
-              <View key={s.l} style={[styles.statCard, { backgroundColor: s.bg }]}>
-                <Text style={[styles.statValue, { color: s.color }]}>{s.v}</Text>
-                <Text style={[styles.statLabel, { color: c.sub }]}>{s.l}</Text>
+              <View style={styles.requestBtns}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    router.push("/request-details");
+                  }}
+                  style={[styles.requestRefuse, { backgroundColor: "rgba(255,255,255,0.15)", borderColor: "rgba(255,255,255,0.3)" }]}
+                >
+                  <Text style={[styles.requestRefuseText, { color: "#fff" }]}>Recusar</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                    router.push("/request-details");
+                  }}
+                  style={[styles.requestAccept, { backgroundColor: "rgba(255,255,255,0.2)", flex: 1 }]}
+                >
+                  <Text style={[styles.requestAcceptText, { color: "#fff" }]}>Ver detalhes →</Text>
+                </Pressable>
               </View>
-            ))}
-          </View>
-        )}
+            </LinearGradient>
+          </Animated.View>
+        ) : !inProgress ? (
+          <Animated.View style={[styles.waitingCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+            <Animated.View style={[styles.waitingPulseRing, { borderColor: c.primary + "33", transform: [{ scale: pulseAnim }] }]} />
+            <View style={[styles.emptyIconWrap, { backgroundColor: `${c.primary}12` }]}>
+              <Ionicons name="hourglass" size={20} color={c.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.requestName, { color: c.text }]}>Aguardando solicitações</Text>
+              <Text style={[styles.requestSub, { color: c.softMuted, marginTop: 2 }]}>
+                Fique online para aparecer no mapa dos clientes.
+              </Text>
+            </View>
+          </Animated.View>
+        ) : null}
 
-        {/* Portfólio — acesso rápido */}
-        <Pressable
-          onPress={() => router.push("/portfolio")}
-          style={[styles.portfolioEntry, { backgroundColor: c.card, borderColor: c.border }]}
-        >
-          <View style={[styles.portfolioIcon, { backgroundColor: `${c.primary}18` }]}>
-            <Ionicons name="briefcase-outline" size={18} color={c.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.portfolioTitle, { color: c.text }]}>Meu Portfólio</Text>
-            <Text style={[styles.portfolioSub, { color: c.softMuted }]}>Personalize como os clientes te veem</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
-        </Pressable>
-
-        {/* Hot area banner */}
-        <HotAreaBanner onPress={() => router.push("/marketplace")} />
-
-        {/* Serviço ativo em andamento */}
+        {/* 3. Serviço ativo em andamento */}
         {inProgress ? (
-          <Pressable onPress={() => router.push("/job")}>
+          <Pressable onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+            router.push("/job");
+          }}>
             <LinearGradient
               colors={[progressAccent, progressAccent + "DD"]}
               start={{ x: 0, y: 0 }}
@@ -1747,51 +1820,34 @@ function PrestadorHome() {
           </Pressable>
         ) : null}
 
-        {/* Solicitação recebida */}
-        {incoming ? (
-          <View style={[styles.requestCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-            <View style={styles.requestHead}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.requestName, { color: c.text }]}>{incoming.customerName}</Text>
-                <Text style={[styles.requestMeta, { color: c.softMuted }]}>
-                  {incoming.category} · {incoming.scheduled ? "Agendado" : "Imediato"}
-                </Text>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={[styles.requestPrice, { color: c.success }]}>R$ {(incoming.estimatedPrice * 0.85).toFixed(2)}</Text>
-                <Text style={[styles.requestSub, { color: c.softMuted }]}>líquido · Agora</Text>
-              </View>
-            </View>
-            <View style={styles.requestBtns}>
-              <Pressable
-                onPress={() => router.push("/request-details")}
-                style={[styles.requestRefuse, { backgroundColor: c.background, borderColor: c.border }]}
-              >
-                <Text style={[styles.requestRefuseText, { color: c.sub }]}>Recusar</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => router.push("/request-details")}
-                style={[styles.requestAccept, { backgroundColor: incomingAccent }]}
-              >
-                <Text style={styles.requestAcceptText}>Ver detalhes →</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : !inProgress ? (
-          <View style={[styles.requestCard, { backgroundColor: c.card, borderColor: c.border, alignItems: "center" }, shadows.sm]}>
-            <View style={[styles.emptyIconWrap, { backgroundColor: c.background }]}>
-              <Ionicons name="hourglass" size={20} color={c.softMuted} />
-            </View>
-            <Text style={[styles.requestName, { color: c.text, marginTop: 10, textAlign: "center" }]}>
-              Aguardando solicitações
-            </Text>
-            <Text style={[styles.requestSub, { color: c.softMuted, textAlign: "center", marginTop: 4 }]}>
-              Quando alguém solicitar um serviço perto de você, aparecerá aqui.
-            </Text>
-          </View>
-        ) : null}
+        {/* 4. Hot area banner */}
+        <HotAreaBanner onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          router.push("/marketplace");
+        }} />
 
-        {/* Dicas para aumentar ganhos */}
+        {/* 5. Stats rápidos */}
+        {dataLoading ? (
+          <View style={styles.statsGrid}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={[styles.statCard, { backgroundColor: c.border }]}>
+                <Skeleton width="60%" height={20} borderRadius={6} style={{ marginBottom: 6 }} />
+                <Skeleton width="40%" height={11} borderRadius={4} />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.statsGrid}>
+            {stats.map((s) => (
+              <View key={s.l} style={[styles.statCard, { backgroundColor: s.bg }]}>
+                <Text style={[styles.statValue, { color: s.color }]}>{s.v}</Text>
+                <Text style={[styles.statLabel, { color: c.sub }]}>{s.l}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* 6. Dicas para aumentar ganhos */}
         <View style={[styles.tipsCard, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 }}>
             <View style={[styles.tipsIconWrap, { backgroundColor: `${c.primary}18` }]}>
@@ -1830,6 +1886,114 @@ function PrestadorHome() {
         forceOpen={infoOpen}
         onClose={() => setInfoOpen(false)}
       />
+    </View>
+  );
+}
+
+/* ─── PortfolioSheet (Modal pageSheet) ──────────────────────────────────── */
+function PortfolioSheet({ onClose }: { onClose: () => void }) {
+  const c = colors.light;
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
+  const [tab, setTab] = useState<"preview" | "edit">("preview");
+  const [bio, setBio] = useState("Especialista em mudanças residenciais e comerciais na Zona Norte. Mais de 5 anos de experiência, equipe treinada e veículo segurado.");
+
+  const pColor = c.primary;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      {/* Header */}
+      <View style={[{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: insets.top + 12, paddingBottom: 12, backgroundColor: c.card, borderBottomWidth: 1, borderBottomColor: c.border }]}>
+        <View style={{ width: 40 }} />
+        <Text style={{ flex: 1, textAlign: "center", fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Meu Portfólio</Text>
+        <Pressable onPress={onClose} style={{ width: 40, height: 40, borderRadius: 12, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center", backgroundColor: c.background }}>
+          <Ionicons name="close" size={18} color={c.text} />
+        </Pressable>
+      </View>
+
+      {/* Tabs */}
+      <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: c.card }}>
+        {(["preview", "edit"] as const).map((t) => (
+          <Pressable key={t} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setTab(t); }}
+            style={{ flex: 1, paddingVertical: 11, alignItems: "center", borderBottomWidth: 2, borderBottomColor: tab === t ? c.primary : "transparent" }}>
+            <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: tab === t ? c.primary : c.softMuted }}>
+              {t === "preview" ? "Visualização" : "Editar"}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 + insets.bottom }} showsVerticalScrollIndicator={false}>
+        {tab === "preview" ? (
+          <>
+            {/* Hero */}
+            <LinearGradient colors={[pColor, pColor + "BB"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={{ borderRadius: 18, padding: 20, marginBottom: 16, alignItems: "center" }}>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                <Text style={{ color: "#fff", fontSize: 20, fontFamily: fonts.serif.extra }}>{initials}</Text>
+              </View>
+              <Text style={{ color: "#fff", fontSize: 17, fontFamily: fonts.sans.bold }}>{user?.name || "Carlos Oliveira"}</Text>
+              <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, fontFamily: fonts.sans.regular, marginTop: 2 }}>Van · ★ 4.9 · Prestador Verificado</Text>
+            </LinearGradient>
+
+            {/* Bio */}
+            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 6 }}>BIO</Text>
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, lineHeight: 19 }}>{bio}</Text>
+            </View>
+
+            {/* Serviços */}
+            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 10 }}>SERVIÇOS</Text>
+              {[
+                { title: "Mudança Residencial", price: "R$89", desc: "Apartamento ou casa, com 2 ajudantes incluídos" },
+                { title: "Frete Rápido", price: "R$49", desc: "Itens avulsos, entrega em até 2h na região" },
+              ].map((s, i) => (
+                <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingVertical: 8, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: c.borderLight }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text }}>{s.title}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 2 }}>{s.desc}</Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontFamily: fonts.serif.extra, color: c.success }}>{s.price}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Depoimento */}
+            <View style={{ backgroundColor: c.warningLight, borderRadius: 14, borderWidth: 1, borderColor: `${c.warning}44`, padding: 16 }}>
+              <View style={{ flexDirection: "row", gap: 4, marginBottom: 8 }}>
+                {[1,2,3,4,5].map((n) => <Ionicons key={n} name="star" size={12} color={c.warning} />)}
+              </View>
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, lineHeight: 19, fontStyle: "italic" }}>
+                "Excelente profissional! Cuidou de tudo com muito cuidado e chegou no horário marcado. Super recomendo!"
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, marginTop: 8 }}>— Maria S.</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 6 }}>BIO / APRESENTAÇÃO</Text>
+            <TextInput
+              style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 14, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, minHeight: 100, textAlignVertical: "top", marginBottom: 4 }}
+              placeholder="Fale sobre você e seu trabalho…"
+              placeholderTextColor={c.softMuted}
+              multiline
+              maxLength={280}
+              value={bio}
+              onChangeText={setBio}
+            />
+            <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, textAlign: "right", marginBottom: 20 }}>{bio.length}/280</Text>
+
+            <View style={{ backgroundColor: `${c.warning}15`, borderRadius: 14, borderWidth: 1, borderColor: `${c.warning}44`, padding: 14, flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+              <Ionicons name="information-circle" size={16} color={c.warning} />
+              <Text style={{ flex: 1, fontSize: 11, fontFamily: fonts.sans.medium, color: c.text, lineHeight: 16 }}>
+                Fotos, serviços e depoimento em destaque serão editáveis na próxima versão.
+              </Text>
+            </View>
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -1995,6 +2159,8 @@ const styles = StyleSheet.create({
   portfolioTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
   portfolioSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 1 },
 
+  waitingCard: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 12, overflow: "hidden" },
+  waitingPulseRing: { position: "absolute", width: 60, height: 60, borderRadius: 30, borderWidth: 2, left: 8 },
   tipsCard: { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 16 },
   tipsIconWrap: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   tipsTitle: { fontSize: 13, fontFamily: fonts.serif.extra, flex: 1 },
@@ -2041,6 +2207,7 @@ function ProvidersSheet({
     }).start();
     startH.current = target;
     setExpanded(target === EXPANDED_H);
+    Haptics.impactAsync(target === EXPANDED_H ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   };
 
   const responder = useRef(

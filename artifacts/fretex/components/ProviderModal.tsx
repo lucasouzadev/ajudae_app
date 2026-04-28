@@ -1,4 +1,5 @@
 import React from "react";
+import * as Haptics from "expo-haptics";
 import { Modal, View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -143,7 +144,7 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
                 title="Solicitar"
                 size="md"
                 color={provider.color}
-                onPress={() => onRequest(provider)}
+                onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); onRequest(provider); }}
                 icon="arrow-forward"
                 style={{ flex: 1.4 }}
               />
