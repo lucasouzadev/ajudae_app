@@ -142,17 +142,76 @@
 
 ---
 
+---
+
+## 🟣 Sessão 2026-04-28 — UI Layer v2 (Fretex Artifact)
+
+### 18. Dashboard prestador — hierarquia, redesign e haptics
+**Status:** ✅ Implementado
+**Detalhe:** Nova hierarquia do `PrestadorHome`: Toggle → Aguardando/Solicitação → Job ativo → HotBanner → Stats → Tips. Toggle online com fundo verde sólido e texto branco quando ativo. Ampulheta animada (flip 180° a cada 700ms) no card de espera. Pulse animation no card de solicitação recebida (LinearGradient colorido). Cards com `shadow`/`elevation` para destoar do fundo. Haptic Medium no toggle online.
+**Arquivo:** `artifacts/fretex/app/index.tsx` — `PrestadorHome`, `PrestadorTabsWrapper`
+
+---
+
+### 19. Portfólio no bottom-bar + editor completo
+**Status:** ✅ Implementado
+**Detalhe:** Botão "Meu Portfólio" removido do conteúdo do dashboard — movido como 4º tab no `BottomTabBar` do prestador (ícone `briefcase`). Abre `PortfolioSheet` como `Modal` pageSheet. Editor completo com seções colapsáveis:
+- **Bio**: textarea editável (280 chars)
+- **Serviços**: add/remove/editar até 3 serviços (título, preço, descrição)
+- **Promoção**: texto livre + data de validade, preview com LinearGradient âmbar
+- **Pin-card**: color picker (6 cores), icon picker (5 ícones), mensagem curta (25 chars), preview em tempo real
+
+Preview completo com hero gradient, bio, promo banner, lista de serviços, prévia do pin como aparece no mapa, depoimento em destaque.
+**Arquivo:** `artifacts/fretex/app/index.tsx` — `PortfolioSheet`, `PIN_COLORS`, `PIN_ICONS`
+
+---
+
+### 20. Pin callout auto-fecha com sheet expandido
+**Status:** ✅ Implementado
+**Detalhe:** `sheetHeightAnim.addListener` em `ClienteHome` detecta quando o sheet sobe mais de 20px acima do `COLLAPSED_H` e fecha automaticamente `active` e `pinCardVisible`. Evita sobreposição de componentes.
+**Arquivo:** `artifacts/fretex/app/index.tsx` — `ClienteHome` `useEffect`
+
+---
+
+### 21. Haptic feedback transversal
+**Status:** ✅ Implementado
+**Detalhe:** `expo-haptics` importado em `index.tsx` e `ProviderModal.tsx`. Mapeamento semântico:
+- **Light**: chip de filtro, 1º toque no pin, tabs do bottom-bar, hub nav, open sheets, sheet snap para baixo
+- **Medium**: toggle online, 2º toque no pin, "Ver perfil/Mais Detalhes" no activeCard, aceitar/recusar solicitação, sheet snap para cima, mapa expandido
+- **NotificationSuccess**: botão "Solicitar" no ProviderModal
+**Arquivos:** `artifacts/fretex/app/index.tsx`, `artifacts/fretex/components/ProviderModal.tsx`
+
+---
+
+### 22. ProviderModal — "Mais Detalhes"
+**Status:** ✅ Implementado
+**Detalhe:** Botão de perfil no `ProviderModal` renomeado de "Ver perfil" para "Mais Detalhes", eliminando duplicidade com o botão "Ver perfil" já presente no activeCard do mapa.
+**Arquivo:** `artifacts/fretex/components/ProviderModal.tsx`
+
+---
+
+### 23. Marketplace — fundo escuro + gradiente no mapa + modal fullscreen
+**Status:** ✅ Implementado
+**Detalhe:**
+- Fundo do marketplace alterado para `#EDEAE3` (mais escuro, destaca o conteúdo)
+- `MarketMap` recebeu prop `onExpand?: () => void` + `LinearGradient` escuro na base (transparent → rgba 38%) + pill "Toque para explorar" quando `onExpand` é fornecida
+- `MapExpandModal` fullScreen com safe-area correta: área preta de `insets.top` no topo, mapa ocupa o restante
+  - **Cliente**: toca no pin → card com nome/categoria/preço + botão "Solicitar este prestador" (NotificationSuccess haptic)
+  - **Prestador**: toca no pin → card "Análise de concorrência" (somente leitura)
+  - Dica textual com fingerprint icon quando nenhum pin selecionado
+**Arquivos:** `artifacts/fretex/app/marketplace.tsx`, `artifacts/fretex/components/MarketMap.tsx`
+
+---
+
 ## Contagem geral
 
 | Status | Quantidade |
 |--------|-----------|
-| ✅ Implementado | 17 |
+| ✅ Implementado | 23 |
 | 🔶 Parcial | 0 |
 | ❌ Pendente | 0 |
-| **Total** | **17** |
+| **Total** | **23** |
 
 ---
 
----
-
-_Ajudaê — PROGRESS v1.4 — atualizado em 2026-04-27 — **17/17 ✅ Todos os itens concluídos** (toggle bloqueado corrigido)_
+_Ajudaê — PROGRESS v1.5 — atualizado em 2026-04-28 — **23/23 ✅** (UI Layer v2 completo)_

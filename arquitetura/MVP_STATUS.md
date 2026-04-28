@@ -1,5 +1,5 @@
 # MVP_STATUS.md — Ajudaê
-> Estado atual do app para testes fechados. Gerado em 2026-04-27.
+> Estado atual do app para testes fechados. Atualizado em 2026-04-28.
 
 ---
 
@@ -24,12 +24,12 @@ O app está **pronto para testes fechados de fluxo completo**. Todos os fluxos c
 
 | Métrica | Valor |
 |---|---|
-| Total de linhas | ~9.840 |
+| Total de linhas | ~11.200 |
 | Telas (`app/*.tsx`) | 19 |
-| Componentes | 23 |
+| Componentes | 24 (+ `MarketMap` atualizado) |
 | Contextos | 5 (Auth, Service, Requests, Payments, Support) |
-| Branch de desenvolvimento | `claude/task3-fix-onboarding-nLaEx` |
-| Commits desde início das tasks | 8 commits |
+| Branch de desenvolvimento | `main` |
+| Commits desde início das tasks | 12 commits |
 
 ---
 
@@ -70,8 +70,8 @@ Home → Solicitar pedido → Aguardar prestador → Rastreamento →
 
 | Tela | O que funciona |
 |---|---|
-| `index.tsx` (cliente) | Home com chips de navegação, card de serviço ativo, acesso ao marketplace |
-| `marketplace.tsx` | Lista de prestadores com filtros por categoria |
+| `index.tsx` (cliente) | Home com mapa interativo, pin callout 2 estados, auto-fechamento com sheet, filtros por categoria |
+| `marketplace.tsx` | Lista de prestadores com filtros, mapa com gradiente, modal fullscreen com CTA "Solicitar" |
 | `provider/[id].tsx` | Perfil completo do prestador |
 | `request.tsx` | Formulário de solicitação com origem/destino, fotos, agendamento |
 | `track.tsx` | Rastreamento do pedido, status em tempo real (mock), mapa SVG, botão de chat, acesso ao ticket |
@@ -94,7 +94,7 @@ Home (online) → Receber solicitação → Aceitar → En route →
 
 | Tela | O que funciona |
 |---|---|
-| `index.tsx` (prestador) | Home com toggle online, grid de stats, radar de mercado, previsão de demanda, heatmap, metas, badges, card de pedido ativo, solicitações recebidas |
+| `index.tsx` (prestador) | Home reestruturada (hierarquia por urgência), toggle verde sólido, ampulheta animada, solicitação com gradiente+pulse, portfólio como 4º tab com editor completo (bio/serviços/promoção/pin-card) |
 | `job.tsx` | Detalhes do job ativo, botão de aceite, status, acesso ao chat |
 | `start-pin.tsx` | Exibe `pin_start` pré-gerado com animação de pulso, auto-navega para `/job` quando status muda para `in_progress` — funciona offline sem rede |
 | `job-otp.tsx` | Input de 6 dígitos para digitar o PIN de conclusão exibido pelo cliente, validação offline, max 5 tentativas → disputa |
@@ -198,25 +198,43 @@ Comportamento idêntico ao Uber/99.
 | Área | Completude estimada |
 |---|---|
 | Autenticação e onboarding | 90% |
-| Fluxo do cliente (criação → conclusão) | 85% |
-| Fluxo do prestador (aceitação → conclusão) | 85% |
+| Fluxo do cliente (criação → conclusão) | 88% |
+| Fluxo do prestador (aceitação → conclusão) | 90% |
 | Sistema de segurança dual-PIN | 95% |
+| Dashboard do prestador (UX/UI) | 95% |
+| Portfólio do prestador (UX/UI) | 80% (backend 0%) |
+| Marketplace (UX/UI) | 85% |
 | Inbox / Chat | 30% (visual estático) |
 | Pagamentos | 15% (visual apenas) |
-| Mapa e geolocalização | 20% (SVG estático) |
+| Mapa e geolocalização | 25% (SVG estático, pin system maduro) |
 | Push notifications | 0% |
-| **MVP testável end-to-end** | **~75%** |
+| Haptic feedback | 90% |
+| **MVP testável end-to-end** | **~80%** |
 
 ---
 
 ## Próximos Passos Recomendados (por prioridade)
 
 1. **Distribuição via Expo Go** — gerar link de preview para o time de QA
-2. **Item #5** — Bloquear toggle do prestador não-verificado (1–2h)
+2. **Persistência local do portfólio** — salvar estado do `PortfolioSheet` em AsyncStorage (antes do backend real)
 3. **Escalabilidade do hash** — migrar djb2 para HMAC-SHA256 com `expo-crypto` antes de produção
-4. **Item #7** — Flag de ambiente `APP_ENV=demo` para ocultar hints de demo em produção
-5. **Backend mínimo** — endpoint de criação de pedido + WebSocket para notificações de aceite
+4. **Backend mínimo** — contratos de API documentados em `HANDOFF_2026-04-28.md` — endpoint de criação de pedido + WebSocket para notificações + API de portfólio
+5. **Mapa real** — integração Google Maps / Mapbox substituindo `MapSVG.tsx` estático; coordenadas de pins via `GET /providers/nearby`
 
 ---
 
-_Ajudaê — MVP Status v1.0 — 2026-04-27_
+---
+
+## Documentação de Referência
+
+| Documento | Conteúdo |
+|---|---|
+| `arquitetura/PROGRESS.md` | Itens implementados com detalhe técnico (23 itens) |
+| `arquitetura/HANDOFF_2026-04-28.md` | Contratos de API, decisões de design, debt técnico da sessão |
+| `arquitetura/PIN_SYSTEM.md` | Sistema dual-PIN detalhado |
+| `arquitetura/Comissionados/Documentos Técnicos/DB_SCHEMA.md` | Schema do banco de dados |
+| `arquitetura/Comissionados/Documentos Técnicos/ARCHITECTURE.md` | Arquitetura geral do sistema |
+
+---
+
+_Ajudaê — MVP Status v1.1 — 2026-04-28 — UI Layer v2 completo, ~80% MVP testável_
