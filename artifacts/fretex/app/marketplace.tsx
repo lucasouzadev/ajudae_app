@@ -265,10 +265,15 @@ function MapExpandModal({
   const [activePin, setActivePin] = useState<string | null>(null);
   const active = pins.find((p) => p.id === activePin) ?? null;
 
+  const safeTop = insets.top || 44;
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: "#1A1714" }}>
-        {/* Map fill */}
+        {/* Status-bar safe zone */}
+        <View style={{ height: safeTop, backgroundColor: "#1A1714" }} />
+
+        {/* Map fill — altura descontada do safe top e bottom */}
         <View style={{ flex: 1, position: "relative" }}>
           <MarketMap
             pins={pins}
@@ -280,20 +285,20 @@ function MapExpandModal({
             title={role === "cliente" ? "Prestadores disponíveis" : "Mapa de concorrência"}
             subtitle={`${pins.length} online · toque em um pin`}
             badgeColor={role === "cliente" ? c.success : c.blue}
-            height={SCREEN_H_MKT}
+            height={SCREEN_H_MKT - safeTop}
           />
         </View>
 
-        {/* Close button — top-left */}
+        {/* Close button — top-left (posicionado sobre o safe zone) */}
         <Pressable
           onPress={onClose}
-          style={{ position: "absolute", top: insets.top + 12, left: 16, width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", zIndex: 20 }}
+          style={{ position: "absolute", top: safeTop + 12, left: 16, width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", zIndex: 20 }}
         >
           <Ionicons name="close" size={20} color="#fff" />
         </Pressable>
 
         {/* Role label */}
-        <View style={{ position: "absolute", top: insets.top + 16, left: 68, zIndex: 20, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+        <View style={{ position: "absolute", top: safeTop + 16, left: 68, zIndex: 20, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
           <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: "#fff" }}>
             {role === "cliente" ? "Solicitar serviço" : "Pesquisa de mercado"}
           </Text>
