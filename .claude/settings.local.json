@@ -17,7 +17,13 @@
       "Bash(pnpm install *)",
       "Bash(pnpm add *)",
       "Bash(npm install *)",
-      "Bash(git commit -m 'feat: setup Google Maps para o projeto *)"
+      "Bash(git commit -m 'feat: setup Google Maps para o projeto *)",
+      "Bash(git commit -m 'docs: Guia de integração Google Maps com próximos passos *)",
+      "Bash(eas login *)",
+      "Bash(eas build *)",
+      "Bash(tee /tmp/eas-build.log)",
+      "Bash(eas init *)",
+      "Bash(git commit -m 'fix: remover react-native-maps do plugins array *)"
     ]
   }
 }

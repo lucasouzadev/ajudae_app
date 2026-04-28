@@ -39,12 +39,17 @@
         }
       ],
       "expo-font",
-      "expo-web-browser",
-      "react-native-maps"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "58679028-d339-4d8d-9fde-bd7dd1ad7725"
+      }
+    },
+    "owner": "juiceluqi"
   }
 }
