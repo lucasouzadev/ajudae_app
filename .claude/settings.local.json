@@ -23,7 +23,10 @@
       "Bash(eas build *)",
       "Bash(tee /tmp/eas-build.log)",
       "Bash(eas init *)",
-      "Bash(git commit -m 'fix: remover react-native-maps do plugins array *)"
+      "Bash(git commit -m 'fix: remover react-native-maps do plugins array *)",
+      "Bash(tee /tmp/build.log)",
+      "Read(//tmp/**)",
+      "Bash(git commit -m 'docs: Google Maps setup documentation completo *)"
     ]
   }
 }
