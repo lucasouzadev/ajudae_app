@@ -1625,17 +1625,26 @@ function PrestadorHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const hourglassAnim = useRef(new Animated.Value(0)).current;
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1200); };
 
   useEffect(() => {
-    const loop = Animated.loop(
+    const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.06, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.04, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
       ])
     );
-    loop.start();
-    return () => loop.stop();
+    const hg = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hourglassAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.delay(600),
+        Animated.timing(hourglassAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    hg.start();
+    return () => { pulse.stop(); hg.stop(); };
   }, []);
 
   useEffect(() => {
@@ -1780,10 +1789,12 @@ function PrestadorHome() {
             </LinearGradient>
           </Animated.View>
         ) : !inProgress ? (
-          <Animated.View style={[styles.waitingCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-            <Animated.View style={[styles.waitingPulseRing, { borderColor: c.primary + "33", transform: [{ scale: pulseAnim }] }]} />
-            <View style={[styles.emptyIconWrap, { backgroundColor: `${c.primary}12` }]}>
-              <Ionicons name="hourglass" size={20} color={c.primary} />
+          <Animated.View style={[styles.waitingCard, { backgroundColor: c.card, borderColor: `${c.primary}44`, borderLeftColor: c.primary, borderLeftWidth: 3 }, shadows.sm]}>
+            <Animated.View style={[styles.waitingPulseRing, { borderColor: c.primary + "22", transform: [{ scale: pulseAnim }] }]} />
+            <View style={[styles.emptyIconWrap, { backgroundColor: `${c.primary}15` }]}>
+              <Animated.View style={{ transform: [{ rotate: hourglassAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] }) }] }}>
+                <Ionicons name="hourglass" size={20} color={c.primary} />
+              </Animated.View>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.requestName, { color: c.text }]}>Aguardando solicitações</Text>
@@ -1891,20 +1902,67 @@ function PrestadorHome() {
 }
 
 /* ─── PortfolioSheet (Modal pageSheet) ──────────────────────────────────── */
+const PIN_COLORS = ["#FF5500", "#2563EB", "#16A34A", "#9333EA", "#D97706", "#0EA5E9"];
+const PIN_ICONS = [
+  { key: "home-outline", label: "Casa" },
+  { key: "car-outline", label: "Van" },
+  { key: "cube-outline", label: "Caixa" },
+  { key: "flash-outline", label: "Rápido" },
+  { key: "star-outline", label: "Top" },
+];
+
 function PortfolioSheet({ onClose }: { onClose: () => void }) {
   const c = colors.light;
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const [tab, setTab] = useState<"preview" | "edit">("preview");
+  const [editSection, setEditSection] = useState<"bio" | "services" | "promo" | "pin" | null>("bio");
+
+  // Bio
   const [bio, setBio] = useState("Especialista em mudanças residenciais e comerciais na Zona Norte. Mais de 5 anos de experiência, equipe treinada e veículo segurado.");
 
-  const pColor = c.primary;
+  // Services
+  const [services, setServices] = useState([
+    { title: "Mudança Residencial", price: "89", desc: "Apartamento ou casa, com 2 ajudantes incluídos" },
+    { title: "Frete Rápido", price: "49", desc: "Itens avulsos, entrega em até 2h na região" },
+  ]);
+  const addService = () => {
+    if (services.length >= 3) return;
+    setServices((s) => [...s, { title: "", price: "", desc: "" }]);
+  };
+  const removeService = (i: number) => setServices((s) => s.filter((_, idx) => idx !== i));
+  const updateService = (i: number, field: "title" | "price" | "desc", val: string) => {
+    setServices((s) => s.map((svc, idx) => idx === i ? { ...svc, [field]: val } : svc));
+  };
+
+  // Promo
+  const [promoText, setPromoText] = useState("Mudança completa com 10% OFF");
+  const [promoDue, setPromoDue] = useState("30/05");
+
+  // Pin card
+  const [pinColor, setPinColor] = useState("#FF5500");
+  const [pinIcon, setPinIcon] = useState("home-outline");
+  const [pinMessage, setPinMessage] = useState("Disponível agora!");
+
+  const Section = ({ sectionKey, label, icon }: { sectionKey: typeof editSection; label: string; icon: string }) => {
+    const open = editSection === sectionKey;
+    return (
+      <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setEditSection(open ? null : sectionKey); }}
+        style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: open ? c.primary : c.border, padding: 14, marginBottom: open ? 0 : 10 }}>
+        <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: open ? `${c.primary}18` : c.background, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name={icon as any} size={16} color={open ? c.primary : c.softMuted} />
+        </View>
+        <Text style={{ flex: 1, fontSize: 13, fontFamily: fonts.sans.bold, color: c.text }}>{label}</Text>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={c.softMuted} />
+      </Pressable>
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       {/* Header */}
-      <View style={[{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: insets.top + 12, paddingBottom: 12, backgroundColor: c.card, borderBottomWidth: 1, borderBottomColor: c.border }]}>
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: insets.top + 12, paddingBottom: 12, backgroundColor: c.card, borderBottomWidth: 1, borderBottomColor: c.border }}>
         <View style={{ width: 40 }} />
         <Text style={{ flex: 1, textAlign: "center", fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Meu Portfólio</Text>
         <Pressable onPress={onClose} style={{ width: 40, height: 40, borderRadius: 12, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center", backgroundColor: c.background }}>
@@ -1924,12 +1982,12 @@ function PortfolioSheet({ onClose }: { onClose: () => void }) {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 50 + insets.bottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {tab === "preview" ? (
           <>
             {/* Hero */}
-            <LinearGradient colors={[pColor, pColor + "BB"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={{ borderRadius: 18, padding: 20, marginBottom: 16, alignItems: "center" }}>
+            <LinearGradient colors={[c.primary, c.primary + "BB"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={{ borderRadius: 18, padding: 20, marginBottom: 14, alignItems: "center" }}>
               <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
                 <Text style={{ color: "#fff", fontSize: 20, fontFamily: fonts.serif.extra }}>{initials}</Text>
               </View>
@@ -1938,26 +1996,51 @@ function PortfolioSheet({ onClose }: { onClose: () => void }) {
             </LinearGradient>
 
             {/* Bio */}
-            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
-              <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 6 }}>BIO</Text>
-              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, lineHeight: 19 }}>{bio}</Text>
+            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 10 }}>
+              <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 6 }}>BIO</Text>
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, lineHeight: 20 }}>{bio || "Nenhuma bio adicionada."}</Text>
             </View>
 
+            {/* Promo */}
+            {promoText ? (
+              <LinearGradient colors={["#D97706", "#F59E0B"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ borderRadius: 14, padding: 14, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Ionicons name="pricetag" size={16} color="#fff" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: "#fff" }}>{promoText}</Text>
+                  {promoDue ? <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontFamily: fonts.sans.regular, marginTop: 2 }}>Válido até {promoDue}</Text> : null}
+                </View>
+              </LinearGradient>
+            ) : null}
+
             {/* Serviços */}
-            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
-              <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 10 }}>SERVIÇOS</Text>
-              {[
-                { title: "Mudança Residencial", price: "R$89", desc: "Apartamento ou casa, com 2 ajudantes incluídos" },
-                { title: "Frete Rápido", price: "R$49", desc: "Itens avulsos, entrega em até 2h na região" },
-              ].map((s, i) => (
+            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 10 }}>
+              <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 10 }}>SERVIÇOS</Text>
+              {services.filter(s => s.title).map((s, i) => (
                 <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingVertical: 8, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: c.borderLight }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text }}>{s.title}</Text>
-                    <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 2 }}>{s.desc}</Text>
+                    {s.desc ? <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 2 }}>{s.desc}</Text> : null}
                   </View>
-                  <Text style={{ fontSize: 14, fontFamily: fonts.serif.extra, color: c.success }}>{s.price}</Text>
+                  {s.price ? <Text style={{ fontSize: 14, fontFamily: fonts.serif.extra, color: c.success, marginLeft: 8 }}>R${s.price}</Text> : null}
                 </View>
               ))}
+              {services.filter(s => s.title).length === 0 ? <Text style={{ fontSize: 12, color: c.softMuted, fontFamily: fonts.sans.regular }}>Nenhum serviço adicionado.</Text> : null}
+            </View>
+
+            {/* Pin Card Preview */}
+            <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 8 }}>SEU PIN NO MAPA</Text>
+            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 10, alignItems: "center" }}>
+              <View style={{ backgroundColor: pinColor, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, flexDirection: "row", gap: 6, alignItems: "center", shadowColor: pinColor, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 }}>
+                <Ionicons name={pinIcon as any} size={14} color="#fff" />
+                <Text style={{ color: "#fff", fontSize: 13, fontFamily: fonts.sans.bold }}>R$89</Text>
+              </View>
+              {pinMessage ? (
+                <View style={{ marginTop: 10, backgroundColor: `${pinColor}15`, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: `${pinColor}33` }}>
+                  <Text style={{ fontSize: 11, fontFamily: fonts.sans.medium, color: pinColor }}>{pinMessage}</Text>
+                </View>
+              ) : null}
+              <Text style={{ fontSize: 10, color: c.softMuted, fontFamily: fonts.sans.regular, marginTop: 8 }}>Assim os clientes veem você no mapa</Text>
             </View>
 
             {/* Depoimento */}
@@ -1973,24 +2056,102 @@ function PortfolioSheet({ onClose }: { onClose: () => void }) {
           </>
         ) : (
           <>
-            <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 6 }}>BIO / APRESENTAÇÃO</Text>
-            <TextInput
-              style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 14, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, minHeight: 100, textAlignVertical: "top", marginBottom: 4 }}
-              placeholder="Fale sobre você e seu trabalho…"
-              placeholderTextColor={c.softMuted}
-              multiline
-              maxLength={280}
-              value={bio}
-              onChangeText={setBio}
-            />
-            <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, textAlign: "right", marginBottom: 20 }}>{bio.length}/280</Text>
+            {/* ── Bio ── */}
+            <Section sectionKey="bio" label="Bio / Apresentação" icon="person-outline" />
+            {editSection === "bio" && (
+              <View style={{ backgroundColor: c.background, borderRadius: 14, borderWidth: 1, borderColor: c.primary, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, padding: 14, marginBottom: 10 }}>
+                <TextInput style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, minHeight: 90, textAlignVertical: "top" }}
+                  placeholder="Fale sobre você e seu trabalho…" placeholderTextColor={c.softMuted} multiline maxLength={280} value={bio} onChangeText={setBio} />
+                <Text style={{ fontSize: 11, color: c.softMuted, fontFamily: fonts.sans.regular, textAlign: "right", marginTop: 4 }}>{bio.length}/280</Text>
+              </View>
+            )}
 
-            <View style={{ backgroundColor: `${c.warning}15`, borderRadius: 14, borderWidth: 1, borderColor: `${c.warning}44`, padding: 14, flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
-              <Ionicons name="information-circle" size={16} color={c.warning} />
-              <Text style={{ flex: 1, fontSize: 11, fontFamily: fonts.sans.medium, color: c.text, lineHeight: 16 }}>
-                Fotos, serviços e depoimento em destaque serão editáveis na próxima versão.
-              </Text>
-            </View>
+            {/* ── Serviços ── */}
+            <Section sectionKey="services" label="Serviços em destaque" icon="list-outline" />
+            {editSection === "services" && (
+              <View style={{ backgroundColor: c.background, borderRadius: 14, borderWidth: 1, borderColor: c.primary, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, padding: 14, marginBottom: 10, gap: 10 }}>
+                {services.map((svc, i) => (
+                  <View key={i} style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted }}>SERVIÇO {i + 1}</Text>
+                      <Pressable onPress={() => removeService(i)}><Ionicons name="close-circle" size={18} color={c.destructive} /></Pressable>
+                    </View>
+                    <TextInput style={{ backgroundColor: c.background, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 10, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, marginBottom: 6 }}
+                      placeholder="Título do serviço" placeholderTextColor={c.softMuted} value={svc.title} onChangeText={(v) => updateService(i, "title", v)} />
+                    <TextInput style={{ backgroundColor: c.background, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 10, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, marginBottom: 6 }}
+                      placeholder="Preço (ex: 89)" placeholderTextColor={c.softMuted} keyboardType="numeric" value={svc.price} onChangeText={(v) => updateService(i, "price", v.replace(/[^0-9]/g, ""))} />
+                    <TextInput style={{ backgroundColor: c.background, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 10, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text }}
+                      placeholder="Descrição curta (opcional)" placeholderTextColor={c.softMuted} value={svc.desc} onChangeText={(v) => updateService(i, "desc", v)} />
+                  </View>
+                ))}
+                {services.length < 3 ? (
+                  <Pressable onPress={addService} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, borderWidth: 1.5, borderColor: c.primary, borderStyle: "dashed", paddingVertical: 12 }}>
+                    <Ionicons name="add-circle-outline" size={16} color={c.primary} />
+                    <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.primary }}>Adicionar serviço</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            )}
+
+            {/* ── Promoção ── */}
+            <Section sectionKey="promo" label="Promoção ativa" icon="pricetag-outline" />
+            {editSection === "promo" && (
+              <View style={{ backgroundColor: c.background, borderRadius: 14, borderWidth: 1, borderColor: c.primary, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, padding: 14, marginBottom: 10, gap: 8 }}>
+                <TextInput style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text }}
+                  placeholder="Ex: 10% OFF em mudanças" placeholderTextColor={c.softMuted} maxLength={50} value={promoText} onChangeText={setPromoText} />
+                <TextInput style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text }}
+                  placeholder="Válido até (ex: 30/06)" placeholderTextColor={c.softMuted} value={promoDue} onChangeText={setPromoDue} />
+              </View>
+            )}
+
+            {/* ── Pin Card ── */}
+            <Section sectionKey="pin" label="Personalizar Pin no mapa" icon="location-outline" />
+            {editSection === "pin" && (
+              <View style={{ backgroundColor: c.background, borderRadius: 14, borderWidth: 1, borderColor: c.primary, borderTopWidth: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, padding: 14, marginBottom: 10 }}>
+                {/* Color picker */}
+                <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 8 }}>COR DO PIN</Text>
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
+                  {PIN_COLORS.map((col) => (
+                    <Pressable key={col} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setPinColor(col); }}
+                      style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: col, borderWidth: pinColor === col ? 3 : 0, borderColor: "#fff", shadowColor: col, shadowOpacity: 0.5, shadowRadius: 4, elevation: 3 }}>
+                      {pinColor === col ? <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}><Ionicons name="checkmark" size={14} color="#fff" /></View> : null}
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Icon picker */}
+                <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 8 }}>ÍCONE</Text>
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+                  {PIN_ICONS.map((ic) => (
+                    <Pressable key={ic.key} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setPinIcon(ic.key); }}
+                      style={{ flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 12, borderWidth: 1.5, borderColor: pinIcon === ic.key ? pinColor : c.border, backgroundColor: pinIcon === ic.key ? `${pinColor}15` : c.card }}>
+                      <Ionicons name={ic.key as any} size={16} color={pinIcon === ic.key ? pinColor : c.softMuted} />
+                      <Text style={{ fontSize: 9, fontFamily: fonts.sans.regular, color: pinIcon === ic.key ? pinColor : c.softMuted, marginTop: 3 }}>{ic.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Message */}
+                <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 6 }}>MENSAGEM NO CARD (MAX 25 CHARS)</Text>
+                <TextInput style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 12, fontSize: 13, fontFamily: fonts.sans.regular, color: c.text, marginBottom: 4 }}
+                  placeholder="Ex: Disponível agora!" placeholderTextColor={c.softMuted} maxLength={25} value={pinMessage} onChangeText={setPinMessage} />
+                <Text style={{ fontSize: 11, color: c.softMuted, fontFamily: fonts.sans.regular, textAlign: "right", marginBottom: 12 }}>{pinMessage.length}/25</Text>
+
+                {/* Preview */}
+                <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 8 }}>PREVIEW</Text>
+                <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, alignItems: "center" }}>
+                  <View style={{ backgroundColor: pinColor, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8, flexDirection: "row", gap: 6, alignItems: "center", shadowColor: pinColor, shadowOpacity: 0.4, shadowRadius: 8, elevation: 5 }}>
+                    <Ionicons name={pinIcon as any} size={13} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 13, fontFamily: fonts.sans.bold }}>R$89</Text>
+                  </View>
+                  {pinMessage ? (
+                    <View style={{ marginTop: 8, backgroundColor: `${pinColor}15`, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: `${pinColor}33` }}>
+                      <Text style={{ fontSize: 10, fontFamily: fonts.sans.medium, color: pinColor }}>{pinMessage}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -2130,13 +2291,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  jobCard: { borderRadius: 18, padding: 18, marginBottom: 16 },
+  jobCard: { borderRadius: 18, padding: 18, marginBottom: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 8 },
   jobBadgeRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 5 },
   jobLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.9)" },
   jobLiveText: { color: "rgba(255,255,255,0.85)", fontSize: 10, fontFamily: fonts.sans.bold, letterSpacing: 1 },
   jobTitle: { color: "#fff", fontSize: 16, fontFamily: fonts.serif.extra },
   jobSub: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontFamily: fonts.sans.regular, marginTop: 3 },
-  requestCard: { borderRadius: 16, borderWidth: 1.5, padding: 14 },
+  requestCard: { borderRadius: 16, borderWidth: 1.5, padding: 14, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 5 },
   requestHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
   requestName: { fontSize: 14, fontFamily: fonts.sans.bold },
   requestMeta: { fontSize: 11, fontFamily: fonts.sans.regular },

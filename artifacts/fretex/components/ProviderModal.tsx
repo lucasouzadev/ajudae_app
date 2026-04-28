@@ -133,7 +133,7 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
           <View style={[styles.ctas, { borderTopColor: c.borderLight }]}>
             <PrimaryButton
               variant="outline"
-              title="Ver perfil"
+              title="Mais Detalhes"
               size="md"
               color={provider.color}
               onPress={() => onProfile(provider)}

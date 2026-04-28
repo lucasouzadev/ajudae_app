@@ -11,7 +11,9 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
+  Dimensions,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -25,6 +27,8 @@ import { SideSheet } from "@/components/SideSheet";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { MarketMap, type MapPin } from "@/components/MarketMap";
 import { InfoSheet, type InfoItem } from "@/components/InfoSheet";
+
+const SCREEN_H_MKT = Dimensions.get("window").height;
 
 export default function MarketplaceScreen() {
   const { role, user } = useAuth();
@@ -242,6 +246,102 @@ function CustomOrderModal({ visible, onClose }: { visible: boolean; onClose: () 
   );
 }
 
+/* ─── MapExpandModal ───────────────────────────────────────────────────── */
+function MapExpandModal({
+  visible,
+  onClose,
+  pins,
+  role,
+  onRequest,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  pins: MapPin[];
+  role: "cliente" | "prestador";
+  onRequest?: (id: string) => void;
+}) {
+  const c = colors.light;
+  const insets = useSafeAreaInsets();
+  const [activePin, setActivePin] = useState<string | null>(null);
+  const active = pins.find((p) => p.id === activePin) ?? null;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "#1A1714" }}>
+        {/* Map fill */}
+        <View style={{ flex: 1, position: "relative" }}>
+          <MarketMap
+            pins={pins}
+            activeId={activePin}
+            onPinPress={(id) => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              setActivePin(id === activePin ? null : id);
+            }}
+            title={role === "cliente" ? "Prestadores disponíveis" : "Mapa de concorrência"}
+            subtitle={`${pins.length} online · toque em um pin`}
+            badgeColor={role === "cliente" ? c.success : c.blue}
+            height={SCREEN_H_MKT}
+          />
+        </View>
+
+        {/* Close button — top-left */}
+        <Pressable
+          onPress={onClose}
+          style={{ position: "absolute", top: insets.top + 12, left: 16, width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", zIndex: 20 }}
+        >
+          <Ionicons name="close" size={20} color="#fff" />
+        </Pressable>
+
+        {/* Role label */}
+        <View style={{ position: "absolute", top: insets.top + 16, left: 68, zIndex: 20, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+          <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: "#fff" }}>
+            {role === "cliente" ? "Solicitar serviço" : "Pesquisa de mercado"}
+          </Text>
+        </View>
+
+        {/* Bottom pin card */}
+        {active ? (
+          <View style={{ position: "absolute", bottom: insets.bottom + 16, left: 16, right: 16, backgroundColor: "#fff", borderRadius: 20, padding: 16, zIndex: 20, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 16, elevation: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: active.color, alignItems: "center", justifyContent: "center" }}>
+                {active.cat === "Mudança" ? <Ionicons name="home" size={18} color="#fff" /> : active.cat === "Frete" ? <Ionicons name="car" size={18} color="#fff" /> : <Ionicons name="cube" size={18} color="#fff" />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>{active.cat}</Text>
+                <Text style={{ fontSize: 12, color: c.softMuted, fontFamily: fonts.sans.regular, marginTop: 1 }}>a partir de {active.label}</Text>
+              </View>
+              <Text style={{ fontSize: 17, fontFamily: fonts.serif.extra, color: active.color }}>{active.label}</Text>
+            </View>
+            {role === "cliente" ? (
+              <Pressable
+                onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); onRequest?.(active.id); onClose(); }}
+                style={{ backgroundColor: active.color, borderRadius: 14, height: 48, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}
+              >
+                <Ionicons name="arrow-forward" size={16} color="#fff" />
+                <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: "#fff" }}>Solicitar este prestador</Text>
+              </Pressable>
+            ) : (
+              <View style={{ backgroundColor: c.blueLight, borderRadius: 14, height: 44, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}>
+                <Ionicons name="bar-chart" size={15} color={c.blue} />
+                <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.blue }}>Análise de concorrência</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={{ position: "absolute", bottom: insets.bottom + 16, left: 16, right: 16, zIndex: 20 }}>
+            <View style={{ backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 16, paddingHorizontal: 16, paddingVertical: 10, alignItems: "center", flexDirection: "row", gap: 8 }}>
+              <Ionicons name="finger-print-outline" size={16} color="rgba(255,255,255,0.7)" />
+              <Text style={{ fontSize: 12, fontFamily: fonts.sans.regular, color: "rgba(255,255,255,0.85)" }}>
+                {role === "cliente" ? "Toque em um pin para solicitar" : "Toque em um pin para ver o concorrente"}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
 /* ─── ClienteMarketplace ─────────────────────────────────────────────── */
 function ClienteMarketplace() {
   const c = colors.light;
@@ -255,6 +355,7 @@ function ClienteMarketplace() {
   const [activePin, setActivePin] = useState<string | null>(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [mapExpanded, setMapExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 900);
@@ -288,7 +389,7 @@ function ClienteMarketplace() {
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.background }}>
+    <View style={{ flex: 1, backgroundColor: "#EDEAE3" }}>
       <TopNav
         title="Marketplace"
         subtitle="Encontre o profissional ideal"
@@ -332,6 +433,7 @@ function ClienteMarketplace() {
           title="Prestadores ao vivo"
           subtitle={`${onlinePins.length} online · disponíveis agora`}
           badgeColor={c.success}
+          onExpand={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setMapExpanded(true); }}
         />
 
         {/* Criar pedido customizado — abaixo do mapa */}
@@ -450,6 +552,7 @@ function ClienteMarketplace() {
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
       <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Cliente"} initials={initials} />
       <CustomOrderModal visible={orderModalOpen} onClose={() => setOrderModalOpen(false)} />
+      <MapExpandModal visible={mapExpanded} onClose={() => setMapExpanded(false)} pins={onlinePins} role="cliente" onRequest={(id) => { setActivePin(id); }} />
       <InfoSheet
         storageKey="ajudae_info_marketplace_cliente"
         title="Bem-vindo ao Marketplace"
@@ -474,6 +577,7 @@ function PrestadorMarketplace() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [activePin, setActivePin] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
 
@@ -506,7 +610,7 @@ function PrestadorMarketplace() {
     : 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.background }}>
+    <View style={{ flex: 1, backgroundColor: "#EDEAE3" }}>
       <TopNav
         title="Marketplace"
         subtitle="Pesquisa de mercado"
@@ -567,6 +671,7 @@ function PrestadorMarketplace() {
           title="Colegas na sua região"
           subtitle={`${peerPins.length} online agora`}
           badgeColor={c.blue}
+          onExpand={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setMapExpanded(true); }}
         />
 
         {/* Filters */}
@@ -667,6 +772,7 @@ function PrestadorMarketplace() {
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
       <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Prestador"} initials={initials} />
+      <MapExpandModal visible={mapExpanded} onClose={() => setMapExpanded(false)} pins={peerPins} role="prestador" />
       <InfoSheet
         storageKey="ajudae_info_marketplace_prestador"
         title="Pesquisa de Mercado"

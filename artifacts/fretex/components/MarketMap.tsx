@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import colors, { fonts, shadows } from "@/constants/colors";
 import type { Category } from "@/constants/mockData";
@@ -24,16 +25,24 @@ interface MarketMapProps {
   subtitle: string;
   badgeColor: string;
   height?: number;
+  onExpand?: () => void;
 }
 
-export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeColor, height = 260 }: MarketMapProps) {
+export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeColor, height = 260, onExpand }: MarketMapProps) {
   const c = colors.light;
 
   return (
     <View style={[styles.wrap, { backgroundColor: c.card, borderColor: c.border, height }, shadows.md]}>
       <MapSVG />
 
-      {/* Soft top gradient overlay handled by header card */}
+      {/* Dark gradient overlay at bottom */}
+      <LinearGradient
+        colors={["transparent", "rgba(0,0,0,0.38)"]}
+        style={styles.bottomGradient}
+        pointerEvents="none"
+      />
+
+      {/* Header card */}
       <View style={[styles.headerCard, { backgroundColor: c.card, borderColor: c.borderLight }, shadows.sm]}>
         <View style={[styles.headerDot, { backgroundColor: badgeColor }]} />
         <View style={{ flex: 1 }}>
@@ -82,6 +91,16 @@ export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeCo
       <Pressable style={[styles.recenter, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
         <MaterialCommunityIcons name="crosshairs-gps" size={16} color={c.text} />
       </Pressable>
+
+      {/* Expand tap affordance */}
+      {onExpand ? (
+        <Pressable onPress={onExpand} style={styles.expandHint}>
+          <View style={styles.expandPill}>
+            <Ionicons name="expand-outline" size={13} color="#fff" />
+            <Text style={styles.expandText}>Toque para explorar</Text>
+          </View>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -98,6 +117,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.13,
     shadowRadius: 18,
     elevation: 10,
+  },
+  bottomGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 90,
+    zIndex: 2,
   },
   headerCard: {
     position: "absolute",
@@ -153,6 +180,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.55)",
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 3,
   },
   meDotInner: { width: 8, height: 8, borderRadius: 4 },
   recenter: {
@@ -165,5 +193,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 5,
   },
+  expandHint: {
+    position: "absolute",
+    bottom: 14,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 6,
+  },
+  expandPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  expandText: { fontSize: 11, fontFamily: fonts.sans.bold, color: "#fff" },
 });
