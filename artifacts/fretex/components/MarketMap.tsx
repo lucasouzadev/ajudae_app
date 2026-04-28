@@ -1,10 +1,10 @@
-import React from "react";
+import React, { useRef } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import colors, { fonts, shadows } from "@/constants/colors";
 import type { Category } from "@/constants/mockData";
-import { MapSVG } from "./MapSVG";
+import { MapReal, MapRealRef } from "./MapReal";
 import { ProviderPin } from "./ProviderPin";
 
 export interface MapPin {
@@ -29,12 +29,30 @@ interface MarketMapProps {
   headerTop?: number;
 }
 
-export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeColor, height = 260, onExpand, headerTop = 12 }: MarketMapProps) {
+export function MarketMap({
+  pins,
+  activeId,
+  onPinPress,
+  title,
+  subtitle,
+  badgeColor,
+  height = 260,
+  onExpand,
+  headerTop = 12,
+}: MarketMapProps) {
   const c = colors.light;
+  const mapRef = useRef<MapRealRef>(null);
 
   return (
-    <View style={[styles.wrap, { backgroundColor: c.card, borderColor: c.border, height }, shadows.md]}>
-      <MapSVG />
+    <View
+      style={[styles.wrap, { backgroundColor: c.card, borderColor: c.border, height }, shadows.md]}
+    >
+      <MapReal
+        ref={mapRef}
+        pins={pins}
+        activeId={activeId}
+        onPinPress={onPinPress}
+      />
 
       {/* Dark gradient overlay at bottom */}
       <LinearGradient
@@ -44,52 +62,30 @@ export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeCo
       />
 
       {/* Header card */}
-      <View style={[styles.headerCard, { backgroundColor: c.card, borderColor: c.borderLight, top: headerTop }, shadows.sm]}>
+      <View
+        style={[
+          styles.headerCard,
+          { backgroundColor: c.card, borderColor: c.borderLight, top: headerTop },
+          shadows.sm,
+        ]}
+      >
         <View style={[styles.headerDot, { backgroundColor: badgeColor }]} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: c.text }]}>{title}</Text>
           <Text style={[styles.headerSub, { color: c.softMuted }]}>{subtitle}</Text>
         </View>
-        <View style={[styles.countPill, { backgroundColor: c.background, borderColor: c.borderLight }]}>
+        <View
+          style={[styles.countPill, { backgroundColor: c.background, borderColor: c.borderLight }]}
+        >
           <Text style={[styles.countTxt, { color: c.text }]}>{pins.length}</Text>
         </View>
       </View>
 
-      {/* Pins */}
-      {pins.map((p) => (
-        <View
-          key={p.id}
-          pointerEvents="box-none"
-          style={[
-            styles.pinHolder,
-            { left: `${p.lng - 8}%`, top: `${p.lat - 5}%` },
-          ]}
-        >
-          <View style={{ alignItems: "center" }}>
-            <ProviderPin
-              category={p.cat}
-              price={p.label}
-              color={p.color}
-              active={activeId === p.id}
-              onPress={() => onPinPress(p.id)}
-            />
-            {p.scheduled ? (
-              <View style={[styles.schedTag, { backgroundColor: c.card, borderColor: p.color }]}>
-                <Ionicons name="calendar" size={8} color={p.color} />
-                <Text style={[styles.schedTxt, { color: p.color }]}>agendado</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      ))}
-
-      {/* My location dot */}
-      <View style={[styles.meDotOuter, { borderColor: badgeColor }]}>
-        <View style={[styles.meDotInner, { backgroundColor: badgeColor }]} />
-      </View>
-
       {/* Recenter button */}
-      <Pressable style={[styles.recenter, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+      <Pressable
+        style={[styles.recenter, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+        onPress={() => mapRef.current?.recenter()}
+      >
         <MaterialCommunityIcons name="crosshairs-gps" size={16} color={c.text} />
       </Pressable>
 
@@ -153,36 +149,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   countTxt: { fontSize: 12, fontFamily: fonts.sans.bold },
-  pinHolder: {
-    position: "absolute",
-    width: 80,
-    alignItems: "center",
-  },
-  schedTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  schedTxt: { fontSize: 8, fontFamily: fonts.sans.bold, letterSpacing: 0.3 },
-  meDotOuter: {
-    position: "absolute",
-    bottom: 18,
-    right: 18,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 3,
-    backgroundColor: "rgba(255,255,255,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 3,
-  },
-  meDotInner: { width: 8, height: 8, borderRadius: 4 },
   recenter: {
     position: "absolute",
     right: 12,

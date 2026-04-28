@@ -12,8 +12,7 @@ import colors, { fonts, shadows } from "@/constants/colors";
 import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
-import { MapSVG } from "@/components/MapSVG";
-import { ProviderPin } from "@/components/ProviderPin";
+import { MapReal, type MapRealRef } from "@/components/MapReal";
 import { Chip } from "@/components/Chip";
 import { ProviderModal } from "@/components/ProviderModal";
 import { Skeleton } from "@/components/Skeleton";
@@ -1283,6 +1282,7 @@ function ClienteHome() {
   const [active, setActive] = useState<Provider | null>(null);   // pin focado (1º toque)
   const [pinCardVisible, setPinCardVisible] = useState(false);
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
+  const mapRef = useRef<MapRealRef>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -1335,50 +1335,25 @@ function ClienteHome() {
           }],
         }}
       >
-        <MapSVG />
-        {/* User location */}
-        <View style={[styles.userLocWrap, { top: "32%" }]} pointerEvents="none">
-          <View style={[styles.userPulse, { backgroundColor: `${c.blue}33` }]} />
-          <View style={[styles.userDot, { backgroundColor: c.blue, borderColor: c.card }]} />
-        </View>
-
-        {/* Pins — tap seleciona provider */}
-        {filtered.map((p) => {
-          const topPct = 14 + (p.lat / 100) * 40;
-          return (
-            <View
-              key={p.id}
-              style={{
-                position: "absolute",
-                left: `${p.lng}%`,
-                top: `${topPct}%`,
-                transform: [{ translateX: -30 }, { translateY: -16 }],
-                zIndex: 20,
-              }}
-            >
-              <ProviderPin
-                category={p.cat}
-                price={p.price}
-                color={p.color}
-                active={active?.id === p.id}
-                onPress={() => {
-                  if (active?.id === p.id) {
-                    // 2º toque → abre modal
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                    setModalProvider(p);
-                    setActive(null);
-                    setPinCardVisible(false);
-                  } else {
-                    // 1º toque → foco no pin
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                    setActive(p);
-                    setPinCardVisible(true);
-                  }
-                }}
-              />
-            </View>
-          );
-        })}
+        <MapReal
+          ref={mapRef}
+          pins={filtered.map((p) => ({ id: p.id, cat: p.cat, color: p.color, label: p.price, lat: p.lat, lng: p.lng }))}
+          activeId={active?.id ?? null}
+          onPinPress={(id) => {
+            const p = filtered.find((x) => x.id === id);
+            if (!p) return;
+            if (active?.id === id) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+              setModalProvider(p);
+              setActive(null);
+              setPinCardVisible(false);
+            } else {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              setActive(p);
+              setPinCardVisible(true);
+            }
+          }}
+        />
 
         {/* Botão de localização — canto inferior direito do mapa */}
         <Animated.View
@@ -1395,7 +1370,7 @@ function ClienteHome() {
         >
           <Pressable
             style={[styles.locateBtn, { backgroundColor: c.card }, shadows.md]}
-            onPress={() => { /* TODO: centralizar no GPS real */ }}
+            onPress={() => { mapRef.current?.recenter(); }}
           >
             <Ionicons name="locate" size={20} color={c.blue} />
           </Pressable>

@@ -57,6 +57,8 @@
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
-    "@expo-google-fonts/fraunces": "^0.4.1"
+    "@expo-google-fonts/fraunces": "^0.4.1",
+    "expo-dev-client": "~6.0.21",
+    "react-native-maps": "1.20.1"
   }
 }

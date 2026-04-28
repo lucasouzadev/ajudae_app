@@ -18,6 +18,9 @@
       "bundleIdentifier": "com.ajuda.app",
       "config": {
         "googleMapsApiKey": "AIzaSyBqvnNAAs_wdQ00HwdnqgmZ73kHO8uBny8"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

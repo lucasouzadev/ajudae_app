@@ -1,0 +1,91 @@
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { StyleSheet } from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import * as Location from "expo-location";
+import { ProviderPin } from "./ProviderPin";
+import type { Category } from "@/constants/mockData";
+
+export interface MapPin {
+  id: string;
+  cat: Category;
+  color: string;
+  label: string;
+  lat: number;
+  lng: number;
+  scheduled?: boolean;
+}
+
+export interface MapRealRef {
+  recenter: () => Promise<void>;
+}
+
+interface MapRealProps {
+  pins: MapPin[];
+  activeId?: string | null;
+  onPinPress: (id: string) => void;
+}
+
+const RIO_DEFAULT = {
+  latitude: -22.9068,
+  longitude: -43.1729,
+  latitudeDelta: 0.09,
+  longitudeDelta: 0.09,
+};
+
+export const MapReal = forwardRef<MapRealRef, MapRealProps>(
+  ({ pins, activeId, onPinPress }, ref) => {
+    const mapRef = useRef<MapView>(null);
+    const [region, setRegion] = useState(RIO_DEFAULT);
+
+    useImperativeHandle(ref, () => ({
+      recenter: async () => {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const loc = await Location.getCurrentPositionAsync({});
+        const newRegion = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.04,
+          longitudeDelta: 0.04,
+        };
+        setRegion(newRegion);
+        mapRef.current?.animateToRegion(newRegion, 600);
+      },
+    }));
+
+    return (
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        style={StyleSheet.absoluteFill}
+        initialRegion={region}
+        showsUserLocation
+        showsMyLocationButton={false}
+        showsCompass={false}
+        toolbarEnabled={false}
+      >
+        {pins.map((p) => (
+          <Marker
+            key={p.id}
+            coordinate={{ latitude: p.lat, longitude: p.lng }}
+            tracksViewChanges={activeId === p.id}
+            anchor={{ x: 0.5, y: 1 }}
+          >
+            <ProviderPin
+              category={p.cat}
+              price={p.label}
+              color={p.color}
+              active={activeId === p.id}
+              onPress={() => onPinPress(p.id)}
+            />
+          </Marker>
+        ))}
+      </MapView>
+    );
+  }
+);
