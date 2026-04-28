@@ -12,7 +12,12 @@
       "Bash(git commit -m 'fix: safe-area no MapExpandModal — status-bar não invadia o conteúdo *)",
       "Bash(npx expo *)",
       "Bash(pkill -f \"expo start\")",
-      "Bash(git commit -m 'fix: descer banner '\\\\''Prestadores disponíveis'\\\\'' no MapExpandModal *)"
+      "Bash(git commit -m 'fix: descer banner '\\\\''Prestadores disponíveis'\\\\'' no MapExpandModal *)",
+      "Bash(rm -rf node_modules/.pnpm)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm add *)",
+      "Bash(npm install *)",
+      "Bash(git commit -m 'feat: setup Google Maps para o projeto *)"
     ]
   }
 }

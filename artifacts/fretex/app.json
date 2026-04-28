@@ -15,10 +15,18 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.ajuda.app"
+      "bundleIdentifier": "com.ajuda.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyBqvnNAAs_wdQ00HwdnqgmZ73kHO8uBny8"
+      }
     },
     "android": {
-      "package": "com.ajuda.app"
+      "package": "com.ajuda.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBqvnNAAs_wdQ00HwdnqgmZ73kHO8uBny8"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -31,7 +39,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "react-native-maps"
     ],
     "experiments": {
       "typedRoutes": true,
