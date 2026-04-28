@@ -1268,7 +1268,8 @@ function ClienteHome() {
   const { active: activeService } = useService();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
-  const [active, setActive] = useState<Provider | null>(null);
+  const [active, setActive] = useState<Provider | null>(null);   // pin focado (1º toque)
+  const [pinCardVisible, setPinCardVisible] = useState(false);
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1338,7 +1339,18 @@ function ClienteHome() {
                 price={p.price}
                 color={p.color}
                 active={active?.id === p.id}
-                onPress={() => setActive(active?.id === p.id ? null : p)}
+                onPress={() => {
+                  if (active?.id === p.id) {
+                    // 2º toque → abre modal
+                    setModalProvider(p);
+                    setActive(null);
+                    setPinCardVisible(false);
+                  } else {
+                    // 1º toque → foco no pin
+                    setActive(p);
+                    setPinCardVisible(true);
+                  }
+                }}
               />
             </View>
           );
@@ -1508,13 +1520,21 @@ function ClienteHome() {
               <Text style={[styles.activePriceText, { color: "#fff" }]}>{active.price}</Text>
               <Text style={[styles.activePriceSub, { color: "rgba(255,255,255,0.7)" }]}>desde</Text>
             </View>
+            {/* 2º toque no pin abre o modal; botão rápido também abre */}
             <Pressable
-              onPress={() => setModalProvider(active)}
+              onPress={() => { setModalProvider(active); setActive(null); setPinCardVisible(false); }}
               style={[styles.activeRequestBtn, { backgroundColor: "#fff" }]}
             >
-              <Ionicons name="flash" size={14} color={active.color} />
-              <Text style={[styles.activeRequestText, { color: active.color }]}>Solicitar</Text>
+              <Ionicons name="person-outline" size={14} color={active.color} />
+              <Text style={[styles.activeRequestText, { color: active.color }]}>Ver perfil</Text>
             </Pressable>
+          </View>
+          {/* Hint de segundo toque */}
+          <View style={styles.pinCardHint}>
+            <Ionicons name="location" size={10} color="rgba(255,255,255,0.7)" />
+            <Text style={[styles.pinCardHintText, { color: "rgba(255,255,255,0.7)" }]}>
+              Toque no pin novamente para ver o perfil completo
+            </Text>
           </View>
         </View>
         </Animated.View>
@@ -1524,7 +1544,16 @@ function ClienteHome() {
       <ProvidersSheet
         providers={filtered}
         active={active}
-        onSelect={(p) => setActive(active?.id === p.id ? null : p)}
+        onSelect={(p) => {
+          if (active?.id === p.id) {
+            setModalProvider(p);
+            setActive(null);
+            setPinCardVisible(false);
+          } else {
+            setActive(p);
+            setPinCardVisible(true);
+          }
+        }}
         onOpenProfile={(p) => router.push(`/provider/${p.id}`)}
         onSeeAll={() => router.push("/marketplace")}
         insetsBottom={insets.bottom}
@@ -1676,6 +1705,21 @@ function PrestadorHome() {
             ))}
           </View>
         )}
+
+        {/* Portfólio — acesso rápido */}
+        <Pressable
+          onPress={() => router.push("/portfolio")}
+          style={[styles.portfolioEntry, { backgroundColor: c.card, borderColor: c.border }]}
+        >
+          <View style={[styles.portfolioIcon, { backgroundColor: `${c.primary}18` }]}>
+            <Ionicons name="briefcase-outline" size={18} color={c.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.portfolioTitle, { color: c.text }]}>Meu Portfólio</Text>
+            <Text style={[styles.portfolioSub, { color: c.softMuted }]}>Personalize como os clientes te veem</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
+        </Pressable>
 
         {/* Hot area banner */}
         <HotAreaBanner onPress={() => router.push("/marketplace")} />
@@ -1939,6 +1983,17 @@ const styles = StyleSheet.create({
   requestRefuseText: { fontSize: 12, fontFamily: fonts.sans.semibold },
   requestAccept: { flex: 2, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   requestAcceptText: { color: "#fff", fontSize: 13, fontFamily: fonts.sans.bold },
+
+  pinCardHint: { flexDirection: "row", alignItems: "center", gap: 4, paddingTop: 6, paddingHorizontal: 2 },
+  pinCardHintText: { fontSize: 10, fontFamily: fonts.sans.regular },
+
+  portfolioEntry: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
+  },
+  portfolioIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  portfolioTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
+  portfolioSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 1 },
 
   tipsCard: { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 16 },
   tipsIconWrap: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },

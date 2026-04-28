@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, KeyboardAvoidingView, Platform } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -47,7 +47,11 @@ export default function RateScreen() {
   };
 
   return (
-    <View style={[styles.wrap, { backgroundColor: c.background, paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.wrap, { backgroundColor: c.background, paddingTop: insets.top }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
       <View style={styles.header}>
         <View style={{ width: 40 }} />
         <Text style={[styles.headerTitle, { color: c.text }]}>Avaliar serviço</Text>
@@ -56,7 +60,11 @@ export default function RateScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 140 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ padding: 24, paddingBottom: 140 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={[styles.providerBox, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <LinearGradient
             colors={[active.providerColor || accent, (active.providerColor || accent) + "AA"]}
@@ -119,7 +127,7 @@ export default function RateScreen() {
           <Text style={styles.btnTxt}>{submitting ? "Enviando..." : "Enviar avaliação"}</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

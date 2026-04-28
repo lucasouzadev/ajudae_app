@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Image } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Image, KeyboardAvoidingView, Platform } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -63,7 +63,11 @@ export default function TicketScreen() {
   }
 
   return (
-    <View style={[styles.wrap, { backgroundColor: c.background, paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.wrap, { backgroundColor: c.background, paddingTop: insets.top }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={[styles.iconBtn, { backgroundColor: c.card, borderColor: c.border }]}>
           <Ionicons name="close" size={18} color={c.text} />
@@ -72,7 +76,11 @@ export default function TicketScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 130 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ padding: 24, paddingBottom: 130 + insets.bottom }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {active ? (
           <View style={[styles.refCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <Ionicons name="document-text" size={16} color={c.softMuted} />
@@ -143,7 +151,7 @@ export default function TicketScreen() {
           <Text style={styles.btnTxt}>{submitting ? "Enviando..." : "Enviar ticket"}</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
