@@ -1278,11 +1278,11 @@ function ClienteHome() {
   const { user } = useAuth();
   const { active: activeService } = useService();
   const insets = useSafeAreaInsets();
+  const mapRef = useRef<MapRealRef>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [active, setActive] = useState<Provider | null>(null);   // pin focado (1º toque)
   const [pinCardVisible, setPinCardVisible] = useState(false);
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
-  const mapRef = useRef<MapRealRef>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
