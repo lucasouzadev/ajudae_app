@@ -543,12 +543,6 @@ function PrestadorMarketplace() {
           ) : null}
         </View>
 
-        {/* Read-only notice compacta */}
-        <View style={[styles.readonlyRow, { backgroundColor: c.blueLight, borderColor: `${c.blue}33` }]}>
-          <Ionicons name="eye" size={13} color={c.blue} />
-          <Text style={[styles.readonlyRowText, { color: c.blue }]}>Apenas visualização · solicitações só pelo cliente</Text>
-        </View>
-
         {/* Pulse metrics */}
         <View style={styles.pulseRow}>
           <View style={[styles.pulseCell, { backgroundColor: c.blueLight }]}>

@@ -89,10 +89,15 @@ export function MarketMap({ pins, activeId, onPinPress, title, subtitle, badgeCo
 const styles = StyleSheet.create({
   wrap: {
     borderRadius: 22,
-    borderWidth: 1,
+    borderWidth: 1.5,
     overflow: "hidden",
     position: "relative",
     marginBottom: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.13,
+    shadowRadius: 18,
+    elevation: 10,
   },
   headerCard: {
     position: "absolute",

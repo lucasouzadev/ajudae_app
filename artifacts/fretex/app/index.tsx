@@ -459,6 +459,13 @@ const pStyles = StyleSheet.create({
   cardTitle: { flex: 1, fontSize: 13, fontFamily: fonts.serif.extra },
   cardBadge: { fontSize: 11, fontFamily: fonts.sans.bold, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
 
+  /* Market stats grid */
+  statsGrid: { flexDirection: "row", gap: 8, marginBottom: 4 },
+  statCard: { flex: 1, borderRadius: 14, padding: 14, alignItems: "center" },
+  statVal: { fontSize: 18, fontFamily: fonts.serif.extra, marginBottom: 2 },
+  statLbl: { fontSize: 11, fontFamily: fonts.sans.bold, marginBottom: 2 },
+  statSub: { fontSize: 11, fontFamily: fonts.sans.regular },
+
   /* Hot area banner */
   hotBanner: {
     flexDirection: "row",
@@ -557,19 +564,32 @@ function PrestadorHubSheet({
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {tab === "analise" && (
             <>
-              <View style={[hubStyles.section, { backgroundColor: c.card, borderColor: c.border }]}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
-                  <Text style={[hubStyles.sectionTitle, { color: c.text }]}>Radar do mercado</Text>
-                  <Text style={[hubStyles.sectionBadge, { color: def.color }]}>6 publicações perto</Text>
+              {/* Mercado — cards por categoria */}
+              <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <View style={pStyles.cardHead}>
+                  <Ionicons name="bar-chart-outline" size={15} color={def.color} />
+                  <Text style={[pStyles.cardTitle, { color: c.text }]}>Radar do mercado</Text>
+                  <Text style={[pStyles.cardBadge, { backgroundColor: c.blueLight, color: c.blue }]}>6 perto</Text>
                 </View>
                 <View style={pStyles.statsGrid}>
-                  {market.map((m) => (
-                    <View key={m.label} style={[pStyles.statCard, { backgroundColor: c.background }]}>
-                      <Text style={[pStyles.statVal, { color: c.text }]}>{m.val}</Text>
-                      <Text style={[pStyles.statLbl, { color: c.softMuted }]}>{m.label}</Text>
-                      <Text style={[pStyles.statSub, { color: m.sub.startsWith("+") ? c.success : c.warning }]}>{m.sub}</Text>
-                    </View>
-                  ))}
+                  {market.map((m) => {
+                    const up = m.sub.startsWith("+");
+                    const subColor = up ? c.success : c.warning;
+                    const subBg = up ? c.successLight : c.warningLight;
+                    return (
+                      <View key={m.label} style={[pStyles.statCard, { backgroundColor: c.background }]}>
+                        <Text style={[pStyles.statVal, { color: c.text }]}>{m.val}</Text>
+                        <Text style={[pStyles.statLbl, { color: c.sub }]}>{m.label}</Text>
+                        <View style={[{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: subBg, marginTop: 2 }]}>
+                          <Text style={[pStyles.statSub, { color: subColor, fontFamily: fonts.sans.bold }]}>{m.sub}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.borderLight }}>
+                  <Ionicons name="time-outline" size={13} color={c.softMuted} />
+                  <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted }}>Variação em relação à semana anterior</Text>
                 </View>
               </View>
               <PriceSuggestion />
@@ -1277,12 +1297,19 @@ function ClienteHome() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      {/* Map area — ocupa tela inteira; sheet se posiciona na frente */}
-      <View
+      {/* Map area — ocupa tela inteira; sheet se posiciona na frente; escala diminui para visão compacta quando expandido */}
+      <Animated.View
         style={{
           position: "absolute",
           top: 0, left: 0, right: 0, bottom: 0,
           overflow: "hidden",
+          transform: [{
+            scale: sheetHeightAnim.interpolate({
+              inputRange: [COLLAPSED_H, EXPANDED_H],
+              outputRange: [1, 0.82],
+              extrapolate: "clamp",
+            }),
+          }],
         }}
       >
         <MapSVG />
@@ -1337,7 +1364,7 @@ function ClienteHome() {
             <Ionicons name="locate" size={20} color={c.blue} />
           </Pressable>
         </Animated.View>
-      </View>
+      </Animated.View>
 
       <TopNav
         title="Ajudaê!"
@@ -1720,6 +1747,27 @@ function PrestadorHome() {
           </View>
         ) : null}
 
+        {/* Dicas para aumentar ganhos */}
+        <View style={[styles.tipsCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <View style={[styles.tipsIconWrap, { backgroundColor: `${c.primary}18` }]}>
+              <Ionicons name="bulb-outline" size={16} color={c.primary} />
+            </View>
+            <Text style={[styles.tipsTitle, { color: c.text }]}>Como ganhar mais</Text>
+          </View>
+          {PROVIDER_TIPS.map((tip, i) => (
+            <View key={i} style={[styles.tipRow, { borderTopColor: c.borderLight }]}>
+              <View style={[styles.tipIconWrap, { backgroundColor: `${tip.color}18` }]}>
+                <Ionicons name={tip.icon as any} size={15} color={tip.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.tipLabel, { color: c.text }]}>{tip.label}</Text>
+                <Text style={[styles.tipDesc, { color: c.sub }]}>{tip.desc}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
       </ScrollView>
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1741,6 +1789,12 @@ function PrestadorHome() {
     </View>
   );
 }
+
+const PROVIDER_TIPS = [
+  { icon: "time-outline", color: "#2563EB", label: "Responda rápido", desc: "Prestadores que aceitam em menos de 2 min têm 3× mais pedidos." },
+  { icon: "star-outline", color: "#D97706", label: "Mantenha a nota acima de 4.7", desc: "Avaliações altas aparecem primeiro para clientes próximos." },
+  { icon: "location-outline", color: "#16A34A", label: "Expanda sua área de atuação", desc: "Atender mais bairros aumenta sua visibilidade no mapa." },
+];
 
 const CLIENTE_HOME_INFO: InfoItem[] = [
   { icon: "map-outline", color: "#2563EB", title: "Mapa ao vivo", description: "Veja os prestadores disponíveis no mapa. Toque em um pin para ver detalhes e solicitar o serviço." },
@@ -1885,6 +1939,14 @@ const styles = StyleSheet.create({
   requestRefuseText: { fontSize: 12, fontFamily: fonts.sans.semibold },
   requestAccept: { flex: 2, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   requestAcceptText: { color: "#fff", fontSize: 13, fontFamily: fonts.sans.bold },
+
+  tipsCard: { borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 16 },
+  tipsIconWrap: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  tipsTitle: { fontSize: 13, fontFamily: fonts.serif.extra, flex: 1 },
+  tipRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingTop: 12, marginTop: 4, borderTopWidth: 1 },
+  tipIconWrap: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  tipLabel: { fontSize: 12, fontFamily: fonts.sans.bold, marginBottom: 2 },
+  tipDesc: { fontSize: 11, fontFamily: fonts.sans.regular, lineHeight: 16 },
 });
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
