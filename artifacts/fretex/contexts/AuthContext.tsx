@@ -1,17 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase, Profile } from '../lib/supabase';
 
 type Role = 'cliente' | 'prestador';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: Role;
-  onboardingCompleted: boolean;
+// Map UI roles (Portuguese) ↔ DB roles (English)
+function toDbRole(role: Role): 'client' | 'provider' {
+  return role === 'cliente' ? 'client' : 'provider';
+}
+function toUiRole(dbRole: string): Role {
+  return dbRole === 'client' ? 'cliente' : 'prestador';
+}
+
+interface User extends Profile {
+  onboardingCompleted?: boolean;
   gpsGranted?: boolean;
-  verified?: boolean;
 }
 
 interface AuthContextType {
@@ -34,57 +37,209 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadUser();
+    // Check existing session on app launch
+    checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        // Fetch user profile from database
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile) {
+          const userData: User = {
+            ...profile,
+            email: session.user.email || '',
+            onboardingCompleted: true,
+          };
+          setUser(userData);
+          setRole(toUiRole(profile.role));
+          await AsyncStorage.setItem('@fretex_user', JSON.stringify(userData));
+        }
+      } else {
+        setUser(null);
+        setRole('cliente');
+        await AsyncStorage.removeItem('@fretex_user');
+      }
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
-  const loadUser = async () => {
+  const checkSession = async () => {
     try {
-      const stored = await AsyncStorage.getItem('@fretex_user');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setUser(parsed);
-        setRole(parsed.role);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile) {
+          const userData: User = {
+            ...profile,
+            email: session.user.email || '',
+            onboardingCompleted: true,
+          };
+          setUser(userData);
+          setRole(toUiRole(profile.role));
+        }
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error('Error checking session:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const login = async (email: string, senha: string) => {
-    const mockUser: User = { id: '1', name: 'João Silva', email, role: 'cliente', onboardingCompleted: true };
-    await AsyncStorage.setItem('@fretex_user', JSON.stringify(mockUser));
-    setUser(mockUser);
-    setRole('cliente');
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: senha,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile) {
+          const userData: User = {
+            ...profile,
+            email: data.user.email || '',
+            onboardingCompleted: true,
+          };
+          setUser(userData);
+          setRole(toUiRole(profile.role));
+          await AsyncStorage.setItem('@fretex_user', JSON.stringify(userData));
+        }
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   const signup = async (nome: string, email: string, telefone: string, senha: string, role: Role) => {
-    const mockUser: User = { id: '2', name: nome, email, role, onboardingCompleted: false, verified: role === 'cliente' };
-    await AsyncStorage.setItem('@fretex_user', JSON.stringify(mockUser));
-    setUser(mockUser);
-    setRole(role);
+    try {
+      // Create auth user
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: senha,
+        options: {
+          data: { name: nome },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        // Create user profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              name: nome,
+              email,
+              phone: telefone,
+              role: toDbRole(role),
+              is_active: true,
+            },
+          ])
+          .select()
+          .single();
+
+        if (profileError) throw profileError;
+
+        if (profile) {
+          const userData: User = {
+            ...profile,
+            email,
+            onboardingCompleted: true,
+          };
+          setUser(userData);
+          setRole(role);
+          await AsyncStorage.setItem('@fretex_user', JSON.stringify(userData));
+        }
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
+    }
   };
 
   const completeOnboarding = async (name: string, phone: string, gpsGranted: boolean) => {
     if (!user) return;
-    const updated: User = { ...user, name, phone, gpsGranted, onboardingCompleted: true };
-    await AsyncStorage.setItem('@fretex_user', JSON.stringify(updated));
-    setUser(updated);
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ name, phone })
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const updated: User = { ...data, email: user.email, onboardingCompleted: true, gpsGranted };
+        setUser(updated);
+        await AsyncStorage.setItem('@fretex_user', JSON.stringify(updated));
+      }
+    } catch (error) {
+      console.error('Onboarding error:', error);
+      throw error;
+    }
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('@fretex_user');
-    setUser(null);
-    setRole('cliente');
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setRole('cliente');
+      await AsyncStorage.removeItem('@fretex_user');
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
   const switchRole = async (newRole: Role) => {
     if (!user) return;
-    const updated = { ...user, role: newRole };
-    await AsyncStorage.setItem('@fretex_user', JSON.stringify(updated));
-    setUser(updated);
-    setRole(newRole);
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ role: toDbRole(newRole) })
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const updated: User = { ...data, email: user.email, onboardingCompleted: true };
+        setUser(updated);
+        setRole(newRole);
+        await AsyncStorage.setItem('@fretex_user', JSON.stringify(updated));
+      }
+    } catch (error) {
+      console.error('Switch role error:', error);
+      throw error;
+    }
   };
 
   return (

@@ -36,7 +36,7 @@ export function MarketMap({
   title,
   subtitle,
   badgeColor,
-  height = 260,
+  height = 310,
   onExpand,
   headerTop = 12,
 }: MarketMapProps) {

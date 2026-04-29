@@ -1320,19 +1320,12 @@ function ClienteHome() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      {/* Map area — ocupa tela inteira; sheet se posiciona na frente; escala diminui para visão compacta quando expandido */}
+      {/* Map area — ocupa tela inteira; sheet se posiciona na frente */}
       <Animated.View
         style={{
           position: "absolute",
           top: 0, left: 0, right: 0, bottom: 0,
           overflow: "hidden",
-          transform: [{
-            scale: sheetHeightAnim.interpolate({
-              inputRange: [COLLAPSED_H, EXPANDED_H],
-              outputRange: [1, 0.82],
-              extrapolate: "clamp",
-            }),
-          }],
         }}
       >
         <MapReal
@@ -2308,7 +2301,7 @@ const styles = StyleSheet.create({
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
 const SCREEN_H = Dimensions.get("window").height;
-const COLLAPSED_H = 164;  // handle + título + mini cards carousel (sem padding extra)
+const COLLAPSED_H = 280;  // mapa maior quando sheet compacto
 const CHIP_ROW_H  = 52;   // altura da faixa flutuante de filtros
 const MINI_CARD_H = 82;   // altura fixa dos mini cards no carrossel
 const EXPANDED_H = Math.min(SCREEN_H * 0.63, 540);

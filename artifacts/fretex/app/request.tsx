@@ -82,26 +82,30 @@ export default function RequestFlowScreen() {
     }
     // submit
     setSubmitting(true);
-    const customerName = user?.name || "Cliente Ajudaê";
-    const initials = customerName.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-    await createService({
-      customerId: user?.id || "u-demo",
-      customerName,
-      customerInitials: initials,
-      customerColor: c.blue,
-      customerRating: 4.9,
-      category,
-      origin,
-      destination: destination.trim() || undefined,
-      description,
-      photos,
-      needsHelper,
-      scheduled,
-      scheduledFor,
-      estimatedPrice,
-    });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    router.replace("/otp-modal");
+    try {
+      const customerName = user?.name || "Cliente Ajudaê";
+      const initials = customerName.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+      await createService({
+        customerId: user?.id || "u-demo",
+        customerName,
+        customerInitials: initials,
+        customerColor: c.blue,
+        customerRating: 4.9,
+        category,
+        origin,
+        destination: destination.trim() || undefined,
+        description,
+        photos,
+        needsHelper,
+        scheduled,
+        scheduledFor,
+        estimatedPrice,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      router.replace("/otp-modal");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleBack = () => {

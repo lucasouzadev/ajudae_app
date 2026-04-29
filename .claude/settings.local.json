@@ -29,7 +29,9 @@
       "Bash(git commit -m 'docs: Google Maps setup documentation completo *)",
       "Bash(git commit -m 'docs: instruções práticas para finalizar Google Maps setup *)",
       "Bash(git commit -m 'docs: resumo executivo da sessão Google Maps *)",
-      "Bash(git commit -m 'docs: Como acompanhar status do EAS build *)"
+      "Bash(git commit -m 'docs: Como acompanhar status do EAS build *)",
+      "WebFetch(domain:rlehpgvvevarpkkamied.supabase.co)",
+      "Bash(curl -s \"https://rlehpgvvevarpkkamied.supabase.co/rest/v1/?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJsZWhwZ3Z2ZXZhcnBra2FtaWVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDUzMDgsImV4cCI6MjA4ODU4MTMwOH0.pUG8lDiQ7E7hDJTYoYZd-aPoTMGAFhis3gID6N1AFUE\")"
     ]
   }
 }
