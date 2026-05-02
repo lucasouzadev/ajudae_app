@@ -10,11 +10,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-/**
- * Supabase client instance for Ajudaê React Native app
- * - Uses AsyncStorage for token persistence
- * - Configured for Expo (React Native)
- */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: AsyncStorage,
@@ -24,40 +19,114 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-/**
- * Type definitions for database tables
- * Generated from Supabase schema
- */
+// ─── Enums (mirror of DB enums) ────────────────────────────────────────────
+
+export type UserRole = 'client' | 'provider' | 'admin';
+
+export type RequestStatus =
+  | 'requested'
+  | 'accepted'
+  | 'en_route'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'expired'
+  | 'disputed';
+
+export type CancelReason =
+  | 'client_gave_up'
+  | 'provider_unavailable'
+  | 'wrong_address'
+  | 'price_disagreement'
+  | 'no_show'
+  | 'other';
+
+export type TicketStatus = 'open' | 'in_review' | 'resolved' | 'closed';
+
+export type VehicleType = 'car' | 'utility' | 'van' | 'truck_small' | 'truck_large';
+
+export type PaymentStatus = 'pending' | 'authorized' | 'captured' | 'refunded' | 'failed';
+
+// ─── Table types (match actual DB schema) ──────────────────────────────────
+
+/** public.profiles — created automatically via handle_new_user trigger */
 export interface Profile {
   id: string;
-  role: 'client' | 'provider';
+  role: UserRole;
   name: string;
   phone?: string;
+  cpf?: string;
   avatar_url?: string;
   is_active: boolean;
+  lat?: number;
+  lng?: number;
+  lgpd_accepted: boolean;
+  geolocation_requested: boolean;
+  camera_requested: boolean;
+  notifications_requested: boolean;
+  last_consent_update?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface Provider extends Profile {
+/** public.providers — separate table, FK → profiles.id */
+export interface ProviderRow {
+  id: string;
   verified: boolean;
+  active: boolean;
   bio?: string;
-  location_lat: number;
-  location_lng: number;
-  vehicle_type?: string;
+  service_radius_km: number;
+  location_lat?: number;
+  location_lng?: number;
+  location_updated_at?: string;
+  vehicle_type?: VehicleType;
   vehicle_plate?: string;
-  capacity_kg?: number;
-  rating_avg?: number;
-  rating_count?: number;
-  service_radius_km?: number;
+  vehicle_capacity_kg?: number;
+  vehicle_model?: string;
+  vehicle_year?: number;
+  service_type?: 'frete' | 'mudanca' | 'entrega';
+  service_category?: string;
+  rating_avg: number;
+  rating_count: number;
+  onboarding_status: 'incomplete' | 'submitted' | 'approved' | 'rejected';
+  cpf?: string;
+  birth_date?: string;
+  contact_method?: 'ligacao' | 'whatsapp';
+  contact_availability?: string;
+  doc_rg_url?: string;
+  doc_residence_url?: string;
+  doc_cnh_url?: string;
+  doc_crlv_url?: string;
+  doc_selfie_url?: string;
+  kyc_status: 'not_started' | 'in_progress' | 'approved' | 'manual_review' | 'rejected';
+  kyc_report_id?: string;
+  kyc_completed_at?: string;
+  kyc_score?: number;
+  submitted_at?: string;
+  validation_notes?: string;
+  rejection_reason?: string;
+  rejection_until?: string;
+  created_at: string;
+  updated_at: string;
 }
 
+/** public.categories */
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  icon_url?: string;
+  active: boolean;
+  created_at: string;
+}
+
+/** public.requests */
 export interface ServiceRequest {
   id: string;
   client_id: string;
   provider_id?: string;
   category_id: string;
-  status: 'requested' | 'accepted' | 'en_route' | 'in_progress' | 'completed' | 'cancelled' | 'disputed';
+  status: RequestStatus;
   address_origin: string;
   address_dest?: string;
   origin_lat?: number;
@@ -65,7 +134,7 @@ export interface ServiceRequest {
   dest_lat?: number;
   dest_lng?: number;
   description?: string;
-  media_urls?: string[];
+  media_urls: string[];
   needs_helper: boolean;
   scheduled_for?: string;
   price_estimated?: number;
@@ -73,32 +142,63 @@ export interface ServiceRequest {
   platform_fee?: number;
   otp_code_hash?: string;
   otp_expires_at?: string;
-  cancel_reason?: string;
+  cancel_reason?: CancelReason;
   cancel_note?: string;
   cancelled_by?: string;
   expires_at: string;
+  payment_status?: PaymentStatus;
+  payment_intent_id?: string;
+  payment_captured_at?: string;
+  payment_amount?: number;
   created_at: string;
   updated_at: string;
 }
 
+/** public.request_events — append-only audit log */
+export interface RequestEvent {
+  id: string;
+  request_id: string;
+  actor_id?: string;
+  from_status?: RequestStatus;
+  to_status: string;
+  meta: Record<string, unknown>;
+  created_at: string;
+}
+
+/** public.tickets */
+export interface Ticket {
+  id: string;
+  request_id: string;
+  opened_by: string;
+  status: TicketStatus;
+  reason: string;
+  description?: string;
+  media_urls: string[];
+  resolved_by?: string;
+  resolution?: string;
+  notes_admin?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** public.ratings */
 export interface Rating {
   id: string;
   request_id: string;
-  rater_id: string;
-  ratee_id: string;
-  score: number; // 1-5
+  client_id: string;
+  provider_id: string;
+  stars: 1 | 2 | 3 | 4 | 5;
   comment?: string;
   created_at: string;
 }
 
-export interface Ticket {
-  id: string;
-  request_id?: string;
-  user_id: string;
-  category: 'dispute' | 'damage' | 'lost_item' | 'other';
-  status: 'open' | 'in_review' | 'resolved' | 'closed';
-  subject: string;
-  description: string;
-  created_at: string;
-  resolved_at?: string;
+/** public.provider_locations */
+export interface ProviderLocation {
+  provider_id: string;
+  lat: number;
+  lng: number;
+  heading?: number;
+  accuracy_m?: number;
+  captured_at: string;
+  source: 'gps' | 'manual' | 'system';
 }

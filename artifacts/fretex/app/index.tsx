@@ -1624,6 +1624,8 @@ function PrestadorHome() {
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
   const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const firstName = (user?.name || "Carlos").split(" ")[0];
+  const providerNeedsValidation = user?.accountStatus === "provider_needs_validation";
+  const providerPendingReview = user?.accountStatus === "provider_pending_review";
 
   const incoming = activeService && activeService.status === "requested" ? activeService : null;
   const inProgress = activeService && ["accepted", "en_route", "in_progress"].includes(activeService.status) ? activeService : null;
@@ -1666,6 +1668,64 @@ function PrestadorHome() {
         onInfo={() => setInfoOpen(true)}
       />
 
+      {providerNeedsValidation || providerPendingReview ? (
+        <>
+          <View style={styles.providerGateShell}>
+            <View style={[styles.providerGateCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+              <View style={[styles.providerGateIcon, { backgroundColor: `${c.blue}14` }]}>
+                <Ionicons
+                  name={providerPendingReview ? "hourglass-outline" : "shield-checkmark-outline"}
+                  size={28}
+                  color={c.blue}
+                />
+              </View>
+              <Text style={[styles.providerGateTitle, { color: c.text }]}>
+                {providerPendingReview ? "Validação em análise" : "Conta não verificada"}
+              </Text>
+              <Text style={[styles.providerGateSub, { color: c.sub }]}>
+                {providerPendingReview
+                  ? "Recebemos seus documentos. Sua conta será liberada assim que a análise terminar."
+                  : "Você pode acessar o app e revisar seu perfil, mas ainda precisa validar sua conta para criar e publicar serviços."}
+              </Text>
+
+              {providerNeedsValidation ? (
+                <Pressable
+                  onPress={() => router.push("/provider-validation" as never)}
+                  style={[styles.providerGateButton, { backgroundColor: c.blue }, shadows.md]}
+                >
+                  <Text style={styles.providerGateButtonText}>Validar conta</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#fff" />
+                </Pressable>
+              ) : (
+                <View style={[styles.providerGateStatus, { backgroundColor: `${c.primary}18` }]}>
+                  <Ionicons name="mail-outline" size={14} color={c.warning} />
+                  <Text style={[styles.providerGateStatusText, { color: c.text }]}>
+                    Você e a equipe Ajudaê receberam uma cópia do envio por e-mail.
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
+          <ProfileOverlay
+            open={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            name={user?.name || "Prestador"}
+            initials={initials}
+          />
+          <InfoSheet
+            storageKey="ajudae_info_home_prestador"
+            title="Sua central de serviços"
+            subtitle="Entenda como maximizar seus ganhos no Ajudaê"
+            accentColor={colors.light.blue}
+            items={PRESTADOR_HOME_INFO}
+            forceOpen={infoOpen}
+            onClose={() => setInfoOpen(false)}
+          />
+        </>
+      ) : (
+        <>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
         showsVerticalScrollIndicator={false}
@@ -1865,6 +1925,8 @@ function PrestadorHome() {
         forceOpen={infoOpen}
         onClose={() => setInfoOpen(false)}
       />
+        </>
+      )}
     </View>
   );
 }
@@ -2212,6 +2274,67 @@ const styles = StyleSheet.create({
   onlineDot: { width: 10, height: 10, borderRadius: 5 },
   onlineTitle: { fontSize: 14, fontFamily: fonts.sans.bold },
   onlineSub: { fontSize: 11, fontFamily: fonts.sans.regular },
+  providerGateShell: {
+    flex: 1,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+  },
+  providerGateCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  providerGateIcon: {
+    width: 74,
+    height: 74,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+  providerGateTitle: {
+    fontSize: 24,
+    fontFamily: fonts.serif.extra,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  providerGateSub: {
+    fontSize: 13,
+    fontFamily: fonts.sans.regular,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  providerGateButton: {
+    width: "100%",
+    height: 54,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  providerGateButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontFamily: fonts.sans.bold,
+  },
+  providerGateStatus: {
+    width: "100%",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  providerGateStatusText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: fonts.sans.medium,
+    lineHeight: 18,
+  },
   toggle: { width: 46, height: 26, borderRadius: 13, position: "relative" },
   toggleDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff", position: "absolute", top: 3 },
   statsGrid: { flexDirection: "row", gap: 8, marginBottom: 16 },

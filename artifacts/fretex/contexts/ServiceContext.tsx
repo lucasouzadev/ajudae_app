@@ -172,6 +172,15 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       const commitment = await computeCommitment(`${Date.now()}`, pin_start, pin_conclusion);
 
       // Call Supabase Edge Function to create request
+      // Resolve category UUID from DB by name before calling Edge Function
+      const { data: catRow } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('name', payload.category)
+        .single();
+
+      if (!catRow?.id) throw new Error(`Categoria "${payload.category}" não encontrada no banco de dados.`);
+
       const { data, error } = await supabase.functions.invoke('request_create', {
         body: {
           category_name: payload.category,
@@ -193,13 +202,15 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       }
 
       const serviceId = data.id || `req-${Date.now()}`;
+      // Use the server-generated OTP as pin_conclusion so provider's verification matches DB hash
+      const serverOtp = data.otp_code || pin_conclusion;
 
       const next: ActiveService = {
         ...payload,
         id: serviceId,
         status: "requested",
         pin_start,
-        pin_conclusion,
+        pin_conclusion: serverOtp,
         commitment,
         startPinAttempts: 0,
         conclusionAttempts: 0,
@@ -263,7 +274,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.functions.invoke('request_update_status', {
         body: {
           request_id: active.id,
-          status: next,
+          new_status: next,
         },
       });
 
@@ -293,11 +304,12 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Call Supabase to cancel if needed
       const { error } = await supabase.functions.invoke('request_update_status', {
         body: {
           request_id: active.id,
-          status: 'cancelled',
+          new_status: 'cancelled',
+          cancel_reason: 'other',
+          cancel_note: reason,
         },
       });
 

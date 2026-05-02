@@ -14,13 +14,138 @@ import {
   Animated,
   Linking,
 } from "react-native";
-import { Ionicons, FontAwesome } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/contexts/AuthContext";
 import colors, { fonts, shadows } from "@/constants/colors";
 
 const LGPD_KEY = "ajudae_lgpd_accepted";
+
+/* ─── Security & formatting helpers ─────────────────────────────────── */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const ERROR_COLOR = "#DC2626";
+
+function sanitize(raw: string): string {
+  return raw.replace(/<[^>]*>/g, "").replace(/[<>"'`\\]/g, "").trimStart();
+}
+
+function maskPhone(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 10) return d.replace(/(\d{2})(\d{4})(\d)/, "($1) $2-$3");
+  return d.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+}
+
+function maskCPF(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+}
+
+function validateCPF(cpf: string): boolean {
+  const c = cpf.replace(/\D/g, "");
+  if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(c[i]) * (10 - i);
+  let rem = sum % 11;
+  const d1 = rem < 2 ? 0 : 11 - rem;
+  if (d1 !== parseInt(c[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(c[i]) * (11 - i);
+  rem = sum % 11;
+  return (rem < 2 ? 0 : 11 - rem) === parseInt(c[10]);
+}
+
+function isFullName(name: string): boolean {
+  const words = name.trim().split(/\s+/).filter((w) => w.length >= 2);
+  return words.length >= 2;
+}
+
+type StrengthLevel = { score: number; label: string; color: string };
+function passwordStrength(p: string): StrengthLevel {
+  if (!p) return { score: 0, label: "", color: "" };
+  let score = 0;
+  if (p.length >= 8) score++;
+  if (/[a-z]/.test(p)) score++;
+  if (/[A-Z]/.test(p)) score++;
+  if (/[0-9]/.test(p)) score++;
+  if (/[!@#$%^&*()\-_=+[\]{};':"\\|,.<>/?`~]/.test(p)) score++;
+  if (score <= 1) return { score: 1, label: "Muito fraca", color: "#DC2626" };
+  if (score === 2) return { score: 2, label: "Fraca", color: "#F97316" };
+  if (score === 3) return { score: 3, label: "Média", color: "#EAB308" };
+  if (score === 4) return { score: 4, label: "Forte", color: "#22C55E" };
+  return { score: 5, label: "Muito forte", color: "#16A34A" };
+}
+
+function mapAuthError(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes("Invalid login credentials"))  return "E-mail ou senha incorretos.";
+  if (msg.includes("Email not confirmed"))         return "Confirme seu e-mail antes de entrar.";
+  if (msg.includes("already registered") || msg.includes("already been registered"))
+    return "Este e-mail já está cadastrado.";
+  if (msg.includes("weak") || msg.includes("Password should contain"))
+    return "Senha fraca — use maiúscula, minúscula, número e símbolo (ex: Senha@123).";
+  if (msg.includes("Password should be at least")) return "Senha muito curta — mínimo 6 caracteres.";
+  if (msg.includes("Invalid API key") || msg.includes("Invalid Refresh Token"))
+    return "Sessão expirada. Feche o app e abra novamente.";
+  if (msg.includes("rate limit") || msg.includes("too many"))
+    return "Muitas tentativas. Aguarde alguns minutos.";
+  if (msg.includes("Network") || msg.includes("fetch"))
+    return "Sem conexão. Verifique sua internet.";
+  if (msg.includes("PGRST") || msg.includes("schema cache"))
+    return "Erro interno. Tente novamente em instantes.";
+  return "Algo deu errado. Tente novamente.";
+}
+
+/* ─── UI helpers ─────────────────────────────────────────────────────── */
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5 }}>
+      <Ionicons name="alert-circle" size={12} color={ERROR_COLOR} />
+      <Text style={{ fontSize: 11, fontFamily: fonts.sans.medium, color: ERROR_COLOR }}>{msg}</Text>
+    </View>
+  );
+}
+
+function ErrorBanner({ msg, onDismiss }: { msg: string; onDismiss: () => void }) {
+  return (
+    <View style={{
+      flexDirection: "row", alignItems: "center", gap: 10,
+      backgroundColor: "#FEF2F2", borderColor: "#FECACA", borderWidth: 1,
+      borderRadius: 12, padding: 12, marginBottom: 16,
+    }}>
+      <Ionicons name="warning" size={16} color="#DC2626" />
+      <Text style={{ flex: 1, fontSize: 13, fontFamily: fonts.sans.medium, color: "#991B1B" }}>{msg}</Text>
+      <Pressable onPress={onDismiss} hitSlop={8}>
+        <Ionicons name="close" size={15} color="#DC2626" />
+      </Pressable>
+    </View>
+  );
+}
+
+function PasswordStrengthBar({ password }: { password: string }) {
+  const str = passwordStrength(password);
+  if (!password) return null;
+  return (
+    <View style={{ marginTop: 8, gap: 4 }}>
+      <View style={{ flexDirection: "row", gap: 3 }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <View
+            key={i}
+            style={{
+              flex: 1, height: 3, borderRadius: 2,
+              backgroundColor: i <= str.score ? str.color : "#E5E7EB",
+            }}
+          />
+        ))}
+      </View>
+      <Text style={{ fontSize: 10, fontFamily: fonts.sans.medium, color: str.color }}>{str.label}</Text>
+    </View>
+  );
+}
 
 /* ─── LGPD Bottom Sheet ──────────────────────────────────────────────── */
 function LGPDSheet({ onAccept, onDecline }: { onAccept: () => void; onDecline: () => void }) {
@@ -179,9 +304,13 @@ export default function AuthScreen() {
   const [senha, setSenha] = useState("");
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [cpf, setCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [lgpdChecked, setLgpdChecked] = useState(false);
   const [showLGPD, setShowLGPD] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState("");
 
   const accent = role === "cliente" ? c.primary : c.blue;
   const accentText = role === "cliente" ? "#1A1714" : "#fff";
@@ -203,32 +332,81 @@ export default function AuthScreen() {
     setShowLGPD(false);
   };
 
+  const clearScreen = (s: Screen) => {
+    setFieldErrors({});
+    setApiError("");
+    setScreen(s);
+  };
+
   const handleLogin = async () => {
+    const errs: Record<string, string> = {};
+    const cleanEmail = sanitize(email).toLowerCase().trim();
+    const cleanSenha = senha.trim();
+
+    if (!cleanEmail) errs.email = "Informe seu e-mail.";
+    else if (!EMAIL_RE.test(cleanEmail)) errs.email = "E-mail inválido.";
+    if (!cleanSenha) errs.senha = "Informe sua senha.";
+    else if (cleanSenha.length < 6) errs.senha = "Senha com no mínimo 6 caracteres.";
+
+    if (Object.keys(errs).length) { setFieldErrors(errs); return; }
+    setFieldErrors({});
+    setApiError("");
     setLoading(true);
     try {
       await login(
-        IS_DEMO ? (email || "ricardo@ajudae.app") : email,
-        IS_DEMO ? (senha || "123456") : senha
+        IS_DEMO ? (cleanEmail || "ricardo@ajudae.app") : cleanEmail,
+        IS_DEMO ? (cleanSenha || "123456") : cleanSenha,
       );
     } catch (e) {
-      console.error(e);
+      setApiError(mapAuthError(e));
     } finally {
       setLoading(false);
     }
   };
 
   const handleSignup = async () => {
+    const errs: Record<string, string> = {};
+    const cleanNome  = sanitize(nome).trim();
+    const cleanEmail = sanitize(email).toLowerCase().trim();
+    const cleanTel   = telefone.replace(/\D/g, "");
+    const cleanCpf   = cpf.replace(/\D/g, "");
+    const cleanSenha = senha;
+    const str        = passwordStrength(cleanSenha);
+
+    if (!cleanNome)                           errs.nome = "Nome completo obrigatório.";
+    else if (!isFullName(cleanNome))          errs.nome = "Informe nome e sobrenome (mín. 2 palavras).";
+    else if (cleanNome.length > 100)          errs.nome = "Nome muito longo (máx. 100 caracteres).";
+
+    if (!cleanCpf)                            errs.cpf = "CPF obrigatório.";
+    else if (!validateCPF(cleanCpf))          errs.cpf = "CPF inválido.";
+
+    if (!cleanEmail)                          errs.email = "Informe seu e-mail.";
+    else if (!EMAIL_RE.test(cleanEmail))      errs.email = "E-mail inválido.";
+
+    if (!cleanTel)                            errs.telefone = "Informe seu telefone.";
+    else if (cleanTel.length < 10 || cleanTel.length > 11)
+      errs.telefone = "Telefone inválido — use DDD + número.";
+
+    if (!cleanSenha)                          errs.senha = "Crie uma senha.";
+    else if (cleanSenha.length < 8)           errs.senha = "Senha com no mínimo 8 caracteres.";
+    else if (str.score < 4)                   errs.senha = "Senha fraca — use maiúscula, minúscula, número e símbolo.";
+    else if (cleanSenha.length > 72)          errs.senha = "Senha muito longa (máx. 72 caracteres).";
+
+    if (Object.keys(errs).length) { setFieldErrors(errs); return; }
+    setFieldErrors({});
+    setApiError("");
     setLoading(true);
     try {
       await signup(
-        IS_DEMO ? (nome || "Novo Usuário") : nome,
-        IS_DEMO ? (email || "novo@ajudae.app") : email,
-        IS_DEMO ? (telefone || "21999999999") : telefone,
-        IS_DEMO ? (senha || "123456") : senha,
+        IS_DEMO ? (cleanNome || "Novo Usuário") : cleanNome,
+        IS_DEMO ? (cleanEmail || "novo@ajudae.app") : cleanEmail,
+        IS_DEMO ? (cleanTel || "21999999999") : cleanTel,
+        IS_DEMO ? (cleanSenha || "Senha@123") : cleanSenha,
         role,
+        cleanCpf || undefined,
       );
     } catch (e) {
-      console.error(e);
+      setApiError(mapAuthError(e));
     } finally {
       setLoading(false);
     }
@@ -278,24 +456,6 @@ export default function AuthScreen() {
           </View>
         )}
 
-        {/* Providers */}
-        <View style={s.dividerRow}>
-          <View style={[s.divider, { backgroundColor: c.border }]} />
-          <Text style={[s.dividerText, { color: c.softMuted }]}>OU</Text>
-          <View style={[s.divider, { backgroundColor: c.border }]} />
-        </View>
-        <View style={s.providersRow}>
-          <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-            <FontAwesome name="google" size={17} color={c.text} />
-          </Pressable>
-          <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-            <FontAwesome name="apple" size={19} color={c.text} />
-          </Pressable>
-          <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Ionicons name="chatbubbles" size={17} color={c.text} />
-          </Pressable>
-        </View>
-
         <Text style={[s.terms, { color: c.softMuted }]}>
           Ao continuar, você concorda com os{" "}
           <Text style={{ color: c.sub }}>Termos de Uso</Text> e a{" "}
@@ -324,36 +484,53 @@ export default function AuthScreen() {
               showsVerticalScrollIndicator={false}
             >
               {/* Nav */}
-              <Pressable onPress={() => setScreen("lobby")} style={s.backBtn}>
+              <Pressable onPress={() => clearScreen("lobby")} style={s.backBtn}>
                 <Ionicons name="chevron-back" size={18} color={c.text} />
               </Pressable>
 
               <Text style={[s.formTitle, { color: c.text }]}>Entrar</Text>
               <Text style={[s.formSub, { color: c.sub }]}>Bem-vindo de volta.</Text>
 
+              {apiError ? <ErrorBanner msg={apiError} onDismiss={() => setApiError("")} /> : null}
+
               <Text style={[s.label, { color: c.softMuted }]}>EMAIL</Text>
               <TextInput
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(t) => { setEmail(sanitize(t)); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: "" })); }}
+                onBlur={() => { setEmail((v) => v.toLowerCase().trim()); }}
                 placeholder="voce@email.com"
                 placeholderTextColor={c.softMuted}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={254}
                 returnKeyType="next"
-                style={[s.input, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+                style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.email ? "#DC2626" : c.border, color: c.text }]}
               />
+              <FieldError msg={fieldErrors.email} />
 
               <Text style={[s.label, { color: c.softMuted }]}>SENHA</Text>
-              <TextInput
-                value={senha}
-                onChangeText={setSenha}
-                placeholder="••••••"
-                placeholderTextColor={c.softMuted}
-                secureTextEntry
-                returnKeyType="done"
-                onSubmitEditing={handleLogin}
-                style={[s.input, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-              />
+              <View style={{ position: "relative" }}>
+                <TextInput
+                  value={senha}
+                  onChangeText={(t) => { setSenha(t); if (fieldErrors.senha) setFieldErrors((p) => ({ ...p, senha: "" })); }}
+                  placeholder="••••••"
+                  placeholderTextColor={c.softMuted}
+                  secureTextEntry={!showPassword}
+                  maxLength={72}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.senha ? "#DC2626" : c.border, color: c.text, paddingRight: 48 }]}
+                />
+                <Pressable
+                  onPress={() => setShowPassword((v) => !v)}
+                  hitSlop={8}
+                  style={{ position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" }}
+                >
+                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color={c.softMuted} />
+                </Pressable>
+              </View>
+              <FieldError msg={fieldErrors.senha} />
 
               <Pressable
                 onPress={handleLogin}
@@ -366,24 +543,7 @@ export default function AuthScreen() {
                 <Ionicons name="arrow-forward" size={16} color="#1A1714" />
               </Pressable>
 
-              <View style={s.dividerRow}>
-                <View style={[s.divider, { backgroundColor: c.border }]} />
-                <Text style={[s.dividerText, { color: c.softMuted }]}>PROVEDORES</Text>
-                <View style={[s.divider, { backgroundColor: c.border }]} />
-              </View>
-              <View style={s.providersRow}>
-                <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-                  <FontAwesome name="google" size={17} color={c.text} />
-                </Pressable>
-                <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-                  <FontAwesome name="apple" size={19} color={c.text} />
-                </Pressable>
-                <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-                  <Ionicons name="chatbubbles" size={17} color={c.text} />
-                </Pressable>
-              </View>
-
-              <Pressable onPress={() => setScreen("signup-role")} style={{ marginTop: 20, alignSelf: "center" }}>
+              <Pressable onPress={() => clearScreen("signup-role")} style={{ marginTop: 20, alignSelf: "center" }}>
                 <Text style={[s.switchLink, { color: c.sub }]}>
                   Não tem conta?{" "}
                   <Text style={{ color: c.text, fontFamily: fonts.sans.bold }}>Criar conta</Text>
@@ -438,14 +598,14 @@ export default function AuthScreen() {
         </View>
 
         <Pressable
-          onPress={() => setScreen("signup-form")}
+          onPress={() => clearScreen("signup-form")}
           style={[s.cta, { backgroundColor: accent, marginTop: 32 }, shadows.md, { shadowColor: accent, shadowOpacity: 0.3 }]}
         >
           <Text style={[s.ctaText, { color: accentText }]}>Continuar</Text>
           <Ionicons name="arrow-forward" size={16} color={accentText} />
         </Pressable>
 
-        <Pressable onPress={() => setScreen("login")} style={{ marginTop: 20, alignSelf: "center" }}>
+        <Pressable onPress={() => clearScreen("login")} style={{ marginTop: 20, alignSelf: "center" }}>
           <Text style={[s.switchLink, { color: c.sub }]}>
             Já tem conta?{" "}
             <Text style={{ color: c.text, fontFamily: fonts.sans.bold }}>Entrar</Text>
@@ -470,7 +630,7 @@ export default function AuthScreen() {
           >
             {/* Nav */}
             <View style={s.formNavRow}>
-              <Pressable onPress={() => setScreen("signup-role")} style={s.backBtn}>
+              <Pressable onPress={() => clearScreen("signup-role")} style={s.backBtn}>
                 <Ionicons name="chevron-back" size={18} color={c.text} />
               </Pressable>
               {/* Role badge */}
@@ -489,50 +649,86 @@ export default function AuthScreen() {
             <Text style={[s.formTitle, { color: c.text }]}>Criar conta</Text>
             <Text style={[s.formSub, { color: c.sub }]}>Preencha seus dados para começar.</Text>
 
+            {apiError ? <ErrorBanner msg={apiError} onDismiss={() => setApiError("")} /> : null}
+
             <Text style={[s.label, { color: c.softMuted }]}>NOME COMPLETO</Text>
             <TextInput
               value={nome}
-              onChangeText={setNome}
-              placeholder="Seu nome"
+              onChangeText={(t) => { setNome(sanitize(t)); if (fieldErrors.nome) setFieldErrors((p) => ({ ...p, nome: "" })); }}
+              placeholder="Nome e sobrenome"
               placeholderTextColor={c.softMuted}
+              autoCorrect={false}
+              maxLength={100}
               returnKeyType="next"
-              style={[s.input, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+              style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.nome ? "#DC2626" : c.border, color: c.text }]}
             />
+            <FieldError msg={fieldErrors.nome} />
 
-            <Text style={[s.label, { color: c.softMuted }]}>TELEFONE</Text>
+            <Text style={[s.label, { color: c.softMuted }]}>CPF</Text>
+            <TextInput
+              value={cpf}
+              onChangeText={(t) => { setCpf(maskCPF(t)); if (fieldErrors.cpf) setFieldErrors((p) => ({ ...p, cpf: "" })); }}
+              placeholder="000.000.000-00"
+              placeholderTextColor={c.softMuted}
+              keyboardType="numeric"
+              maxLength={14}
+              returnKeyType="next"
+              style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.cpf ? "#DC2626" : c.border, color: c.text }]}
+            />
+            <FieldError msg={fieldErrors.cpf} />
+
+            <Text style={[s.label, { color: c.softMuted }]}>TELEFONE (WHATSAPP)</Text>
             <TextInput
               value={telefone}
-              onChangeText={setTelefone}
+              onChangeText={(t) => { setTelefone(maskPhone(t)); if (fieldErrors.telefone) setFieldErrors((p) => ({ ...p, telefone: "" })); }}
               placeholder="(21) 99999-9999"
               placeholderTextColor={c.softMuted}
               keyboardType="phone-pad"
+              maxLength={15}
               returnKeyType="next"
-              style={[s.input, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+              style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.telefone ? "#DC2626" : c.border, color: c.text }]}
             />
+            <FieldError msg={fieldErrors.telefone} />
 
             <Text style={[s.label, { color: c.softMuted }]}>EMAIL</Text>
             <TextInput
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(t) => { setEmail(sanitize(t)); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: "" })); }}
+              onBlur={() => setEmail((v) => v.toLowerCase().trim())}
               placeholder="voce@email.com"
               placeholderTextColor={c.softMuted}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={254}
               returnKeyType="next"
-              style={[s.input, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+              style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.email ? "#DC2626" : c.border, color: c.text }]}
             />
+            <FieldError msg={fieldErrors.email} />
 
             <Text style={[s.label, { color: c.softMuted }]}>SENHA</Text>
-            <TextInput
-              value={senha}
-              onChangeText={setSenha}
-              placeholder="••••••"
-              placeholderTextColor={c.softMuted}
-              secureTextEntry
-              returnKeyType="done"
-              onSubmitEditing={handleSignup}
-              style={[s.input, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-            />
+            <View style={{ position: "relative" }}>
+              <TextInput
+                value={senha}
+                onChangeText={(t) => { setSenha(t); if (fieldErrors.senha) setFieldErrors((p) => ({ ...p, senha: "" })); }}
+                placeholder="Mínimo 6 caracteres"
+                placeholderTextColor={c.softMuted}
+                secureTextEntry={!showPassword}
+                maxLength={72}
+                returnKeyType="done"
+                onSubmitEditing={handleSignup}
+                style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.senha ? "#DC2626" : c.border, color: c.text, paddingRight: 48 }]}
+              />
+              <Pressable
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={8}
+                style={{ position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" }}
+              >
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color={c.softMuted} />
+              </Pressable>
+            </View>
+            <PasswordStrengthBar password={senha} />
+            <FieldError msg={fieldErrors.senha} />
 
             <Pressable
               onPress={handleSignup}
@@ -545,22 +741,7 @@ export default function AuthScreen() {
               <Ionicons name="arrow-forward" size={16} color={accentText} />
             </Pressable>
 
-            <View style={s.dividerRow}>
-              <View style={[s.divider, { backgroundColor: c.border }]} />
-              <Text style={[s.dividerText, { color: c.softMuted }]}>PROVEDORES</Text>
-              <View style={[s.divider, { backgroundColor: c.border }]} />
-            </View>
-            <View style={s.providersRow}>
-              <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-                <FontAwesome name="google" size={17} color={c.text} />
-              </Pressable>
-              <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-                <FontAwesome name="apple" size={19} color={c.text} />
-              </Pressable>
-              <Pressable style={[s.provBtn, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Ionicons name="chatbubbles" size={17} color={c.text} />
-              </Pressable>
-            </View>
+            {/* Social login buttons removed — to be designed in a future sprint */}
 
             <Text style={[s.terms, { color: c.softMuted }]}>
               Ao continuar, você concorda com os{" "}

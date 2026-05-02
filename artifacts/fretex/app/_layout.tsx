@@ -33,7 +33,7 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function AuthGate() {
-  const { isAuthenticated, isLoading, user, role } = useAuth();
+  const { isAuthenticated, isLoading, user, role, accountStatus } = useAuth();
   const { active } = useService();
   const segments = useSegments();
   const router = useRouter();
@@ -43,21 +43,18 @@ function AuthGate() {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === "auth";
-    const inOnboarding = segments[0] === "onboarding";
+    const rootSegment = String(segments[0] ?? "");
+    const inAuthGroup = rootSegment === "auth";
+    const inPending = rootSegment === "account-pending";
 
-    if (!isAuthenticated && !inAuthGroup) {
+    if (accountStatus === "pending_email" && !inPending) {
+      router.replace("/account-pending" as never);
+    } else if (!isAuthenticated && !inAuthGroup && !inPending) {
       router.replace("/auth");
-    } else if (isAuthenticated && inAuthGroup) {
-      if (user && !user.onboardingCompleted) {
-        router.replace("/onboarding");
-      } else {
-        router.replace("/");
-      }
-    } else if (isAuthenticated && !inOnboarding && user && !user.onboardingCompleted) {
-      router.replace("/onboarding");
+    } else if (isAuthenticated && (inAuthGroup || inPending)) {
+      router.replace("/");
     }
-  }, [isAuthenticated, isLoading, segments, user]);
+  }, [accountStatus, isAuthenticated, isLoading, segments, user]);
 
   useEffect(() => {
     if (!isAuthenticated || isLoading) return;
@@ -82,6 +79,8 @@ function AuthGate() {
     <Stack screenOptions={{ headerShown: false, headerBackTitle: "Voltar", contentStyle: { backgroundColor: "#F7F5F2" } }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
+      <Stack.Screen name="account-pending" options={{ headerShown: false, gestureEnabled: false }} />
+      <Stack.Screen name="provider-validation" options={{ headerShown: false }} />
       <Stack.Screen name="marketplace" options={{ headerShown: false }} />
       <Stack.Screen name="inbox" options={{ headerShown: false }} />
       <Stack.Screen name="support" options={{ headerShown: false }} />
