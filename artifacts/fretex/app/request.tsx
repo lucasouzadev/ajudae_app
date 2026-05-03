@@ -10,6 +10,7 @@ import { MOCK_PROVIDERS, CATEGORY_COLORS } from "@/constants/mockData";
 import type { Category } from "@/constants/mockData";
 import { useAuth } from "@/contexts/AuthContext";
 import { useService } from "@/contexts/ServiceContext";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 
 const PHOTO_MOCKS = [
   "https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=400&q=80",
@@ -31,12 +32,17 @@ export default function RequestFlowScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { createService } = useService();
+  const { portfolio } = usePortfolio();
   const [step, setStep] = useState(1);
   const totalSteps = 4;
   const { providerId } = useLocalSearchParams<{ providerId?: string }>();
   const provider = providerId ? MOCK_PROVIDERS.find((p) => p.id === providerId) : null;
   const accent = provider?.color || c.primary;
   const category: Category = provider?.cat || "Frete";
+  // Use portfolio data for own provider (p-1), otherwise fall back to mockData helpers count
+  const providerSupportsHelpers = provider
+    ? (provider.id === "p-1" ? portfolio.supportsHelpers : provider.helpers > 0)
+    : true; // quando sem prestador fixo, mostra a opção
   const catColor = CATEGORY_COLORS[category];
 
   const [origin, setOrigin] = useState("Rua Conde de Bonfim, 200 — Tijuca");
@@ -273,21 +279,34 @@ export default function RequestFlowScreen() {
             <Text style={[styles.title, { color: c.text }]}>Opções extras</Text>
             <Text style={[styles.subtitle, { color: c.softMuted }]}>Personalize o pedido conforme sua necessidade.</Text>
 
-            <View style={[styles.toggleCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-              <View style={[styles.toggleIcon, { backgroundColor: needsHelper ? `${accent}18` : c.background }]}>
-                <Ionicons name="people" size={18} color={needsHelper ? accent : c.softMuted} />
+            {providerSupportsHelpers ? (
+              <View style={[styles.toggleCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+                <View style={[styles.toggleIcon, { backgroundColor: needsHelper ? `${accent}18` : c.background }]}>
+                  <Ionicons name="people" size={18} color={needsHelper ? accent : c.softMuted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.toggleTitle, { color: c.text }]}>Precisa de ajudante?</Text>
+                  <Text style={[styles.toggleSub, { color: c.softMuted }]}>+ R$35 · alguém para carregar com você</Text>
+                </View>
+                <Switch
+                  value={needsHelper}
+                  onValueChange={setNeedsHelper}
+                  trackColor={{ true: accent, false: c.border }}
+                  thumbColor="#fff"
+                />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.toggleTitle, { color: c.text }]}>Precisa de ajudante?</Text>
-                <Text style={[styles.toggleSub, { color: c.softMuted }]}>+ R$35 · alguém para carregar com você</Text>
+            ) : (
+              <View style={[styles.toggleCard, { backgroundColor: c.background, borderColor: c.borderLight, opacity: 0.7 }, shadows.sm]}>
+                <View style={[styles.toggleIcon, { backgroundColor: c.background }]}>
+                  <Ionicons name="people" size={18} color={c.softMuted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.toggleTitle, { color: c.softMuted }]}>Ajudante não disponível</Text>
+                  <Text style={[styles.toggleSub, { color: c.softMuted }]}>Este prestador não trabalha com ajudantes</Text>
+                </View>
+                <Ionicons name="close-circle" size={18} color={c.softMuted} />
               </View>
-              <Switch
-                value={needsHelper}
-                onValueChange={setNeedsHelper}
-                trackColor={{ true: accent, false: c.border }}
-                thumbColor="#fff"
-              />
-            </View>
+            )}
 
             <View style={[styles.toggleCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 10 }, shadows.sm]}>
               <View style={[styles.toggleIcon, { backgroundColor: scheduled ? `${accent}18` : c.background }]}>

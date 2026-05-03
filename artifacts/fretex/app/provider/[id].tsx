@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MOCK_PROVIDERS } from "@/constants/mockData";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 
 export default function ProviderProfileScreen() {
   const c = colors.light;
@@ -14,8 +15,12 @@ export default function ProviderProfileScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { role } = useAuth();
+  const { portfolio } = usePortfolio();
   const provider = MOCK_PROVIDERS.find((p) => p.id === id);
   const isClient = role === "cliente";
+  // The logged-in provider is always MOCK_PROVIDERS[0] (p-1) in this mock
+  const isOwnProfile = provider?.id === "p-1";
+  const displayBio = isOwnProfile ? portfolio.bio : provider?.bio ?? "";
 
   if (!provider) {
     return (
@@ -105,23 +110,60 @@ export default function ProviderProfileScreen() {
         {/* Bio */}
         <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <Text style={[styles.sectionTitle, { color: c.text }]}>Sobre</Text>
-          <Text style={[styles.bio, { color: c.sub }]}>{provider.bio}</Text>
+          <Text style={[styles.bio, { color: c.sub }]}>{displayBio}</Text>
         </View>
 
         {/* Stats */}
+        {(() => {
+          const supportsHelpers = isOwnProfile ? portfolio.supportsHelpers : provider.helpers > 0;
+          const helpersLabel = supportsHelpers
+            ? (isOwnProfile ? `${portfolio.helpersCount}` : `${provider.helpers}`)
+            : "Não";
+          return (
         <View style={styles.statsRow}>
           {[
             { v: provider.responseTime, l: "Resposta" },
             { v: provider.completionRate, l: "Conclusão" },
             { v: provider.acceptanceRate, l: "Aceitação" },
-            { v: `${provider.helpers}`, l: "Ajudantes" },
+            { v: helpersLabel, l: "Ajudantes", isHelper: true, supportsHelpers },
           ].map((s) => (
             <View key={s.l} style={[styles.statCell, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={[styles.statV, { color: accentText }]}>{s.v}</Text>
+              <Text style={[styles.statV, { color: (s as any).isHelper && !(s as any).supportsHelpers ? c.softMuted : accentText }]}>{s.v}</Text>
               <Text style={[styles.statL, { color: c.softMuted }]}>{s.l}</Text>
             </View>
           ))}
         </View>
+          );
+        })()}
+
+        {/* Serviços em destaque (do portfólio) */}
+        {isOwnProfile && portfolio.servicesSection && portfolio.services.length > 0 ? (
+          <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>Serviços em destaque</Text>
+            {portfolio.services.map((sv, i) => (
+              <View key={i} style={[styles.serviceRow, i > 0 && { borderTopColor: c.borderLight, borderTopWidth: 1 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.serviceTitle, { color: c.text }]}>{sv.title}</Text>
+                  <Text style={[styles.serviceSub, { color: c.softMuted }]}>{sv.desc}</Text>
+                </View>
+                <Text style={[styles.servicePrice, { color: accentText }]}>{sv.price}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Promoção ativa (do portfólio) */}
+        {isOwnProfile && portfolio.promoText ? (
+          <View style={[styles.section, { backgroundColor: `${provider.color}10`, borderColor: `${provider.color}44` }, shadows.sm]}>
+            <View style={[styles.promoBadge, { backgroundColor: provider.color }]}>
+              <Text style={[styles.promoBadgeText, { color: provider.color === "#FFCC00" ? "#1A1714" : "#fff" }]}>PROMOÇÃO</Text>
+            </View>
+            <Text style={[styles.promoText, { color: c.text }]}>{portfolio.promoText}</Text>
+            {portfolio.promoDue ? (
+              <Text style={[styles.promoDue, { color: c.softMuted }]}>Válido até {portfolio.promoDue}</Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* Vehicle */}
         <View style={[styles.section, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
@@ -422,4 +464,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   peerTagText: { fontSize: 11, fontFamily: fonts.sans.bold },
+
+  serviceRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  serviceTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
+  serviceSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  servicePrice: { fontSize: 15, fontFamily: fonts.serif.extra },
+
+  promoBadge: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, marginBottom: 8 },
+  promoBadgeText: { fontSize: 10, fontFamily: fonts.sans.bold, letterSpacing: 0.8 },
+  promoText: { fontSize: 15, fontFamily: fonts.serif.extra },
+  promoDue: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 4 },
 });

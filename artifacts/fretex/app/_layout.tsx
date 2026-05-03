@@ -26,6 +26,7 @@ import { RequestsProvider } from "@/contexts/RequestsContext";
 import { PaymentsProvider } from "@/contexts/PaymentsContext";
 import { SupportProvider } from "@/contexts/SupportContext";
 import { ServiceProvider, useService } from "@/contexts/ServiceContext";
+import { PortfolioProvider } from "@/contexts/PortfolioContext";
 import { StatusBar } from "expo-status-bar";
 
 SplashScreen.preventAutoHideAsync();
@@ -134,16 +135,18 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <AuthProvider>
-                <RequestsProvider>
-                  <ServiceProvider>
-                    <PaymentsProvider>
-                      <SupportProvider>
-                        <StatusBar style="dark" backgroundColor="#F7F5F2" />
-                        <AuthGate />
-                      </SupportProvider>
-                    </PaymentsProvider>
-                  </ServiceProvider>
-                </RequestsProvider>
+                <PortfolioProvider>
+                  <RequestsProvider>
+                    <ServiceProvider>
+                      <PaymentsProvider>
+                        <SupportProvider>
+                          <StatusBar style="dark" backgroundColor="#F7F5F2" />
+                          <AuthGate />
+                        </SupportProvider>
+                      </PaymentsProvider>
+                    </ServiceProvider>
+                  </RequestsProvider>
+                </PortfolioProvider>
               </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
