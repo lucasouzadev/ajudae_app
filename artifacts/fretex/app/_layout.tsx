@@ -28,6 +28,8 @@ import { SupportProvider } from "@/contexts/SupportContext";
 import { ServiceProvider, useService } from "@/contexts/ServiceContext";
 import { PortfolioProvider } from "@/contexts/PortfolioContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { PermissionsProvider } from "@/contexts/PermissionsContext";
+import { PermissionGate } from "@/components/PermissionGate";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 
@@ -90,28 +92,31 @@ function AuthGate() {
   }, [isAuthenticated, isLoading, active, role, segments]);
 
   return (
-    <Stack screenOptions={{ headerShown: false, headerBackTitle: "Voltar", contentStyle: { backgroundColor: "#F7F5F2" } }}>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="auth" options={{ headerShown: false }} />
-      <Stack.Screen name="account-pending" options={{ headerShown: false, gestureEnabled: false }} />
-      <Stack.Screen name="provider-validation" options={{ headerShown: false }} />
-      <Stack.Screen name="marketplace" options={{ headerShown: false }} />
-      <Stack.Screen name="inbox" options={{ headerShown: false }} />
-      <Stack.Screen name="support" options={{ headerShown: false }} />
-      <Stack.Screen name="provider/[id]" options={{ presentation: "card" }} />
-      <Stack.Screen name="payment" options={{ presentation: "modal" }} />
-      <Stack.Screen name="request" options={{ presentation: "modal" }} />
-      <Stack.Screen name="request-details" options={{ presentation: "modal" }} />
-      <Stack.Screen name="otp-modal" options={{ presentation: "modal", gestureEnabled: false }} />
-      <Stack.Screen name="track" options={{ headerShown: false }} />
-      <Stack.Screen name="rate" options={{ presentation: "modal" }} />
-      <Stack.Screen name="ticket" options={{ presentation: "modal" }} />
-      <Stack.Screen name="job" options={{ headerShown: false }} />
-      <Stack.Screen name="job-otp" options={{ presentation: "modal" }} />
-      <Stack.Screen name="start-pin" options={{ presentation: "modal", gestureEnabled: false }} />
-      <Stack.Screen name="confirm-start-pin" options={{ presentation: "modal" }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
-    </Stack>
+    <>
+      <PermissionGate />
+      <Stack screenOptions={{ headerShown: false, headerBackTitle: "Voltar", contentStyle: { backgroundColor: "#F7F5F2" } }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="account-pending" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="provider-validation" options={{ headerShown: false }} />
+        <Stack.Screen name="marketplace" options={{ headerShown: false }} />
+        <Stack.Screen name="inbox" options={{ headerShown: false }} />
+        <Stack.Screen name="support" options={{ headerShown: false }} />
+        <Stack.Screen name="provider/[id]" options={{ presentation: "card" }} />
+        <Stack.Screen name="payment" options={{ presentation: "modal" }} />
+        <Stack.Screen name="request" options={{ presentation: "modal" }} />
+        <Stack.Screen name="request-details" options={{ presentation: "modal" }} />
+        <Stack.Screen name="otp-modal" options={{ presentation: "modal", gestureEnabled: false }} />
+        <Stack.Screen name="track" options={{ headerShown: false }} />
+        <Stack.Screen name="rate" options={{ presentation: "modal" }} />
+        <Stack.Screen name="ticket" options={{ presentation: "modal" }} />
+        <Stack.Screen name="job" options={{ headerShown: false }} />
+        <Stack.Screen name="job-otp" options={{ presentation: "modal" }} />
+        <Stack.Screen name="start-pin" options={{ presentation: "modal", gestureEnabled: false }} />
+        <Stack.Screen name="confirm-start-pin" options={{ presentation: "modal" }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+      </Stack>
+    </>
   );
 }
 
@@ -148,20 +153,22 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <AuthProvider>
-                <PortfolioProvider>
-                  <RequestsProvider>
-                    <ServiceProvider>
-                      <NotificationProvider>
-                        <PaymentsProvider>
-                          <SupportProvider>
-                            <StatusBar style="dark" backgroundColor="#F7F5F2" />
-                            <AuthGate />
-                          </SupportProvider>
-                        </PaymentsProvider>
-                      </NotificationProvider>
-                    </ServiceProvider>
-                  </RequestsProvider>
-                </PortfolioProvider>
+                <PermissionsProvider>
+                  <PortfolioProvider>
+                    <RequestsProvider>
+                      <ServiceProvider>
+                        <NotificationProvider>
+                          <PaymentsProvider>
+                            <SupportProvider>
+                              <StatusBar style="dark" backgroundColor="#F7F5F2" />
+                              <AuthGate />
+                            </SupportProvider>
+                          </PaymentsProvider>
+                        </NotificationProvider>
+                      </ServiceProvider>
+                    </RequestsProvider>
+                  </PortfolioProvider>
+                </PermissionsProvider>
               </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

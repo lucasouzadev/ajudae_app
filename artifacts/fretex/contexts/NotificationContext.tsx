@@ -5,6 +5,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from "r
 import { Platform } from "react-native";
 
 import { useAuth } from "./AuthContext";
+import { usePermissions } from "./PermissionsContext";
 import { useService, type ServiceStatus } from "./ServiceContext";
 
 // ─── Foreground notification handler ──────────────────────────────────────────
@@ -195,31 +196,6 @@ const CATALOG: Record<NotificationEvent, (v?: Vars) => NotificationPayload> = {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-async function setupAndroidChannel() {
-  if (Platform.OS !== "android") return;
-  await Notifications.setNotificationChannelAsync("ajudae-default", {
-    name: "Ajudaê",
-    importance: Notifications.AndroidImportance.MAX,
-    vibrationPattern: [0, 200, 100, 200],
-    lightColor: "#FF6A00",
-    sound: "default",
-  });
-  await Notifications.setNotificationChannelAsync("ajudae-service", {
-    name: "Atualizações de serviço",
-    importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: "#10B981",
-    sound: "default",
-  });
-  await Notifications.setNotificationChannelAsync("ajudae-jobs", {
-    name: "Novos pedidos",
-    importance: Notifications.AndroidImportance.MAX,
-    vibrationPattern: [0, 300, 100, 300],
-    lightColor: "#6366F1",
-    sound: "default",
-  });
-}
-
 async function fire(event: NotificationEvent, vars?: Vars): Promise<void> {
   const payload = CATALOG[event](vars);
 
@@ -258,7 +234,7 @@ const NotificationContext = createContext<NotificationContextType | null>(null);
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { role } = useAuth();
   const { active } = useService();
-  const [hasPermission, setHasPermission] = useState(false);
+  const { notifications, requestNotifications } = usePermissions();
   const [pushToken, setPushToken] = useState<string | null>(null);
 
   // Track previous service state to detect changes
@@ -270,24 +246,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => { roleRef.current = role; }, [role]);
 
-  // ── Android channels + permission bootstrap ───────────────────────────────
+  // ── Request push token once notification permission is granted ────────────
   useEffect(() => {
-    setupAndroidChannel();
-    Notifications.getPermissionsAsync().then(async ({ status }) => {
-      if (status === "granted") {
-        setHasPermission(true);
-      } else if (status === "undetermined") {
-        // Auto-request on first launch — standard mobile UX
-        const { status: granted } = await Notifications.requestPermissionsAsync();
-        setHasPermission(granted === "granted");
-      }
-      // "denied" → user must re-enable from OS settings manually
-    });
-  }, []);
-
-  // ── Request push token once permission is granted ─────────────────────────
-  useEffect(() => {
-    if (!hasPermission || pushToken) return;
+    if (!notifications.granted || pushToken) return;
     const projectId =
       (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.eas?.projectId as
         | string
@@ -295,7 +256,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     Notifications.getExpoPushTokenAsync({ projectId })
       .then((t) => setPushToken(t.data))
       .catch(() => setPushToken("local-only")); // simulator fallback
-  }, [hasPermission]);
+  }, [notifications.granted]);
 
   // ── Reactive service state watcher ────────────────────────────────────────
   useEffect(() => {
@@ -389,20 +350,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const requestPermission = async (): Promise<boolean> => {
-    const { status } = await Notifications.requestPermissionsAsync();
-    const granted = status === "granted";
-    setHasPermission(granted);
-    if (granted) await setupAndroidChannel();
-    return granted;
-  };
+  const requestPermission = requestNotifications;
 
   const send = async (event: NotificationEvent, vars?: Vars): Promise<void> => {
     await fire(event, vars);
   };
 
   return (
-    <NotificationContext.Provider value={{ hasPermission, pushToken, requestPermission, send }}>
+    <NotificationContext.Provider value={{ hasPermission: notifications.granted, pushToken, requestPermission, send }}>
       {children}
     </NotificationContext.Provider>
   );

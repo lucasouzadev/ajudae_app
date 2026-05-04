@@ -431,7 +431,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await supabase
       .from('profiles')
-      .update({ name, phone })
+      .update({
+        name,
+        phone,
+        geolocation_requested: gpsGranted,
+        last_consent_update: new Date().toISOString(),
+      })
       .eq('id', user.id)
       .select()
       .single();
