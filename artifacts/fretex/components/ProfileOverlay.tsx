@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotification } from "@/contexts/NotificationContext";
 
 interface ProfileOverlayProps {
   open: boolean;
@@ -203,17 +204,18 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
   }
 
   if (label === "Configurações") {
+    const { hasPermission, requestPermission } = useNotification();
     const settings = [
-      { icon: "notifications" as const, label: "Notificações de pedidos", sub: "Push e e-mail", on: true },
-      { icon: "notifications-outline" as const, label: "Notificações promocionais", sub: "Ofertas e novidades", on: false },
-      { icon: "location" as const, label: "Localização em segundo plano", sub: "Para rastreamento de serviço", on: true },
-      { icon: "moon" as const, label: "Modo escuro", sub: "Seguir tema do sistema", on: false },
-      { icon: "language" as const, label: "Idioma", sub: "Português (Brasil)", on: null },
+      { icon: "notifications" as const, label: "Notificações de pedidos", sub: "Push e e-mail", on: hasPermission, onToggle: () => { if (!hasPermission) requestPermission(); } },
+      { icon: "notifications-outline" as const, label: "Notificações promocionais", sub: "Ofertas e novidades", on: false, onToggle: undefined },
+      { icon: "location" as const, label: "Localização em segundo plano", sub: "Para rastreamento de serviço", on: true, onToggle: undefined },
+      { icon: "moon" as const, label: "Modo escuro", sub: "Seguir tema do sistema", on: false, onToggle: undefined },
+      { icon: "language" as const, label: "Idioma", sub: "Português (Brasil)", on: null, onToggle: undefined },
     ];
     return (
       <View style={subStyles.container}>
         {settings.map((item, i) => (
-          <View key={i} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <Pressable key={i} onPress={item.onToggle} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
             <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
               <Ionicons name={item.icon} size={18} color={c.sub} />
             </View>
@@ -228,7 +230,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
             ) : (
               <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
             )}
-          </View>
+          </Pressable>
         ))}
         <View style={[subStyles.row, { backgroundColor: "#FEF2F218", borderColor: "#E5373718" }]}>
           <View style={[subStyles.iconBox, { backgroundColor: "#E5373718" }]}>

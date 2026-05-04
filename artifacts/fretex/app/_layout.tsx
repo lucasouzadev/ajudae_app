@@ -27,6 +27,8 @@ import { PaymentsProvider } from "@/contexts/PaymentsContext";
 import { SupportProvider } from "@/contexts/SupportContext";
 import { ServiceProvider, useService } from "@/contexts/ServiceContext";
 import { PortfolioProvider } from "@/contexts/PortfolioContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 
 SplashScreen.preventAutoHideAsync();
@@ -40,6 +42,17 @@ function AuthGate() {
   const router = useRouter();
 
   const terminalStatuses = ["completed", "cancelled", "disputed"];
+
+  // Navigate to the screen embedded in notification data when user taps a notification
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const screen = response.notification.request.content.data?.screen;
+      if (screen && isAuthenticated) {
+        router.push(`/${screen}` as never);
+      }
+    });
+    return () => sub.remove();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -138,12 +151,14 @@ export default function RootLayout() {
                 <PortfolioProvider>
                   <RequestsProvider>
                     <ServiceProvider>
-                      <PaymentsProvider>
-                        <SupportProvider>
-                          <StatusBar style="dark" backgroundColor="#F7F5F2" />
-                          <AuthGate />
-                        </SupportProvider>
-                      </PaymentsProvider>
+                      <NotificationProvider>
+                        <PaymentsProvider>
+                          <SupportProvider>
+                            <StatusBar style="dark" backgroundColor="#F7F5F2" />
+                            <AuthGate />
+                          </SupportProvider>
+                        </PaymentsProvider>
+                      </NotificationProvider>
                     </ServiceProvider>
                   </RequestsProvider>
                 </PortfolioProvider>
