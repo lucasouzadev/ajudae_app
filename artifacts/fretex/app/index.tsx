@@ -1471,6 +1471,20 @@ function ClienteHome() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [active, setActive] = useState<Provider | null>(null);   // pin focado (1º toque)
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
+  const [locating, setLocating] = useState(false);
+  const locateSpin = useRef(new Animated.Value(0)).current;
+
+  const handleLocate = async () => {
+    setLocating(true);
+    Animated.loop(
+      Animated.timing(locateSpin, { toValue: 1, duration: 600, useNativeDriver: true })
+    ).start();
+    try { await mapRef.current?.recenter(); } catch {}
+    locateSpin.stopAnimation();
+    locateSpin.setValue(0);
+    setLocating(false);
+  };
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -1498,11 +1512,14 @@ function ClienteHome() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      {/* Map area — ocupa tela inteira; sheet se posiciona na frente */}
+      {/* Map area — encolhe à medida que o sheet sobe */}
       <Animated.View
         style={{
           position: "absolute",
-          top: 0, left: 0, right: 0, bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: sheetHeightAnim,   // map height = screen - sheet height
           overflow: "hidden",
         }}
       >
@@ -1524,28 +1541,26 @@ function ClienteHome() {
           }}
         />
 
-        {/* Botão de localização — canto inferior direito do mapa */}
-        <Animated.View
-          style={{
-            position: "absolute",
-            right: 16,
-            bottom: sheetHeightAnim.interpolate({
-              inputRange: [COLLAPSED_H, EXPANDED_H],
-              outputRange: [COLLAPSED_H + CHIP_ROW_H + 16, 16],
-              extrapolate: "clamp",
-            }),
-            zIndex: 25,
-          }}
-        >
+        {/* Botão de localização — sempre 16px acima da borda inferior do mapa */}
+        <View style={{ position: "absolute", right: 16, bottom: 16, zIndex: 25 }}>
           <Pressable
             style={[styles.locateBtn, { backgroundColor: locating ? c.blue : c.card }, shadows.md]}
             onPress={handleLocate}
           >
-            <Animated.View style={{ transform: [{ rotate: locateSpin }] }}>
+            <Animated.View
+              style={{
+                transform: [{
+                  rotate: locateSpin.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["0deg", "360deg"],
+                  }),
+                }],
+              }}
+            >
               <Ionicons name="locate" size={20} color={locating ? "#fff" : c.blue} />
             </Animated.View>
           </Pressable>
-        </Animated.View>
+        </View>
       </Animated.View>
 
       <TopNav
