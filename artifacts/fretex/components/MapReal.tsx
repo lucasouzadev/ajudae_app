@@ -88,7 +88,7 @@ export const MapReal = forwardRef<MapRealRef, MapRealProps>(
           <Marker
             key={p.id}
             coordinate={{ latitude: p.lat, longitude: p.lng }}
-            tracksViewChanges={activeId === p.id}
+            tracksViewChanges
             anchor={{ x: 0.5, y: 1 }}
             onPress={() => onPinPress(p.id)}
           >
