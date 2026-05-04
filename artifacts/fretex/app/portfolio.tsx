@@ -16,24 +16,13 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePortfolio } from "@/contexts/PortfolioContext";
 import { MOCK_PROVIDERS } from "@/constants/mockData";
-
-/* ─── Mock portfolio state (seria salvo no backend) ─────────────────────── */
-const INITIAL_PORTFOLIO = {
-  bio: "Especialista em mudanças residenciais e comerciais na Zona Norte do Rio. Mais de 5 anos de experiência, equipe treinada e veículo segurado.",
-  promoText: "Mudança completa com 10% OFF",
-  promoDue: "30/05",
-  services: [
-    { title: "Mudança Residencial", price: "R$89", desc: "Apartamento ou casa, com 2 ajudantes incluídos" },
-    { title: "Frete Rápido", price: "R$49", desc: "Itens avulsos, entrega em até 2h na região" },
-  ] as { title: string; price: string; desc: string }[],
-  featuredReview: "Excelente profissional! Cuidou de tudo com muito cuidado e chegou no horário marcado. Super recomendo!",
-  reviewAuthor: "Maria S.",
-};
 
 /* ─── Seções disponíveis para edição ────────────────────────────────────── */
 const PORTFOLIO_SECTIONS = [
   { key: "bio",      icon: "person-outline" as const,     label: "Bio / Apresentação",       desc: "Fale sobre você e seu trabalho (máx. 280 caracteres)" },
+  { key: "helpers",  icon: "people-outline" as const,     label: "Ajudantes",                desc: "Informe se você trabalha com ajudantes e quantos" },
   { key: "services", icon: "list-outline" as const,       label: "Serviços em destaque",      desc: "Até 3 serviços com título, preço e descrição curta" },
   { key: "promo",    icon: "pricetag-outline" as const,   label: "Promoção ativa",            desc: "Oferta especial com texto livre e prazo de validade" },
   { key: "photos",   icon: "images-outline" as const,     label: "Fotos do trabalho",         desc: "Até 6 fotos dos seus serviços (disponível em breve)" },
@@ -50,7 +39,7 @@ export default function PortfolioScreen() {
   const onColor = provider.color === "#FFCC00" ? "#1A1714" : "#fff";
 
   const [tab, setTab] = useState<"preview" | "edit">("preview");
-  const [portfolio, setPortfolio] = useState(INITIAL_PORTFOLIO);
+  const { portfolio, setPortfolio } = usePortfolio();
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -133,6 +122,26 @@ function PortfolioPreview({ portfolio, provider, c, insets }: any) {
       ) : (
         <PlaceholderBlock icon="person-outline" label="Bio não preenchida" hint="Vá em Editar para adicionar sua apresentação" c={c} />
       )}
+
+      {/* Ajudantes */}
+      <View style={[s.previewCard, { backgroundColor: c.card, borderColor: c.border }]}>
+        <View style={s.previewCardHead}>
+          <View style={[s.previewIconWrap, { backgroundColor: `${provider.color}18` }]}>
+            <Ionicons name="people-outline" size={15} color={provider.color} />
+          </View>
+          <Text style={[s.previewCardTitle, { color: c.text }]}>Ajudantes</Text>
+          <View style={[s.helperBadge, { backgroundColor: portfolio.supportsHelpers ? `${c.success}18` : `${c.softMuted}18` }]}>
+            <Text style={[s.helperBadgeText, { color: portfolio.supportsHelpers ? c.success : c.softMuted }]}>
+              {portfolio.supportsHelpers ? "Sim" : "Não"}
+            </Text>
+          </View>
+        </View>
+        <Text style={[s.previewBio, { color: c.sub }]}>
+          {portfolio.supportsHelpers
+            ? `Trabalha com ajudantes · ${portfolio.helpersCount} disponível${portfolio.helpersCount !== 1 ? "s" : ""}`
+            : "Não trabalha com ajudantes no momento"}
+        </Text>
+      </View>
 
       {/* Promoção */}
       {portfolio.promoText ? (
@@ -312,6 +321,44 @@ function PortfolioEdit({ portfolio, onChange, c, insets }: any) {
                     textAlignVertical="top"
                   />
                   <Text style={[s.charCount, { color: c.softMuted }]}>{portfolio.bio.length}/280</Text>
+                </View>
+              )}
+
+              {open && sec.key === "helpers" && (
+                <View style={s.editBody}>
+                  <Pressable
+                    onPress={() => update("supportsHelpers", !portfolio.supportsHelpers)}
+                    style={[s.helperToggleRow, { backgroundColor: portfolio.supportsHelpers ? `${c.success}12` : c.background, borderColor: portfolio.supportsHelpers ? c.success : c.border }]}
+                  >
+                    <Ionicons name="people" size={18} color={portfolio.supportsHelpers ? c.success : c.softMuted} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.toggleTitle, { color: c.text }]}>Trabalha com ajudantes?</Text>
+                      <Text style={[s.toggleSub, { color: c.softMuted }]}>Visível para clientes no perfil e na solicitação</Text>
+                    </View>
+                    <View style={[s.togglePill, { backgroundColor: portfolio.supportsHelpers ? c.success : "#D4D0CB" }]}>
+                      <View style={[s.toggleDot, { left: portfolio.supportsHelpers ? 20 : 2 }]} />
+                    </View>
+                  </Pressable>
+                  {portfolio.supportsHelpers && (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={[s.fieldLabel, { color: c.sub }]}>Quantidade de ajudantes disponíveis</Text>
+                      <View style={s.counterRow}>
+                        <Pressable
+                          onPress={() => update("helpersCount", Math.max(1, portfolio.helpersCount - 1))}
+                          style={[s.counterBtn, { backgroundColor: c.background, borderColor: c.border }]}
+                        >
+                          <Ionicons name="remove" size={18} color={c.text} />
+                        </Pressable>
+                        <Text style={[s.counterVal, { color: c.text }]}>{portfolio.helpersCount}</Text>
+                        <Pressable
+                          onPress={() => update("helpersCount", Math.min(10, portfolio.helpersCount + 1))}
+                          style={[s.counterBtn, { backgroundColor: c.background, borderColor: c.border }]}
+                        >
+                          <Ionicons name="add" size={18} color={c.text} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -562,4 +609,23 @@ const s = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
   },
   saveBtnText: { fontSize: 15, fontFamily: fonts.sans.bold },
+
+  helperBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  helperBadgeText: { fontSize: 11, fontFamily: fonts.sans.bold },
+
+  helperToggleRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    padding: 14, borderRadius: 14, borderWidth: 1.5,
+  },
+  toggleTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
+  toggleSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 1 },
+  togglePill: { width: 44, height: 24, borderRadius: 12, position: "relative" },
+  toggleDot: { width: 18, height: 18, borderRadius: 9, backgroundColor: "#fff", position: "absolute", top: 3 },
+
+  counterRow: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 8 },
+  counterBtn: {
+    width: 40, height: 40, borderRadius: 12, borderWidth: 1,
+    alignItems: "center", justifyContent: "center",
+  },
+  counterVal: { fontSize: 20, fontFamily: fonts.serif.extra, minWidth: 30, textAlign: "center" },
 });

@@ -114,13 +114,23 @@ function genPin(digits: number): string {
   return Math.floor(min + Math.random() * (max - min + 1)).toString();
 }
 
+function djb2Hash(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h) ^ str.charCodeAt(i);
+    h = h >>> 0; // keep unsigned 32-bit
+  }
+  // extend to 16 hex chars by mixing two passes
+  let h2 = 0x811c9dc5;
+  for (let i = str.length - 1; i >= 0; i--) {
+    h2 = ((h2 ^ str.charCodeAt(i)) * 0x01000193) >>> 0;
+  }
+  return (h >>> 0).toString(16).padStart(8, "0") + (h2 >>> 0).toString(16).padStart(8, "0");
+}
+
 async function computeCommitment(serviceId: string, pinStart: string, pinConclusion: string): Promise<string> {
   const input = `${serviceId}|${pinStart}|${pinConclusion}`;
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return djb2Hash(input);
 }
 
 // ---------------------------------------------------------------------------

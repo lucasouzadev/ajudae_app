@@ -89,25 +89,156 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
 
   if (label === "Histórico de Pedidos") {
     const orders = [
-      { title: "Mudança", price: "R$420", status: "Concluído", color: c.success },
-      { title: "Frete", price: "R$90", status: "Concluído", color: c.success },
-      { title: "Entrega", price: "R$45", status: "Cancelado", color: c.error ?? "#E53E3E" },
+      { icon: "home" as const, cat: "Mudança", route: "Tijuca → Centro", price: "R$420", status: "Concluído", when: "há 2 dias", color: c.success },
+      { icon: "car" as const, cat: "Frete", route: "Barra → Recreio", price: "R$90", status: "Concluído", when: "há 1 semana", color: c.success },
+      { icon: "cube" as const, cat: "Entrega", route: "Botafogo → Humaitá", price: "R$45", status: "Cancelado", when: "há 2 semanas", color: "#E53E3E" },
+      { icon: "home" as const, cat: "Mudança", route: "Méier → Tijuca", price: "R$165", status: "Concluído", when: "há 1 mês", color: c.success },
     ];
     return (
       <View style={subStyles.container}>
         {orders.map((o, i) => (
           <View key={i} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
-            <View style={[subStyles.iconBox, { backgroundColor: `${c.primary}18` }]}>
-              <Ionicons name="cube" size={18} color={c.primary} />
+            <View style={[subStyles.iconBox, { backgroundColor: `${o.color}18` }]}>
+              <Ionicons name={o.icon} size={18} color={o.color} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[subStyles.rowLabel, { color: c.text }]}>{o.title} · {o.price}</Text>
+              <Text style={[subStyles.rowLabel, { color: c.text }]}>{o.cat} · {o.price}</Text>
+              <Text style={[subStyles.rowSub, { color: c.softMuted }]}>{o.route} · {o.when}</Text>
             </View>
             <View style={[subStyles.badge, { backgroundColor: `${o.color}18` }]}>
               <Text style={[subStyles.badgeText, { color: o.color }]}>{o.status}</Text>
             </View>
           </View>
         ))}
+      </View>
+    );
+  }
+
+  if (label === "Avaliações") {
+    const reviews = [
+      { author: "Carlos O.", rating: 5, text: "Pontual e muito cuidadoso com os móveis. Super recomendo!", when: "há 3 dias" },
+      { author: "Marcos F.", rating: 5, text: "Serviço impecável, comunicação excelente durante todo o processo.", when: "há 1 semana" },
+      { author: "Rafael C.", rating: 4, text: "Bom profissional, chegou no horário combinado.", when: "há 2 semanas" },
+    ];
+    return (
+      <View style={subStyles.container}>
+        <View style={[subStyles.ratingHeader, { backgroundColor: c.background, borderColor: c.border }]}>
+          <Text style={[subStyles.ratingBig, { color: c.warning }]}>4.9</Text>
+          <View>
+            <View style={{ flexDirection: "row", gap: 3 }}>
+              {[1,2,3,4,5].map((i) => <Ionicons key={i} name="star" size={16} color={c.warning} />)}
+            </View>
+            <Text style={[subStyles.rowSub, { color: c.softMuted, marginTop: 4 }]}>Baseado em 12 avaliações</Text>
+          </View>
+        </View>
+        {reviews.map((r, i) => (
+          <View key={i} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border, flexDirection: "column", alignItems: "flex-start", gap: 6 }]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", width: "100%" }}>
+              <Text style={[subStyles.rowLabel, { color: c.text }]}>{r.author}</Text>
+              <Text style={[subStyles.rowSub, { color: c.softMuted }]}>{r.when}</Text>
+            </View>
+            <View style={{ flexDirection: "row", gap: 2 }}>
+              {Array.from({ length: r.rating }).map((_, k) => <Ionicons key={k} name="star" size={12} color={c.warning} />)}
+            </View>
+            <Text style={[subStyles.rowSub, { color: c.sub }]}>{r.text}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  if (label === "Segurança") {
+    return (
+      <View style={subStyles.container}>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.success}18` }]}>
+            <Ionicons name="checkmark-shield" size={18} color={c.success} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>PIN de segurança</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Configurado · 4 dígitos</Text>
+          </View>
+          <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
+            <Text style={[subStyles.badgeText, { color: c.success }]}>Ativo</Text>
+          </View>
+        </View>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.blue}18` }]}>
+            <Ionicons name="phone-portrait" size={18} color={c.blue} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Verificação em 2 etapas</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Via SMS · •••• 9821</Text>
+          </View>
+          <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
+            <Text style={[subStyles.badgeText, { color: c.success }]}>Ativo</Text>
+          </View>
+        </View>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: "#6B728018" }]}>
+            <Ionicons name="document-text" size={18} color="#6B7280" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>CPF verificado</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>•••.•••.123-45</Text>
+          </View>
+          <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
+            <Text style={[subStyles.badgeText, { color: c.success }]}>Verificado</Text>
+          </View>
+        </View>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: "#9333EA18" }]}>
+            <Ionicons name="finger-print" size={18} color="#9333EA" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Biometria</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Face ID / Touch ID</Text>
+          </View>
+          <View style={[subStyles.badge, { backgroundColor: "#9333EA18" }]}>
+            <Text style={[subStyles.badgeText, { color: "#9333EA" }]}>Ativo</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (label === "Configurações") {
+    const settings = [
+      { icon: "notifications" as const, label: "Notificações de pedidos", sub: "Push e e-mail", on: true },
+      { icon: "notifications-outline" as const, label: "Notificações promocionais", sub: "Ofertas e novidades", on: false },
+      { icon: "location" as const, label: "Localização em segundo plano", sub: "Para rastreamento de serviço", on: true },
+      { icon: "moon" as const, label: "Modo escuro", sub: "Seguir tema do sistema", on: false },
+      { icon: "language" as const, label: "Idioma", sub: "Português (Brasil)", on: null },
+    ];
+    return (
+      <View style={subStyles.container}>
+        {settings.map((item, i) => (
+          <View key={i} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+            <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+              <Ionicons name={item.icon} size={18} color={c.sub} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[subStyles.rowLabel, { color: c.text }]}>{item.label}</Text>
+              <Text style={[subStyles.rowSub, { color: c.softMuted }]}>{item.sub}</Text>
+            </View>
+            {item.on !== null ? (
+              <View style={[subStyles.miniSwitch, { backgroundColor: item.on ? c.success : "#D4D0CB" }]}>
+                <View style={[subStyles.miniDot, { left: item.on ? 14 : 2 }]} />
+              </View>
+            ) : (
+              <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
+            )}
+          </View>
+        ))}
+        <View style={[subStyles.row, { backgroundColor: "#FEF2F218", borderColor: "#E5373718" }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: "#E5373718" }]}>
+            <Ionicons name="trash" size={18} color="#E53737" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: "#E53737" }]}>Excluir conta</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Ação irreversível</Text>
+          </View>
+        </View>
       </View>
     );
   }
@@ -381,4 +512,16 @@ const subStyles = StyleSheet.create({
     borderWidth: 1,
   },
   comingSoonText: { fontSize: 14, fontFamily: fonts.sans.semibold },
+  ratingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 2,
+  },
+  ratingBig: { fontSize: 36, fontFamily: fonts.sans.bold },
+  miniSwitch: { width: 36, height: 20, borderRadius: 10, position: "relative" },
+  miniDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: "#fff", position: "absolute", top: 3 },
 });

@@ -262,6 +262,7 @@ function MapExpandModal({
 }) {
   const c = colors.light;
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [activePin, setActivePin] = useState<string | null>(null);
   const active = pins.find((p) => p.id === activePin) ?? null;
 
@@ -321,17 +322,29 @@ function MapExpandModal({
             </View>
             {role === "cliente" ? (
               <Pressable
-                onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); onRequest?.(active.id); onClose(); }}
+                onPress={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                  onRequest?.(active.id);
+                  onClose();
+                  router.push({ pathname: "/request", params: { providerId: active.id } });
+                }}
                 style={{ backgroundColor: active.color, borderRadius: 14, height: 48, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}
               >
-                <Ionicons name="arrow-forward" size={16} color="#fff" />
-                <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: "#fff" }}>Solicitar este prestador</Text>
+                <Ionicons name="arrow-forward" size={16} color={active.color === "#FFCC00" ? "#1A1714" : "#fff"} />
+                <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: active.color === "#FFCC00" ? "#1A1714" : "#fff" }}>Solicitar este prestador</Text>
               </Pressable>
             ) : (
-              <View style={{ backgroundColor: c.blueLight, borderRadius: 14, height: 44, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  onClose();
+                  router.push(`/provider/${active.id}`);
+                }}
+                style={{ backgroundColor: c.blueLight, borderRadius: 14, height: 44, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}
+              >
                 <Ionicons name="bar-chart" size={15} color={c.blue} />
                 <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.blue }}>Análise de concorrência</Text>
-              </View>
+              </Pressable>
             )}
           </View>
         ) : (

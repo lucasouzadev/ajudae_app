@@ -1470,55 +1470,8 @@ function ClienteHome() {
   const mapRef = useRef<MapRealRef>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [active, setActive] = useState<Provider | null>(null);   // pin focado (1º toque)
-  const [pinCardVisible, setPinCardVisible] = useState(false);
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const pinCardVisibleRef = useRef(pinCardVisible);
-  useEffect(() => { pinCardVisibleRef.current = pinCardVisible; }, [pinCardVisible]);
-
-  const locateAnim = useRef(new Animated.Value(0)).current;
-  const locateSpinLoop = useRef<Animated.CompositeAnimation | null>(null);
-  const [locating, setLocating] = useState(false);
-
-  const handleLocate = () => {
-    if (locating) return;
-    setLocating(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    locateAnim.setValue(0);
-    locateSpinLoop.current = Animated.loop(
-      Animated.timing(locateAnim, { toValue: 1, duration: 700, useNativeDriver: true })
-    );
-    locateSpinLoop.current.start();
-    mapRef.current?.recenter().finally(() => {
-      locateSpinLoop.current?.stop();
-      locateAnim.setValue(0);
-      setLocating(false);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    });
-  };
-
-  const locateSpin = locateAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
-
-  const sheetWasExpanded = useRef(false);
-  useEffect(() => {
-    const id = sheetHeightAnim.addListener(({ value }) => {
-      const isExpanded = value >= EXPANDED_H - 20;
-      if (isExpanded !== sheetWasExpanded.current) {
-        sheetWasExpanded.current = isExpanded;
-        if (isExpanded) {
-          mapRef.current?.zoomOut();
-        } else {
-          mapRef.current?.zoomIn();
-        }
-      }
-      if (value > COLLAPSED_H + 20 && pinCardVisibleRef.current) {
-        setActive(null);
-        setPinCardVisible(false);
-      }
-    });
-    return () => sheetHeightAnim.removeListener(id);
-  }, [sheetHeightAnim]);
   const [profileOpen, setProfileOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [modalProvider, setModalProvider] = useState<Provider | null>(null);
@@ -1564,11 +1517,9 @@ function ClienteHome() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
               setModalProvider(p);
               setActive(null);
-              setPinCardVisible(false);
             } else {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
               setActive(p);
-              setPinCardVisible(true);
             }
           }}
         />
@@ -1657,7 +1608,7 @@ function ClienteHome() {
 
       {/* Floating filter chips — fades out as sheet rises */}
       <Animated.View
-        pointerEvents={active ? "none" : "box-none"}
+        pointerEvents="box-none"
         style={{
           position: "absolute",
           bottom: COLLAPSED_H + 8,
@@ -1690,17 +1641,16 @@ function ClienteHome() {
         </ScrollView>
       </Animated.View>
 
-      {/* Active provider card — fades out as sheet rises */}
+      {/* Active provider card — persists above sheet regardless of sheet height */}
       {active ? (
         <Animated.View
           style={{
-            opacity: sheetHeightAnim.interpolate({
-              inputRange: [COLLAPSED_H, COLLAPSED_H + 60],
-              outputRange: [1, 0],
+            position: "absolute",
+            bottom: sheetHeightAnim.interpolate({
+              inputRange: [COLLAPSED_H, EXPANDED_H],
+              outputRange: [COLLAPSED_H + CHIP_ROW_H + 8, EXPANDED_H + 8],
               extrapolate: "clamp",
             }),
-            position: "absolute",
-            bottom: COLLAPSED_H + CHIP_ROW_H + 8,
             left: 0,
             right: 0,
             zIndex: 50,
@@ -1741,7 +1691,7 @@ function ClienteHome() {
             </View>
             {/* 2º toque no pin abre o modal; botão rápido também abre */}
             <Pressable
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setModalProvider(active); setActive(null); setPinCardVisible(false); }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setModalProvider(active); setActive(null); }}
               style={[styles.activeRequestBtn, { backgroundColor: "#fff" }]}
             >
               <Ionicons name="person-outline" size={14} color={active.color} />
@@ -1767,10 +1717,8 @@ function ClienteHome() {
           if (active?.id === p.id) {
             setModalProvider(p);
             setActive(null);
-            setPinCardVisible(false);
           } else {
             setActive(p);
-            setPinCardVisible(true);
           }
         }}
         onOpenProfile={(p) => router.push(`/provider/${p.id}`)}
