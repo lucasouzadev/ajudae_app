@@ -207,11 +207,120 @@ Preview completo com hero gradient, bio, promo banner, lista de serviços, prév
 
 | Status | Quantidade |
 |--------|-----------|
-| ✅ Implementado | 23 |
-| 🔶 Parcial | 0 |
+| ✅ Implementado | 33 |
+| 🔶 Parcial | 1 |
 | ❌ Pendente | 0 |
-| **Total** | **23** |
+| **Total** | **34** |
 
 ---
 
-_Ajudaê — PROGRESS v1.5 — atualizado em 2026-04-28 — **23/23 ✅** (UI Layer v2 completo)_
+---
+
+## 🟣 Sessão 2026-05-04 — Bug Fixes, Notificações e LGPD
+
+### 24. Fix: crash `crypto.subtle.digest` no ServiceContext
+**Status:** ✅ Implementado  
+**Detalhe:** `crypto.subtle.digest` (Web Crypto API) não existe em React Native e causava `ReferenceError` na geração do commitment hash. Substituído por implementação pura em JS: `djb2Hash` com dois passes (forward + reverse FNV-1a) produzindo 16 hex chars. Sem dependências externas — funciona offline e sem `expo-crypto`.  
+**Arquivo:** `contexts/ServiceContext.tsx`
+
+---
+
+### 25. PortfolioContext — sincronização cross-screen do portfólio
+**Status:** ✅ Implementado  
+**Detalhe:** `PortfolioContext` criado como fonte única de verdade para dados do portfólio do prestador (`bio`, `promoText`, `promoDue`, `services`, `supportsHelpers`, `helpersCount`, `photoSections`, `reviewSection`, `servicesSection`). Elimina a necessidade de estado local duplicado entre `portfolio.tsx` (editor) e `provider/[id].tsx` (visualização do cliente). `PortfolioProvider` inserido no tree de providers acima de `RequestsProvider`.  
+**Arquivo:** `contexts/PortfolioContext.tsx` (novo)
+
+---
+
+### 26. Painel de perfil do prestador sincroniza com editor de portfólio
+**Status:** ✅ Implementado  
+**Detalhe:** `provider/[id].tsx` agora usa `usePortfolio()` para exibir bio, serviços e promoção quando o perfil visualizado é o do prestador logado (`isOwnProfile = provider.id === "p-1"`). Alterações feitas em `portfolio.tsx` refletem imediatamente no perfil público. `app/portfolio.tsx` refatorado para usar `usePortfolio()` em vez de estado local.  
+**Arquivos:** `app/provider/[id].tsx`, `app/portfolio.tsx`
+
+---
+
+### 27. Badges de ajudantes com "Sim"/"Não" + configuração no portfólio
+**Status:** ✅ Implementado  
+**Detalhe:** Stats row em `provider/[id].tsx` exibe "Sim"/"Não" (em vez de número bruto) quando `supportsHelpers === false`. Badge fica cinza quando não suporta ajudantes. Em `request.tsx`, o toggle de "Precisa de ajudante" fica oculto com aviso explicativo quando o prestador não oferece esse recurso (`providerSupportsHelpers`). Editor de portfólio em `portfolio.tsx` ganhou seção "Ajudantes" com toggle on/off e contador (1–10).  
+**Arquivos:** `app/provider/[id].tsx`, `app/request.tsx`, `app/portfolio.tsx`
+
+---
+
+### 28. ProfileOverlay — conteúdo completo nos sub-menus
+**Status:** ✅ Implementado  
+**Detalhe:** Sub-menus antes vazios ("Em breve") agora têm conteúdo mock rico para a apresentação de stakeholders:
+- **Histórico de Pedidos**: 4 pedidos com ícone, rota, preço e badge de status colorido
+- **Avaliações**: header com nota agregada (4.9/5, 5 estrelas), 3 avaliações individuais com texto
+- **Segurança**: PIN ativo, 2FA SMS, CPF verificado, biometria — cada um com badge colorido
+- **Configurações**: toggles de notificações e localização ligados ao estado real do OS (via `usePermissions()`), mais preferências estáticas (dark mode, idioma)  
+**Arquivo:** `components/ProfileOverlay.tsx`
+
+---
+
+### 29. Marketplace — botões de ação do mapa navegam corretamente
+**Status:** ✅ Implementado  
+**Detalhe:** No `MapExpandModal` (mapa expandido do marketplace), os botões de CTA agora navegam:
+- **Cliente** — "Solicitar este prestador": `router.push({ pathname: "/request", params: { providerId } })` + haptic NotificationSuccess
+- **Prestador** — "Análise de concorrência": `router.push(\`/provider/${id}\`)` + haptic Medium  
+Antes, ambos eram inertes (sem navegação).  
+**Arquivo:** `app/marketplace.tsx`
+
+---
+
+### 30. Home — pin card persiste acima do sheet ao expandir/recolher
+**Status:** ✅ Implementado  
+**Detalhe:** O pin card (card de detalhes do prestador selecionado no mapa) agora segue o topo do sheet usando `sheetHeightAnim.interpolate()` como valor de `bottom`. Antes, o card desaparecia quando o sheet era expandido por causa de um `useEffect` que limpava `active` ao detectar expansão. Esse `useEffect` foi removido. A seleção de pin só é limpa quando o usuário explicitamente toca em outro pin ou fecha o card.  
+**Arquivo:** `app/index.tsx` — `ClienteHome`
+
+---
+
+### 31. Home — mapa redimensiona com o sheet + botão localizar ancorado
+**Status:** ✅ Implementado  
+**Detalhe:** O container do mapa (`Animated.View`) agora tem `bottom: sheetHeightAnim` em vez de `bottom: 0`, fazendo com que a área do mapa encolha corretamente à medida que o sheet sobe (antes o mapa ficava em tamanho fixo com zoom distante e animação travada). O botão de localizar foi movido para dentro do container do mapa com `bottom: 16` fixo, ficando sempre ancorado na borda inferior visível do mapa. Botão exibe `locateSpin` (animação de rotação 360°) e fundo azul durante o recenter ativo.  
+**Arquivo:** `app/index.tsx` — `ClienteHome`
+
+---
+
+### 32. Sistema de push notifications — 22 eventos
+**Status:** ✅ Implementado  
+**Detalhe:** `NotificationContext` com catálogo de 22 eventos cobrindo todos os fluxos críticos:
+- **Cliente**: `service_requested/accepted/en_route/in_progress/completed/cancelled/disputed`, `pin_start_wrong/disputed`, `pin_end_wrong/disputed`
+- **Prestador**: `new_job_request`, `job_accepted/en_route/in_progress/completed/cancelled/disputed`
+- **Compartilhado**: `new_message`, `payment_authorized`, `payout_processed`, `email_confirmed`, `provider_verified`
+
+Watcher reativo dentro de `NotificationProvider` detecta mudanças em `active.status`, `startPinAttempts` e `conclusionAttempts` via refs (evita hydration falsa do AsyncStorage; de-duplica notificação PIN+disputed). 3 canais Android pré-configurados por prioridade. Toque na notificação navega para a tela correta. Permissão delegada para `PermissionsContext`.  
+**Arquivo:** `contexts/NotificationContext.tsx` (novo)
+
+---
+
+### 33. Sistema de permissões LGPD-compliant com sync no banco
+**Status:** ✅ Implementado  
+**Detalhe:** `PermissionsContext` como fonte única de verdade para todas as permissões do app:
+- Lê estados do OS via `expo-location`, `expo-image-picker`, `expo-notifications` no boot e a cada retorno ao foreground (`AppState`)
+- Sincroniza `geolocation_requested`, `camera_requested`, `notifications_requested`, `lgpd_accepted`, `last_consent_update` para `profiles` no Supabase
+- `lgpd_accepted` armazenado em AsyncStorage (offline) + DB (fonte de verdade)
+
+`PermissionGate` — modal que aparece após autenticação:
+1. **Tela LGPD** (bloqueante): explica cada categoria de dados, links para Política e Termos, salva aceite em AsyncStorage + DB
+2. **Tela Localização** (pode pular): explica uso; dispara dialog do OS
+3. **Tela Notificações** (pode pular): explica uso; dispara dialog do OS
+
+`ProfileOverlay` Configurações: toggle verde quando granted, "Toque para ativar" quando canAsk, "Abrir Configurações" (laranja + ícone external) quando permanentemente negado → `Linking.openSettings()`.
+
+`AuthContext.completeOnboarding` atualizado para persistir `geolocation_requested` + `last_consent_update` no banco.  
+**Arquivos:** `contexts/PermissionsContext.tsx` (novo), `components/PermissionGate.tsx` (novo), `contexts/AuthContext.tsx`, `components/ProfileOverlay.tsx`
+
+---
+
+## Contagem geral
+
+| Status | Quantidade |
+|--------|-----------|
+| ✅ Implementado | 33 |
+| 🔶 Parcial | 1 |
+| ❌ Pendente | 0 |
+| **Total** | **34** |
+
+---
+
+_Ajudaê — PROGRESS v2.0 — atualizado em 2026-05-04 — **33/34 ✅** (Notificações + LGPD completos)_

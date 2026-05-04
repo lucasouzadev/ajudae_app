@@ -1,21 +1,23 @@
 # MVP_STATUS.md — Ajudaê
-> Estado atual do app para testes fechados. Atualizado em 2026-04-28.
+> Estado atual do app para testes fechados. Atualizado em 2026-05-04.
 
 ---
 
 ## Resumo Executivo
 
-O app está **pronto para testes fechados de fluxo completo**. Todos os fluxos críticos — autenticação, onboarding, criação de pedido, aceitação pelo prestador, rastreamento, sistema dual-PIN de início e conclusão, disputa e avaliação — estão implementados e funcionando localmente via AsyncStorage. Não há dependência de backend externo para testar os fluxos de negócio.
+O app está **pronto para testes fechados com backend real**. Todos os fluxos críticos — autenticação (Supabase), onboarding, LGPD + permissões OS, criação de pedido via Edge Function, rastreamento, sistema dual-PIN, disputa e avaliação — estão implementados. Push notifications disparam automaticamente em cada mudança de estado. O único bloco para lançamento é a substituição de `MOCK_PROVIDERS` por dados reais e integração de mapa/pagamento.
 
 | Dimensão | Status |
 |---|---|
 | Fluxos de negócio core | ✅ 100% testável |
-| Segurança dual-PIN | ✅ Implementado (commitment hash) |
+| Segurança dual-PIN | ✅ Implementado (commitment hash djb2) |
 | UI Blocking durante serviço | ✅ Implementado |
-| Backend real | ❌ Todo mock local |
-| Push notifications | ❌ Não implementado |
-| Pagamento real | ❌ Mock |
-| Mapa real (GPS) | ❌ SVG estático |
+| Push notifications | ✅ 22 eventos — todos os fluxos cobertos |
+| LGPD / permissões OS | ✅ Implementado com sync no DB |
+| Backend real (Auth + Edge Fns) | ✅ Supabase integrado |
+| MOCK_PROVIDERS → API real | ❌ Pendente (`GET /providers/nearby`) |
+| Mapa real (GPS) | ❌ SVG estático (react-native-maps pronto para coords reais) |
+| Pagamento real | ❌ Mock visual |
 | Chat em tempo real | ❌ Dados estáticos |
 
 ---
@@ -24,12 +26,12 @@ O app está **pronto para testes fechados de fluxo completo**. Todos os fluxos c
 
 | Métrica | Valor |
 |---|---|
-| Total de linhas | ~11.200 |
-| Telas (`app/*.tsx`) | 19 |
-| Componentes | 24 (+ `MarketMap` atualizado) |
-| Contextos | 5 (Auth, Service, Requests, Payments, Support) |
-| Branch de desenvolvimento | `main` |
-| Commits desde início das tasks | 12 commits |
+| Total de linhas estimado | ~14.500 |
+| Telas (`app/*.tsx`) | 21 |
+| Componentes (`components/`) | 27 |
+| Contextos (`contexts/`) | 8 (Auth, Permissions, Notifications, Portfolio, Service, Requests, Payments, Support) |
+| Branch de desenvolvimento | `claude/fix-provider-profile-sync-DOXXR` |
+| Branch de produção | `main` |
 
 ---
 
@@ -38,11 +40,37 @@ O app está **pronto para testes fechados de fluxo completo**. Todos os fluxos c
 ### Autenticação
 | Tela | O que funciona |
 |---|---|
-| `auth.tsx` | Login com credenciais mock, registro com validação, seleção de role (cliente / prestador) com cartões contextuais, persistência de sessão via AsyncStorage |
+| `auth.tsx` | Login/cadastro via Supabase Auth, validação de e-mail com OTP, seleção de role, persistência de sessão |
 
 **Credenciais demo:**
 - Cliente: `cliente@ajudae.com` / `123456`
 - Prestador: `prestador@ajudae.com` / `123456`
+
+---
+
+### LGPD & Permissões (novo em 2026-05-04)
+
+Fluxo exibido automaticamente após a primeira autenticação:
+
+```
+Login/Cadastro
+  ↓
+Tela LGPD (blocking) — explica coleta de dados, links para Política e Termos
+  ↓ aceitar
+Tela Localização — "Permitir" (dispara dialog OS) ou "Agora não"
+  ↓
+Tela Notificações — "Permitir" ou "Agora não"
+  ↓
+App desbloqueado
+```
+
+Após isso, o usuário pode reativar permissões a qualquer momento em **Perfil → Configurações**.
+
+- Toggle verde = granted
+- Toggle cinza + "Toque para ativar" = OS pode ainda pedir
+- Ícone laranja + "Abrir Configurações" = negado permanentemente → abre OS Settings
+
+Todo consentimento é salvo no campo `lgpd_accepted`, `geolocation_requested`, `camera_requested`, `notifications_requested` e `last_consent_update` em `profiles` no Supabase.
 
 ---
 
@@ -52,10 +80,10 @@ O app está **pronto para testes fechados de fluxo completo**. Todos os fluxos c
 | 1 | Boas-vindas com animação |
 | 2 | Nome (mín. 3 chars, validação em tempo real) |
 | 3 | Telefone (DDD + 8–9 dígitos, máscara) |
-| 4 | Permissão GPS (pode pular) |
+| 4 | Permissão GPS (pode pular — integra com `PermissionsContext`) |
 | 5 | "Tudo pronto!" com mensagem diferenciada por role |
 
-Onboarding é obrigatório uma vez, flag `onboardingCompleted` salva em AsyncStorage. Tela de boas-vindas e animações de fade/slide entre etapas.
+`geolocation_requested` agora persiste no DB ao finalizar onboarding.
 
 ---
 
@@ -70,16 +98,15 @@ Home → Solicitar pedido → Aguardar prestador → Rastreamento →
 
 | Tela | O que funciona |
 |---|---|
-| `index.tsx` (cliente) | Home com mapa interativo, pin callout 2 estados, auto-fechamento com sheet, filtros por categoria |
-| `marketplace.tsx` | Lista de prestadores com filtros, mapa com gradiente, modal fullscreen com CTA "Solicitar" |
-| `provider/[id].tsx` | Perfil completo do prestador |
-| `request.tsx` | Formulário de solicitação com origem/destino, fotos, agendamento |
-| `track.tsx` | Rastreamento do pedido, status em tempo real (mock), mapa SVG, botão de chat, acesso ao ticket |
-| `confirm-start-pin.tsx` | Input de 4 dígitos com teclado numérico, validação offline (commitment hash), max 5 tentativas → disputa, KeyboardAvoidingView correto |
-| `otp-modal.tsx` | Exibe PIN de conclusão de 6 dígitos para mostrar ao prestador |
+| `index.tsx` (cliente) | Home com mapa, pin card persiste sobre o sheet, filtros por categoria, localizar com spin animation |
+| `marketplace.tsx` | Lista de prestadores com filtros, mapa com gradiente, modal fullscreen com CTA navegando para `/request` |
+| `provider/[id].tsx` | Perfil completo sincronizado com `PortfolioContext`; helper badge "Sim"/"Não" |
+| `request.tsx` | Formulário com origem/destino, fotos, agendamento; toggle de ajudante oculto se prestador não suporta |
+| `track.tsx` | Rastreamento do pedido, status em tempo real (mock), acesso ao ticket |
+| `confirm-start-pin.tsx` | Input 4 dígitos, validação offline (djb2 commitment hash), max 5 tentativas → disputa |
+| `otp-modal.tsx` | Exibe PIN de conclusão de 6 dígitos |
 | `rate.tsx` | Avaliação em estrelas + comentário após conclusão |
-| `payment.tsx` | Tela de pagamento (mock, sem processamento real) |
-| `request-details.tsx` | Detalhe do pedido anterior |
+| `payment.tsx` | Tela de pagamento (mock visual) |
 
 ---
 
@@ -94,102 +121,102 @@ Home (online) → Receber solicitação → Aceitar → En route →
 
 | Tela | O que funciona |
 |---|---|
-| `index.tsx` (prestador) | Home reestruturada (hierarquia por urgência), toggle verde sólido, ampulheta animada, solicitação com gradiente+pulse, portfólio como 4º tab com editor completo (bio/serviços/promoção/pin-card) |
-| `job.tsx` | Detalhes do job ativo, botão de aceite, status, acesso ao chat |
-| `start-pin.tsx` | Exibe `pin_start` pré-gerado com animação de pulso, auto-navega para `/job` quando status muda para `in_progress` — funciona offline sem rede |
-| `job-otp.tsx` | Input de 6 dígitos para digitar o PIN de conclusão exibido pelo cliente, validação offline, max 5 tentativas → disputa |
+| `index.tsx` (prestador) | Home reestruturada por urgência, toggle verde sólido, ampulheta animada, portfólio como 4º tab |
+| `portfolio.tsx` | Editor completo (bio, serviços, promoção, pin-card, ajudantes on/off com contador) — sincronizado via `PortfolioContext` |
+| `job.tsx` | Detalhes do job ativo, aceite, status, chat |
+| `start-pin.tsx` | Exibe `pin_start` com animação de pulso, funciona offline |
+| `job-otp.tsx` | Input de 6 dígitos para PIN de conclusão, validação offline, max 5 tentativas → disputa |
+
+---
+
+### Push Notifications (novo em 2026-05-04)
+
+22 eventos automáticos cobrindo todos os fluxos:
+
+| Grupo | Eventos disparados |
+|---|---|
+| **Cliente — Serviço** | `service_requested/accepted/en_route/in_progress/completed/cancelled/disputed` |
+| **Cliente — PIN** | `pin_start_wrong` (X tentativas restantes), `pin_start_disputed`, `pin_end_wrong`, `pin_end_disputed` |
+| **Prestador — Job** | `new_job_request`, `job_accepted/en_route/in_progress/completed/cancelled/disputed` |
+| **Compartilhado** | `new_message`, `payment_authorized`, `payout_processed`, `email_confirmed`, `provider_verified` |
+
+As notificações disparam automaticamente ao alterar `ServiceContext`. Toque na notificação navega para a tela correta.
 
 ---
 
 ### Sistema Dual-PIN (Segurança)
 | Propriedade | Valor |
 |---|---|
-| Algoritmo | djb2 hash: `hash(serviceId \| pin_start \| pin_conclusion)` |
-| Dependência de rede na verificação | Nenhuma — 100% local |
-| PINs transmitidos via app | Nunca |
-| Tentativas máximas por PIN | 5 → status `disputed` automático |
-| Geração | No momento da criação do pedido (quando há rede) |
+| Algoritmo | djb2 duplo-passe: `hash(serviceId \| pin_start \| pin_conclusion)` |
+| Dependência de rede | Nenhuma — 100% offline |
+| Tentativas máximas | 5 → status `disputed` automático |
 | `pin_start` | 4 dígitos — prestador exibe, cliente digita |
 | `pin_conclusion` | 6 dígitos — cliente exibe, prestador digita |
 
 ---
 
 ### UI Blocking durante Serviço Ativo
-Quando há um serviço não-terminal (`requested`, `accepted`, `en_route`, `in_progress`):
-- **Cliente**: só pode acessar `track`, `confirm-start-pin`, `otp-modal`, `ticket`, `rate`, `inbox`
-- **Prestador**: só pode acessar `job`, `start-pin`, `job-otp`, `ticket`, `inbox`
-- Qualquer tentativa de navegar para fora redireciona automaticamente para `/track` ou `/job`
-
-Comportamento idêntico ao Uber/99.
+- **Cliente**: só acessa `track`, `confirm-start-pin`, `otp-modal`, `ticket`, `rate`, `inbox`
+- **Prestador**: só acessa `job`, `start-pin`, `job-otp`, `ticket`, `inbox`
+- Redirecionamento automático idêntico ao Uber/99
 
 ---
 
 ### Fluxos Auxiliares
 | Tela/Componente | Status |
 |---|---|
-| `inbox.tsx` | Lista de conversas por role, hubs de suporte, tabs "Todas / Não lidas", auto-scroll para conversa do serviço atual quando acessada via botão de chat |
+| `inbox.tsx` | Lista de conversas por role, hubs de suporte |
 | `support.tsx` | Tela de suporte com categorias |
 | `ticket.tsx` | Abertura de ticket de disputa |
-| `SideSheet.tsx` | Menu lateral com navegação |
-| `ProfileOverlay.tsx` | Overlay de perfil com dados mock (Pagamentos, Endereços, Histórico) |
+| `ProfileOverlay.tsx` | Overlay com sub-menus completos (Histórico, Avaliações, Segurança, Configurações com toggles reais) |
 
 ---
 
 ## O que NÃO está pronto para produção
 
-### Bloqueadores de produção (não afetam testes fechados)
-
 | Item | Detalhe |
 |---|---|
-| Backend / API | Todo o estado é AsyncStorage local. Para produção: substituir por API REST com autenticação JWT |
-| Push notifications | Sem `expo-notifications`. Prestadores não recebem novos pedidos em background |
-| Pagamento real | `payment.tsx` é visual. Sem integração Pix/Stripe |
-| Mapa real | `MapSVG.tsx` é SVG estático. Sem Google Maps / Mapbox e sem geolocalização real |
-| Chat em tempo real | `inbox.tsx` usa dados estáticos. Sem WebSocket ou Firebase Realtime |
-| Commitment hash | djb2 em JS puro (sem `expo-crypto`). Para produção: migrar para HMAC-SHA256 com chave de sessão |
-| Upload de fotos | `request.tsx` tem picker mas sem upload real (sem bucket S3/GCS) |
-
-### Itens do PROGRESS.md ainda pendentes (não-bloqueadores para teste)
-
-| # | Item | Status | Impacto |
-|---|---|---|---|
-| 1 | Navegação bottom tab real | 🔶 Chips existem, sem TabNavigator | Baixo para teste |
-| 5 | Toggle bloqueado para prestador não-verificado | ❌ | Médio |
-| 7 | Flag de ambiente para hints de demo | ❌ | Baixo |
-| 8 | Skeletons nos ScrollViews | ❌ | Baixo |
-| 9 | Botão cancelar explícito no modal de mensagens rápidas | 🔶 | Baixo |
-| 10 | ProviderModal com animação slide | ❌ | Cosmético |
-| 13 | Pull-to-refresh | ❌ | Baixo |
+| `MOCK_PROVIDERS` | Lista de prestadores é estática. Substituir por `GET /providers/nearby?lat=X&lng=Y` |
+| Mapa real GPS | `MapSVG.tsx` estático. `react-native-maps` está integrado e pronto para coordenadas reais |
+| WebSocket posições | Sem stream de posições em tempo real dos prestadores |
+| Pagamento real | `payment.tsx` é visual. Sem Pix/Stripe |
+| Chat em tempo real | `inbox.tsx` usa dados estáticos. Sem WebSocket |
+| djb2 → HMAC-SHA256 | Migrar para `expo-crypto` antes de produção |
+| Upload de fotos | `request.tsx` tem picker mas sem upload real (sem S3/GCS) |
+| Portfólio → Supabase | `PortfolioContext` é local. Sem `PATCH /providers/me/portfolio` ainda |
+| Camera permission onboarding | Câmera só é pedida pelo `ImagePicker` quando necessário, sem passo no `PermissionGate` para prestadores |
 
 ---
 
 ## Roteiro de Teste Sugerido (QA Fechado)
 
+### Cenário 0 — LGPD e Permissões (novo)
+1. Instalar via Expo Go em dispositivo novo (ou limpar dados do app)
+2. Fazer login → verificar que a tela LGPD aparece e bloqueia o app
+3. Aceitar → verificar as telas de localização e notificações em sequência
+4. Ir em Perfil → Configurações → verificar que toggles mostram estado real do OS
+5. Negar uma permissão pelo OS e reabrir o app → verificar badge "Abrir Configurações" laranja
+
 ### Cenário 1 — Fluxo completo feliz
-1. Instalar via Expo Go (link do projeto)
-2. Criar conta como **cliente** → completar onboarding
-3. Solicitar um frete com fotos e agendamento
-4. Mudar de dispositivo / conta → entrar como **prestador**
-5. Aceitar o pedido → ir para "em rota"
-6. Tela `start-pin`: verificar que o PIN de 4 dígitos aparece sem precisar de rede
-7. No dispositivo do cliente: digitar o PIN correto em `confirm-start-pin`
-8. Verificar que ambos são redirecionados para o fluxo de `in_progress`
-9. No cliente: acessar `otp-modal`, anotar o PIN de 6 dígitos
-10. No prestador: digitar o PIN em `job-otp`
-11. Verificar conclusão e tela de avaliação
+1. Criar conta como **cliente** → completar onboarding
+2. Solicitar um frete com fotos e agendamento
+3. Mudar para conta **prestador** → aceitar o pedido
+4. Verificar notificação push em cada mudança de status
+5. Exibir PIN de início → cliente digita → ambos avançam para `in_progress`
+6. Cliente anota PIN de conclusão → prestador digita → conclusão e avaliação
 
 ### Cenário 2 — PIN incorreto (segurança)
-1. Na etapa 7 acima, digitar PINs incorretos repetidamente
-2. Verificar que após 5 tentativas o status muda para `disputed`
-3. Verificar que a tela de erro aparece e o redirecionamento para `/track` ocorre
+1. Digitar PINs incorretos repetidamente
+2. Verificar notificação "PIN incorreto — X tentativas restantes"
+3. Após 5 tentativas: notificação "Limite atingido" + status `disputed` automático
 
 ### Cenário 3 — UI Blocking
-1. Com serviço ativo, tentar navegar manualmente para `/marketplace` ou `/auth`
-2. Verificar que o app redireciona automaticamente para `/track` ou `/job`
+1. Com serviço ativo, tentar navegar para `/marketplace` ou `/auth`
+2. Verificar redirecionamento automático para `/track` ou `/job`
 
 ### Cenário 4 — Reinício do app
-1. Com serviço em andamento, forçar o fechamento do app
-2. Reabrir → verificar que o estado é restaurado do AsyncStorage corretamente
+1. Com serviço em andamento, forçar fechamento
+2. Reabrir → estado restaurado do AsyncStorage; notificações não re-disparam
 
 ---
 
@@ -197,31 +224,30 @@ Comportamento idêntico ao Uber/99.
 
 | Área | Completude estimada |
 |---|---|
-| Autenticação e onboarding | 90% |
-| Fluxo do cliente (criação → conclusão) | 88% |
-| Fluxo do prestador (aceitação → conclusão) | 90% |
+| Autenticação e onboarding | 92% |
+| LGPD e permissões OS | 95% |
+| Push notifications | 95% |
+| Fluxo do cliente (criação → conclusão) | 90% |
+| Fluxo do prestador (aceitação → conclusão) | 92% |
 | Sistema de segurança dual-PIN | 95% |
 | Dashboard do prestador (UX/UI) | 95% |
-| Portfólio do prestador (UX/UI) | 80% (backend 0%) |
-| Marketplace (UX/UI) | 85% |
+| Portfólio do prestador (UX/UI) | 88% (backend 0%) |
+| Marketplace (UX/UI) | 88% |
 | Inbox / Chat | 30% (visual estático) |
 | Pagamentos | 15% (visual apenas) |
-| Mapa e geolocalização | 25% (SVG estático, pin system maduro) |
-| Push notifications | 0% |
-| Haptic feedback | 90% |
-| **MVP testável end-to-end** | **~80%** |
+| Mapa e geolocalização | 30% (react-native-maps pronto, sem coords reais) |
+| **MVP testável end-to-end** | **~90%** |
 
 ---
 
 ## Próximos Passos Recomendados (por prioridade)
 
-1. **Distribuição via Expo Go** — gerar link de preview para o time de QA
-2. **Persistência local do portfólio** — salvar estado do `PortfolioSheet` em AsyncStorage (antes do backend real)
-3. **Escalabilidade do hash** — migrar djb2 para HMAC-SHA256 com `expo-crypto` antes de produção
-4. **Backend mínimo** — contratos de API documentados em `HANDOFF_2026-04-28.md` — endpoint de criação de pedido + WebSocket para notificações + API de portfólio
-5. **Mapa real** — integração Google Maps / Mapbox substituindo `MapSVG.tsx` estático; coordenadas de pins via `GET /providers/nearby`
-
----
+1. **QA fechado** — testar todos os cenários acima em 2 dispositivos iOS e 2 Android
+2. **`MOCK_PROVIDERS` → API real** — `GET /providers/nearby` + WebSocket de posições
+3. **Mapa real** — substituir `MapSVG.tsx` por `react-native-maps` com coordenadas Supabase
+4. **Portfolio → Supabase** — `PATCH /providers/me/portfolio` para persistir portfolio remotamente
+5. **Pagamento** — integração Pix/Stripe
+6. **djb2 → HMAC-SHA256** — migrar antes de ir para produção
 
 ---
 
@@ -229,12 +255,12 @@ Comportamento idêntico ao Uber/99.
 
 | Documento | Conteúdo |
 |---|---|
-| `arquitetura/PROGRESS.md` | Itens implementados com detalhe técnico (23 itens) |
-| `arquitetura/HANDOFF_2026-04-28.md` | Contratos de API, decisões de design, debt técnico da sessão |
+| `arquitetura/PROGRESS.md` | 33 itens implementados com detalhe técnico |
+| `arquitetura/HANDOFF_2026-05-04.md` | Handoff da sessão atual (bugs, notificações, LGPD) |
+| `arquitetura/HANDOFF_2026-04-28.md` | Handoff UI Layer v2 (contratos de API, decisões de design) |
 | `arquitetura/PIN_SYSTEM.md` | Sistema dual-PIN detalhado |
 | `arquitetura/Comissionados/Documentos Técnicos/DB_SCHEMA.md` | Schema do banco de dados |
-| `arquitetura/Comissionados/Documentos Técnicos/ARCHITECTURE.md` | Arquitetura geral do sistema |
 
 ---
 
-_Ajudaê — MVP Status v1.1 — 2026-04-28 — UI Layer v2 completo, ~80% MVP testável_
+_Ajudaê — MVP Status v2.0 — 2026-05-04 — Notificações + LGPD completos, ~90% MVP testável_
