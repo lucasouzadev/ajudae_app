@@ -1471,20 +1471,6 @@ function ClienteHome() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [active, setActive] = useState<Provider | null>(null);   // pin focado (1º toque)
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
-  const [locating, setLocating] = useState(false);
-  const locateSpin = useRef(new Animated.Value(0)).current;
-
-  const handleLocate = async () => {
-    setLocating(true);
-    Animated.loop(
-      Animated.timing(locateSpin, { toValue: 1, duration: 600, useNativeDriver: true })
-    ).start();
-    try { await mapRef.current?.recenter(); } catch {}
-    locateSpin.stopAnimation();
-    locateSpin.setValue(0);
-    setLocating(false);
-  };
-
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);

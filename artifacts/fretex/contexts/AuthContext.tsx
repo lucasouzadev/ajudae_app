@@ -514,3 +514,24 @@ export function useAuth() {
   if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }
+
+// Safe version that returns defaults if context unavailable (for provider components)
+export function useAuthSafe() {
+  const context = useContext(AuthContext);
+  return context ?? {
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+    role: null,
+    accountStatus: null,
+    login: async () => {},
+    signup: async () => {},
+    logout: async () => {},
+    refreshUser: async () => {},
+    confirmSignupOtp: async () => {},
+    resendSignupOtp: async () => {},
+    clearPendingAccount: () => {},
+    completeOnboarding: async () => {},
+    pendingAccount: null,
+  };
+}

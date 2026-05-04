@@ -1,21 +1,33 @@
 import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
-import { useAuth } from "./AuthContext";
+import { useAuthSafe } from "./AuthContext";
 import { usePermissions } from "./PermissionsContext";
 import { useService, type ServiceStatus } from "./ServiceContext";
 
+let Notifications: typeof import("expo-notifications") | null = null;
+try {
+  Notifications = require("expo-notifications");
+} catch (e) {
+  console.warn("expo-notifications not available (dev env without native modules)");
+}
+
 // ─── Foreground notification handler ──────────────────────────────────────────
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+if (Notifications) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (e) {
+    console.warn("NotificationHandler setup failed:", (e as Error).message);
+  }
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -197,6 +209,7 @@ const CATALOG: Record<NotificationEvent, (v?: Vars) => NotificationPayload> = {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 async function fire(event: NotificationEvent, vars?: Vars): Promise<void> {
+  if (!Notifications) return; // notifications not available in dev
   const payload = CATALOG[event](vars);
 
   // Map events to Android channels
@@ -248,7 +261,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // ── Request push token once notification permission is granted ────────────
   useEffect(() => {
-    if (!notifications.granted || pushToken) return;
+    if (!Notifications || !notifications.granted || pushToken) return;
     const projectId =
       (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.eas?.projectId as
         | string

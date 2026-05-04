@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
-import * as Notifications from "expo-notifications";
 import React, {
   createContext,
   useCallback,
@@ -13,7 +12,14 @@ import React, {
 import { AppState, Linking } from "react-native";
 
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "./AuthContext";
+import { useAuthSafe } from "./AuthContext";
+
+let Notifications: typeof import("expo-notifications") | null = null;
+try {
+  Notifications = require("expo-notifications");
+} catch (e) {
+  // expo-notifications not available in dev
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,7 +65,7 @@ const DENIED: OsPermission = { granted: false, canAsk: false };
 const UNKNOWN: OsPermission = { granted: false, canAsk: true };
 
 export function PermissionsProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuthSafe();
 
   const [location, setLocation] = useState<OsPermission>(UNKNOWN);
   const [camera, setCamera] = useState<OsPermission>(UNKNOWN);
@@ -72,12 +78,13 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
 
   // ── Read all OS permission states ───────────────────────────────────────────
   const refresh = useCallback(async () => {
-    const [locResult, camResult, libResult, notifResult] = await Promise.all([
+    const results = await Promise.all([
       Location.getForegroundPermissionsAsync(),
       ImagePicker.getCameraPermissionsAsync(),
       ImagePicker.getMediaLibraryPermissionsAsync(),
-      Notifications.getPermissionsAsync(),
+      Notifications ? Notifications.getPermissionsAsync() : Promise.resolve({ status: "denied", canAskAgain: false }),
     ]);
+    const [locResult, camResult, libResult, notifResult] = results;
     setLocation(toOsPerm(locResult.status, locResult.canAskAgain));
     setCamera(toOsPerm(camResult.status, camResult.canAskAgain));
     setMediaLibrary(toOsPerm(libResult.status, libResult.canAskAgain));
@@ -181,6 +188,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   };
 
   const requestNotifications = async (): Promise<boolean> => {
+    if (!Notifications) return false; // notifications not available in dev
     await setupAndroidNotificationChannels();
     const result = await Notifications.requestPermissionsAsync();
     const perm = toOsPerm(result.status, result.canAskAgain);
@@ -236,6 +244,7 @@ export function usePermissions() {
 // ─── Android channel setup (shared with NotificationContext) ─────────────────
 
 async function setupAndroidNotificationChannels() {
+  if (!Notifications) return; // notifications not available in dev
   const { Platform } = await import("react-native");
   if (Platform.OS !== "android") return;
   await Promise.all([
