@@ -262,7 +262,7 @@ export default function ProviderValidationScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images,
       quality: 0.9,
     });
 
@@ -327,7 +327,13 @@ export default function ProviderValidationScreen() {
       return value;
     }
 
-    const response = await fetch(value);
+    let response: Response;
+    try {
+      response = await fetch(value);
+    } catch (err) {
+      console.warn(`[uploadDocument] fetch falhou para ${name}:`, err);
+      throw new Error(`Não foi possível ler o arquivo "${name}". Tente selecionar novamente.`);
+    }
     const blob = await response.blob();
     const extension = (blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
     const path = `${providerUser.id}/${Date.now()}-${name}.${extension}`;

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { Linking, View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -82,6 +82,12 @@ export default function SupportScreen() {
           {QUICK.map((q) => (
             <Pressable
               key={q.label}
+              onPress={() => {
+                if (q.label === "Reportar problema") router.push("/ticket");
+                else if (q.label === "Chat com agente") router.push({ pathname: "/chat", params: { id: "support", name: "Suporte Ajudaê", ini: "SA", color: "#FF5500", type: "support" } } as any);
+                else if (q.label === "Cobrança") router.push({ pathname: "/chat", params: { id: "financial", name: "Suporte Financeiro", ini: "SF", color: "#16A34A", type: "financial" } } as any);
+                else if (q.label === "Segurança") router.push("/ticket");
+              }}
               style={[styles.quickCell, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
             >
               <View style={[styles.quickIcon, { backgroundColor: `${q.color}18` }]}>
@@ -176,7 +182,7 @@ export default function SupportScreen() {
         {/* Contacts */}
         <Text style={[styles.sectionTitle, { color: c.text, marginTop: 24 }]}>Outros canais</Text>
         <View style={[styles.contactCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-          <View style={[styles.contactRow, { borderBottomColor: c.borderLight }]}>
+          <Pressable onPress={() => Linking.openURL("whatsapp://send?phone=5521998765432").catch(() => Linking.openURL("https://wa.me/5521998765432"))} style={[styles.contactRow, { borderBottomColor: c.borderLight }]}>
             <View style={[styles.contactIcon, { backgroundColor: c.successLight }]}>
               <MaterialCommunityIcons name="whatsapp" size={18} color={c.success} />
             </View>
@@ -185,8 +191,8 @@ export default function SupportScreen() {
               <Text style={[styles.contactSub, { color: c.softMuted }]}>(21) 9 9876-5432</Text>
             </View>
             <Ionicons name="open-outline" size={16} color={c.softMuted} />
-          </View>
-          <View style={[styles.contactRow, { borderBottomColor: c.borderLight }]}>
+          </Pressable>
+          <Pressable onPress={() => Linking.openURL("mailto:ajuda@ajudae.app")} style={[styles.contactRow, { borderBottomColor: c.borderLight }]}>
             <View style={[styles.contactIcon, { backgroundColor: c.blueLight }]}>
               <Ionicons name="mail" size={18} color={c.blue} />
             </View>
@@ -195,8 +201,8 @@ export default function SupportScreen() {
               <Text style={[styles.contactSub, { color: c.softMuted }]}>ajuda@ajudae.app</Text>
             </View>
             <Ionicons name="open-outline" size={16} color={c.softMuted} />
-          </View>
-          <View style={styles.contactRow}>
+          </Pressable>
+          <Pressable onPress={() => Linking.openURL("tel:08002004500")} style={styles.contactRow}>
             <View style={[styles.contactIcon, { backgroundColor: c.warningLight }]}>
               <Ionicons name="call" size={18} color={c.warning} />
             </View>
@@ -205,7 +211,7 @@ export default function SupportScreen() {
               <Text style={[styles.contactSub, { color: c.softMuted }]}>0800 200 4500</Text>
             </View>
             <Ionicons name="open-outline" size={16} color={c.softMuted} />
-          </View>
+          </Pressable>
         </View>
       </ScrollView>
 

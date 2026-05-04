@@ -1,5 +1,6 @@
-import React, { useRef } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import React, { useRef, useState } from "react";
+import { View, Text, Pressable, StyleSheet, Animated } from "react-native";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import colors, { fonts, shadows } from "@/constants/colors";
@@ -27,6 +28,7 @@ interface MarketMapProps {
   height?: number;
   onExpand?: () => void;
   headerTop?: number;
+  recenterBottom?: number;
 }
 
 export function MarketMap({
@@ -39,9 +41,32 @@ export function MarketMap({
   height = 310,
   onExpand,
   headerTop = 12,
+  recenterBottom = 60,
 }: MarketMapProps) {
   const c = colors.light;
   const mapRef = useRef<MapRealRef>(null);
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const spinLoop = useRef<Animated.CompositeAnimation | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  const handleRecenter = () => {
+    if (locating) return;
+    setLocating(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    spinAnim.setValue(0);
+    spinLoop.current = Animated.loop(
+      Animated.timing(spinAnim, { toValue: 1, duration: 700, useNativeDriver: true })
+    );
+    spinLoop.current.start();
+    mapRef.current?.recenter().finally(() => {
+      spinLoop.current?.stop();
+      spinAnim.setValue(0);
+      setLocating(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    });
+  };
+
+  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   return (
     <View
@@ -83,10 +108,12 @@ export function MarketMap({
 
       {/* Recenter button */}
       <Pressable
-        style={[styles.recenter, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
-        onPress={() => mapRef.current?.recenter()}
+        style={[styles.recenter, { bottom: recenterBottom, backgroundColor: locating ? c.primary + "20" : c.card, borderColor: locating ? c.primary : c.border }, shadows.sm]}
+        onPress={handleRecenter}
       >
-        <MaterialCommunityIcons name="crosshairs-gps" size={16} color={c.text} />
+        <Animated.View style={{ transform: [{ rotate: spin }] }}>
+          <MaterialCommunityIcons name="crosshairs-gps" size={16} color={locating ? c.primary : c.text} />
+        </Animated.View>
       </Pressable>
 
       {/* Expand tap affordance */}
@@ -152,7 +179,7 @@ const styles = StyleSheet.create({
   recenter: {
     position: "absolute",
     right: 12,
-    top: 80,
+    bottom: 0, /* overridden inline via recenterBottom prop */
     width: 36,
     height: 36,
     borderRadius: 12,

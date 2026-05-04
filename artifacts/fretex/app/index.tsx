@@ -934,10 +934,51 @@ const tabBarStyles = StyleSheet.create({
 
 /* ─── PedidosTab (Cliente) ──────────────────────────────────────────────── */
 const MOCK_PEDIDOS = [
-  { id: "PD001", cat: "Mudança", provider: "Carlos Oliveira", status: "in_progress", price: "R$320", date: "Hoje, 14h30", color: "#FF5500" },
-  { id: "PD002", cat: "Frete", provider: "Marcos Frete", status: "completed", price: "R$120", date: "Ontem", color: "#2563EB" },
-  { id: "PD003", cat: "Entrega", provider: "Pedro Entrega", status: "completed", price: "R$52", date: "22 abr", color: "#9333EA" },
-  { id: "PD004", cat: "Frete", provider: "Rafael Carreto", status: "cancelled", price: "R$80", date: "19 abr", color: "#2563EB" },
+  {
+    id: "PD001", cat: "Mudança", provider: "Carlos Oliveira", providerIni: "CO", status: "in_progress",
+    price: "R$320", priceBase: "R$280", priceTaxa: "R$40", date: "Hoje, 14h30", color: "#FF5500",
+    origin: "Rua General Glicério, 248 — Laranjeiras", dest: "Av. das Américas, 1510 — Barra",
+    vehicle: "Van", rating: 4.9, timeline: [
+      { label: "Solicitado", when: "Hoje, 14h30", done: true },
+      { label: "Aceito", when: "Hoje, 14h35", done: true },
+      { label: "A caminho", when: "Hoje, 14h50", done: true },
+      { label: "Iniciado", when: "Hoje, 15h10", done: false },
+      { label: "Concluído", when: "—", done: false },
+    ],
+  },
+  {
+    id: "PD002", cat: "Frete", provider: "Marcos Frete", providerIni: "MF", status: "completed",
+    price: "R$120", priceBase: "R$100", priceTaxa: "R$20", date: "Ontem, 10h00", color: "#2563EB",
+    origin: "Rua Voluntários da Pátria, 90 — Botafogo", dest: "Rua do Catete, 350 — Catete",
+    vehicle: "Caminhão", rating: 4.7, timeline: [
+      { label: "Solicitado", when: "Ontem, 09h50", done: true },
+      { label: "Aceito", when: "Ontem, 09h55", done: true },
+      { label: "A caminho", when: "Ontem, 10h05", done: true },
+      { label: "Iniciado", when: "Ontem, 10h30", done: true },
+      { label: "Concluído", when: "Ontem, 12h15", done: true },
+    ],
+  },
+  {
+    id: "PD003", cat: "Entrega", provider: "Pedro Entrega", providerIni: "PE", status: "completed",
+    price: "R$52", priceBase: "R$45", priceTaxa: "R$7", date: "22 abr, 16h00", color: "#9333EA",
+    origin: "Loja Magazine — Shopping Tijuca", dest: "Rua Araguaia, 120 — Jacarepaguá",
+    vehicle: "Moto", rating: 4.8, timeline: [
+      { label: "Solicitado", when: "22 abr, 15h50", done: true },
+      { label: "Aceito", when: "22 abr, 15h53", done: true },
+      { label: "A caminho", when: "22 abr, 16h00", done: true },
+      { label: "Iniciado", when: "22 abr, 16h10", done: true },
+      { label: "Concluído", when: "22 abr, 16h45", done: true },
+    ],
+  },
+  {
+    id: "PD004", cat: "Frete", provider: "Rafael Carreto", providerIni: "RC", status: "cancelled",
+    price: "R$80", priceBase: "R$80", priceTaxa: "R$0", date: "19 abr, 11h00", color: "#2563EB",
+    origin: "Rua Álvaro Ramos, 200 — Botafogo", dest: "Rua Conde de Bonfim, 88 — Tijuca",
+    vehicle: "Caminhonete", rating: 4.5, timeline: [
+      { label: "Solicitado", when: "19 abr, 11h00", done: true },
+      { label: "Cancelado pelo prestador", when: "19 abr, 11h15", done: true },
+    ],
+  },
 ];
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
@@ -946,6 +987,147 @@ const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> = 
   cancelled: { label: "Cancelado", bg: "#FEE2E2", fg: "#DC2626" },
   requested: { label: "Aguardando", bg: "#DBEAFE", fg: "#2563EB" },
 };
+
+type MockPedido = typeof MOCK_PEDIDOS[number];
+
+function PedidoDetailModal({ pedido, onClose }: { pedido: MockPedido; onClose: () => void }) {
+  const c = colors.light;
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const st = STATUS_LABEL[pedido.status] || STATUS_LABEL.requested;
+  const isCompleted = pedido.status === "completed";
+  const isCancelled = pedido.status === "cancelled";
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: c.background }}>
+        {/* Header */}
+        <View style={[{ paddingTop: insets.top + 12, paddingBottom: 14, paddingHorizontal: 16, backgroundColor: c.card, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+          <Pressable onPress={onClose} style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: c.background, borderWidth: 1, borderColor: c.borderLight, alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="close" size={18} color={c.text} />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, fontFamily: fonts.sans.bold, color: c.text }}>{pedido.cat} · #{pedido.id}</Text>
+            <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 1 }}>{pedido.date}</Text>
+          </View>
+          <View style={[{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: st.bg }]}>
+            <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: st.fg }}>{st.label}</Text>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }} showsVerticalScrollIndicator={false}>
+          {/* Provider */}
+          <View style={[{ backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 12 }, shadows.sm]}>
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: pedido.color, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ color: "#fff", fontSize: 15, fontFamily: fonts.serif.extra }}>{pedido.providerIni}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>{pedido.provider}</Text>
+              <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 2 }}>{pedido.vehicle} · ★ {pedido.rating}</Text>
+            </View>
+            {!isCancelled && (
+              <Pressable
+                onPress={() => { onClose(); router.push({ pathname: "/chat", params: { id: `c-1`, name: pedido.provider, ini: pedido.providerIni, color: pedido.color, type: "dm" } } as any); }}
+                style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: `${pedido.color}18`, alignItems: "center", justifyContent: "center" }}
+              >
+                <Ionicons name="chatbubble-ellipses" size={16} color={pedido.color} />
+              </Pressable>
+            )}
+          </View>
+
+          {/* Addresses */}
+          <View style={[{ backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 12 }, shadows.sm]}>
+            <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 10 }}>ENDEREÇOS</Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+              <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: "#DCFCE7", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="radio-button-on" size={13} color="#16A34A" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.4 }}>ORIGEM</Text>
+                <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text, marginTop: 2 }}>{pedido.origin}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
+              <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: "#FEE2E2", alignItems: "center", justifyContent: "center" }}>
+                <Ionicons name="location" size={13} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.4 }}>DESTINO</Text>
+                <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text, marginTop: 2 }}>{pedido.dest}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Price */}
+          <View style={[{ backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 12 }, shadows.sm]}>
+            <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 10 }}>PAGAMENTO</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.sub }}>Serviço</Text>
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text }}>{pedido.priceBase}</Text>
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.sub }}>Taxa da plataforma</Text>
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text }}>{pedido.priceTaxa}</Text>
+            </View>
+            <View style={{ height: 1, backgroundColor: c.borderLight, marginBottom: 10 }} />
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Total</Text>
+              <Text style={{ fontSize: 16, fontFamily: fonts.serif.extra, color: pedido.color }}>{pedido.price}</Text>
+            </View>
+          </View>
+
+          {/* Timeline */}
+          <View style={[{ backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }, shadows.sm]}>
+            <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 12 }}>LINHA DO TEMPO</Text>
+            {pedido.timeline.map((t, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: i < pedido.timeline.length - 1 ? 12 : 0 }}>
+                <View style={{ alignItems: "center", width: 22 }}>
+                  <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: t.done ? (isCancelled && i === pedido.timeline.length - 1 ? "#FEE2E2" : "#DCFCE7") : c.borderLight, alignItems: "center", justifyContent: "center" }}>
+                    <Ionicons name={t.done ? (isCancelled && i === pedido.timeline.length - 1 ? "close" : "checkmark") : "ellipse-outline"} size={12} color={t.done ? (isCancelled && i === pedido.timeline.length - 1 ? "#DC2626" : "#16A34A") : c.softMuted} />
+                  </View>
+                  {i < pedido.timeline.length - 1 && <View style={{ width: 1, height: 14, backgroundColor: t.done ? c.success : c.borderLight, marginTop: 3 }} />}
+                </View>
+                <View style={{ flex: 1, paddingTop: 2 }}>
+                  <Text style={{ fontSize: 13, fontFamily: t.done ? fonts.sans.semibold : fonts.sans.regular, color: t.done ? c.text : c.softMuted }}>{t.label}</Text>
+                  <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 1 }}>{t.when}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Actions */}
+          {isCompleted && (
+            <Pressable
+              onPress={() => { onClose(); router.push({ pathname: "/chat", params: { id: `c-1`, name: pedido.provider, ini: pedido.providerIni, color: pedido.color, type: "dm" } } as any); }}
+              style={[{ height: 48, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: pedido.color }, shadows.sm]}
+            >
+              <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
+              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: "#fff" }}>Mensagem ao prestador</Text>
+            </Pressable>
+          )}
+          {!isCompleted && !isCancelled && (
+            <Pressable
+              onPress={() => { onClose(); router.push("/track"); }}
+              style={[{ height: 48, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.primary }, shadows.sm]}
+            >
+              <Ionicons name="navigate" size={16} color="#1A1714" />
+              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: "#1A1714" }}>Acompanhar serviço</Text>
+            </Pressable>
+          )}
+          {(isCompleted || isCancelled) && (
+            <Pressable
+              onPress={() => { onClose(); router.push("/ticket"); }}
+              style={[{ height: 44, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 8 }]}
+            >
+              <Ionicons name="warning-outline" size={15} color={c.softMuted} />
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.sub }}>Reportar problema</Text>
+            </Pressable>
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
 
 function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
   const c = colors.light;
@@ -956,6 +1138,7 @@ function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [selectedPedido, setSelectedPedido] = useState<MockPedido | null>(null);
   const hasActive = !!(active && active.status !== "completed" && active.status !== "cancelled");
 
   return (
@@ -1008,7 +1191,11 @@ function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
         {MOCK_PEDIDOS.map((p) => {
           const st = STATUS_LABEL[p.status] || STATUS_LABEL.requested;
           return (
-            <View key={p.id} style={[pedidosStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+            <Pressable
+              key={p.id}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setSelectedPedido(p); }}
+              style={[pedidosStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+            >
               <View style={[pedidosStyles.catDot, { backgroundColor: `${p.color}22` }]}>
                 {p.cat === "Mudança" ? (
                   <Ionicons name="home" size={16} color={p.color} />
@@ -1028,10 +1215,12 @@ function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
                   <Text style={[pedidosStyles.statusText, { color: st.fg }]}>{st.label}</Text>
                 </View>
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={14} color={c.softMuted} />
+            </Pressable>
           );
         })}
       </ScrollView>
+      {selectedPedido && <PedidoDetailModal pedido={selectedPedido} onClose={() => setSelectedPedido(null)} />}
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
       <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Cliente"} initials={initials} />
     </View>
@@ -1285,15 +1474,51 @@ function ClienteHome() {
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const pinCardVisibleRef = useRef(pinCardVisible);
+  useEffect(() => { pinCardVisibleRef.current = pinCardVisible; }, [pinCardVisible]);
+
+  const locateAnim = useRef(new Animated.Value(0)).current;
+  const locateSpinLoop = useRef<Animated.CompositeAnimation | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  const handleLocate = () => {
+    if (locating) return;
+    setLocating(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    locateAnim.setValue(0);
+    locateSpinLoop.current = Animated.loop(
+      Animated.timing(locateAnim, { toValue: 1, duration: 700, useNativeDriver: true })
+    );
+    locateSpinLoop.current.start();
+    mapRef.current?.recenter().finally(() => {
+      locateSpinLoop.current?.stop();
+      locateAnim.setValue(0);
+      setLocating(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    });
+  };
+
+  const locateSpin = locateAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+
+  const sheetWasExpanded = useRef(false);
   useEffect(() => {
     const id = sheetHeightAnim.addListener(({ value }) => {
-      if (value > COLLAPSED_H + 20 && pinCardVisible) {
+      const isExpanded = value >= EXPANDED_H - 20;
+      if (isExpanded !== sheetWasExpanded.current) {
+        sheetWasExpanded.current = isExpanded;
+        if (isExpanded) {
+          mapRef.current?.zoomOut();
+        } else {
+          mapRef.current?.zoomIn();
+        }
+      }
+      if (value > COLLAPSED_H + 20 && pinCardVisibleRef.current) {
         setActive(null);
         setPinCardVisible(false);
       }
     });
     return () => sheetHeightAnim.removeListener(id);
-  }, [pinCardVisible]);
+  }, [sheetHeightAnim]);
   const [profileOpen, setProfileOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [modalProvider, setModalProvider] = useState<Provider | null>(null);
@@ -1362,10 +1587,12 @@ function ClienteHome() {
           }}
         >
           <Pressable
-            style={[styles.locateBtn, { backgroundColor: c.card }, shadows.md]}
-            onPress={() => { mapRef.current?.recenter(); }}
+            style={[styles.locateBtn, { backgroundColor: locating ? c.blue : c.card }, shadows.md]}
+            onPress={handleLocate}
           >
-            <Ionicons name="locate" size={20} color={c.blue} />
+            <Animated.View style={{ transform: [{ rotate: locateSpin }] }}>
+              <Ionicons name="locate" size={20} color={locating ? "#fff" : c.blue} />
+            </Animated.View>
           </Pressable>
         </Animated.View>
       </Animated.View>
@@ -2424,10 +2651,10 @@ const styles = StyleSheet.create({
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
 const SCREEN_H = Dimensions.get("window").height;
-const COLLAPSED_H = 280;  // mapa maior quando sheet compacto
+const COLLAPSED_H = 196;  // mapa maior quando sheet compacto
 const CHIP_ROW_H  = 52;   // altura da faixa flutuante de filtros
 const MINI_CARD_H = 82;   // altura fixa dos mini cards no carrossel
-const EXPANDED_H = Math.min(SCREEN_H * 0.63, 540);
+const EXPANDED_H = Math.min(SCREEN_H * 0.50, 400);
 
 function ProvidersSheet({
   providers,

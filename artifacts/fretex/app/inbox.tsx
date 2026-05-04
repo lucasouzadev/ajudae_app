@@ -135,7 +135,19 @@ export default function InboxScreen() {
           {hubs.map((h) => (
             <Pressable
               key={h.label}
-              onPress={() => router.push("/support")}
+              onPress={() => {
+                if (h.label === "Chat com suporte" || h.label === "Suporte prestador") {
+                  router.push({ pathname: "/chat", params: { id: "support", name: h.label, ini: "S", color: h.color, type: role === "prestador" ? "provider_support" : "support" } } as any);
+                } else if (h.label === "WhatsApp") {
+                  import("react-native").then(({ Linking }) => Linking.openURL("whatsapp://send?phone=5521998765432").catch(() => Linking.openURL("https://wa.me/5521998765432")));
+                } else if (h.label === "Reportar problema" || h.label === "Disputa ou no-show") {
+                  router.push("/ticket");
+                } else if (h.label === "Pagamentos") {
+                  router.push({ pathname: "/chat", params: { id: "financial", name: "Suporte Financeiro", ini: "SF", color: h.color, type: "financial" } } as any);
+                } else {
+                  router.push("/support");
+                }
+              }}
               style={[styles.hubCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
             >
               <View style={[styles.hubIcon, { backgroundColor: `${h.color}18` }]}>
@@ -206,6 +218,7 @@ export default function InboxScreen() {
           filtered.map((m) => (
             <Pressable
               key={m.id}
+              onPress={() => router.push({ pathname: "/chat", params: { id: m.id, name: m.name, ini: m.ini, color: m.color, type: "dm" } } as any)}
               style={[
                 styles.convoCard,
                 { backgroundColor: c.card, borderColor: highlightId === m.id ? accent : c.border },

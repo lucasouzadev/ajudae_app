@@ -25,6 +25,8 @@ export interface MapPin {
 
 export interface MapRealRef {
   recenter: () => Promise<void>;
+  zoomOut: () => void;
+  zoomIn: () => void;
 }
 
 interface MapRealProps {
@@ -44,6 +46,7 @@ export const MapReal = forwardRef<MapRealRef, MapRealProps>(
   ({ pins, activeId, onPinPress }, ref) => {
     const mapRef = useRef<MapView>(null);
     const [region, setRegion] = useState(RIO_DEFAULT);
+    const regionRef = useRef(RIO_DEFAULT);
 
     useImperativeHandle(ref, () => ({
       recenter: async () => {
@@ -56,8 +59,17 @@ export const MapReal = forwardRef<MapRealRef, MapRealProps>(
           latitudeDelta: 0.04,
           longitudeDelta: 0.04,
         };
+        regionRef.current = newRegion;
         setRegion(newRegion);
         mapRef.current?.animateToRegion(newRegion, 600);
+      },
+      zoomOut: () => {
+        const r = { ...regionRef.current, latitudeDelta: 0.22, longitudeDelta: 0.22 };
+        mapRef.current?.animateToRegion(r, 500);
+      },
+      zoomIn: () => {
+        const r = { ...regionRef.current, latitudeDelta: 0.07, longitudeDelta: 0.07 };
+        mapRef.current?.animateToRegion(r, 500);
       },
     }));
 

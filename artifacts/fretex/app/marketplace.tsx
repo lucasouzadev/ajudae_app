@@ -287,6 +287,7 @@ function MapExpandModal({
             badgeColor={role === "cliente" ? c.success : c.blue}
             height={SCREEN_H_MKT - safeTop}
             headerTop={64}
+            recenterBottom={insets.bottom + 72}
           />
         </View>
 
@@ -853,7 +854,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  searchInput: { flex: 1, fontSize: 14, fontFamily: fonts.sans.medium, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: fonts.sans.medium, paddingVertical: 0, letterSpacing: 0 },
   filterChip: {
     paddingHorizontal: 14,
     height: 32,

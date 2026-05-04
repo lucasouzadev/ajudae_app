@@ -356,7 +356,7 @@ function ProviderOnboarding() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -373,7 +373,7 @@ function ProviderOnboarding() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images,
       quality: 0.9,
     });
     if (!result.canceled && result.assets[0]) {
