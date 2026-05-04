@@ -1490,10 +1490,33 @@ function ClienteHome() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [modalProvider, setModalProvider] = useState<Provider | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const spinLoop = useRef<Animated.CompositeAnimation | null>(null);
+
   const onRefresh = () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1200);
   };
+
+  const handleLocate = () => {
+    if (locating) return;
+    setLocating(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    spinAnim.setValue(0);
+    spinLoop.current = Animated.loop(
+      Animated.timing(spinAnim, { toValue: 1, duration: 700, useNativeDriver: true })
+    );
+    spinLoop.current.start();
+    mapRef.current?.recenter().finally(() => {
+      spinLoop.current?.stop();
+      spinAnim.setValue(0);
+      setLocating(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    });
+  };
+
+  const locateSpin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   const filtered = useMemo(
     () => (filter === "Todos" ? MOCK_PROVIDERS : MOCK_PROVIDERS.filter((p) => p.cat === filter)),
@@ -2617,7 +2640,7 @@ const SCREEN_H = Dimensions.get("window").height;
 const COLLAPSED_H = 196;  // mapa maior quando sheet compacto
 const CHIP_ROW_H  = 52;   // altura da faixa flutuante de filtros
 const MINI_CARD_H = 82;   // altura fixa dos mini cards no carrossel
-const EXPANDED_H = Math.min(SCREEN_H * 0.50, 400);
+const EXPANDED_H = Math.min(SCREEN_H * 0.58, 460);
 
 function ProvidersSheet({
   providers,
