@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 interface ProfileOverlayProps {
   open: boolean;
@@ -203,16 +204,68 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
   }
 
   if (label === "Configurações") {
-    const settings = [
-      { icon: "notifications" as const, label: "Notificações de pedidos", sub: "Push e e-mail", on: true },
-      { icon: "notifications-outline" as const, label: "Notificações promocionais", sub: "Ofertas e novidades", on: false },
-      { icon: "location" as const, label: "Localização em segundo plano", sub: "Para rastreamento de serviço", on: true },
-      { icon: "moon" as const, label: "Modo escuro", sub: "Seguir tema do sistema", on: false },
-      { icon: "language" as const, label: "Idioma", sub: "Português (Brasil)", on: null },
+    const { notifications, location, requestNotifications, requestLocation, openSettings } = usePermissions();
+
+    // Build a row descriptor for each OS permission toggle
+    type PermRow = {
+      icon: React.ComponentProps<typeof Ionicons>["name"];
+      label: string;
+      sub: string;
+      granted: boolean;
+      canAsk: boolean;
+      onRequest: () => void;
+    };
+
+    const permRows: PermRow[] = [
+      {
+        icon: "notifications",
+        label: "Notificações de pedidos",
+        sub: notifications.granted ? "Ativas" : notifications.canAsk ? "Toque para ativar" : "Abrir Configurações",
+        granted: notifications.granted,
+        canAsk: notifications.canAsk,
+        onRequest: notifications.canAsk ? requestNotifications : openSettings,
+      },
+      {
+        icon: "location",
+        label: "Localização em segundo plano",
+        sub: location.granted ? "Ativa" : location.canAsk ? "Toque para ativar" : "Abrir Configurações",
+        granted: location.granted,
+        canAsk: location.canAsk,
+        onRequest: location.canAsk ? requestLocation : openSettings,
+      },
     ];
+
+    const staticRows = [
+      { icon: "moon" as const, label: "Modo escuro", sub: "Seguir tema do sistema", on: false },
+      { icon: "language" as const, label: "Idioma", sub: "Português (Brasil)", on: null as boolean | null },
+    ];
+
     return (
       <View style={subStyles.container}>
-        {settings.map((item, i) => (
+        {/* Permission-backed toggles */}
+        {permRows.map((item, i) => (
+          <Pressable key={i} onPress={() => item.onRequest()} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+            <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+              <Ionicons name={item.icon} size={18} color={item.granted ? c.success : c.sub} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[subStyles.rowLabel, { color: c.text }]}>{item.label}</Text>
+              <Text style={[subStyles.rowSub, { color: item.granted ? c.success : item.canAsk ? c.softMuted : "#F97316" }]}>
+                {item.sub}
+              </Text>
+            </View>
+            {!item.canAsk && !item.granted ? (
+              <Ionicons name="open-outline" size={16} color="#F97316" />
+            ) : (
+              <View style={[subStyles.miniSwitch, { backgroundColor: item.granted ? c.success : "#D4D0CB" }]}>
+                <View style={[subStyles.miniDot, { left: item.granted ? 14 : 2 }]} />
+              </View>
+            )}
+          </Pressable>
+        ))}
+
+        {/* Static preference rows */}
+        {staticRows.map((item, i) => (
           <View key={i} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
             <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
               <Ionicons name={item.icon} size={18} color={c.sub} />
