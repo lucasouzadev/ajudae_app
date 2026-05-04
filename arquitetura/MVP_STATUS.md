@@ -42,9 +42,7 @@ O app está **pronto para testes fechados com backend real**. Todos os fluxos cr
 |---|---|
 | `auth.tsx` | Login/cadastro via Supabase Auth, validação de e-mail com OTP, seleção de role, persistência de sessão |
 
-**Credenciais demo:**
-- Cliente: `cliente@ajudae.com` / `123456`
-- Prestador: `prestador@ajudae.com` / `123456`
+Criar contas reais via onboarding do app. Para QA: criar 1 conta cliente e 1 conta prestador no Supabase.
 
 ---
 

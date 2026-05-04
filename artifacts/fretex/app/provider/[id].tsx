@@ -1,26 +1,46 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MOCK_PROVIDERS } from "@/constants/mockData";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
+import { type Provider } from "@/constants/mockData";
+import { fetchProviderById } from "@/lib/providers";
 
 export default function ProviderProfileScreen() {
   const c = colors.light;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { portfolio } = usePortfolio();
-  const provider = MOCK_PROVIDERS.find((p) => p.id === id);
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [loadingProvider, setLoadingProvider] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoadingProvider(true);
+    fetchProviderById(id).then((data) => {
+      setProvider(data);
+      setLoadingProvider(false);
+    });
+  }, [id]);
+
   const isClient = role === "cliente";
-  // The logged-in provider is always MOCK_PROVIDERS[0] (p-1) in this mock
-  const isOwnProfile = provider?.id === "p-1";
+  // Own profile: when the logged-in provider is viewing their own page
+  const isOwnProfile = user?.id === id;
   const displayBio = isOwnProfile ? portfolio.bio : provider?.bio ?? "";
+
+  if (loadingProvider) {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.background, justifyContent: "center", alignItems: "center" }}>
+        <Text style={{ color: c.sub, fontFamily: fonts.sans.regular }}>Carregando...</Text>
+      </View>
+    );
+  }
 
   if (!provider) {
     return (

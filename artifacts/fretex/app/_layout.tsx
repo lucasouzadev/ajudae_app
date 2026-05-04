@@ -30,8 +30,16 @@ import { PortfolioProvider } from "@/contexts/PortfolioContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { PermissionGate } from "@/components/PermissionGate";
-import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
+
+// expo-notifications requires native modules — not available in Expo Go without a dev build.
+// Using conditional require so _layout.tsx loads normally in all environments.
+let Notifications: typeof import("expo-notifications") | null = null;
+try {
+  Notifications = require("expo-notifications");
+} catch {
+  // Native module ExpoPushTokenManager not available — notification tap-to-navigate disabled
+}
 
 SplashScreen.preventAutoHideAsync();
 
@@ -46,7 +54,9 @@ function AuthGate() {
   const terminalStatuses = ["completed", "cancelled", "disputed"];
 
   // Navigate to the screen embedded in notification data when user taps a notification
+  // Guard: Notifications is null when native modules are not available (Expo Go / dev)
   useEffect(() => {
+    if (!Notifications) return;
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const screen = response.notification.request.content.data?.screen;
       if (screen && isAuthenticated) {

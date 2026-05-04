@@ -1,13 +1,14 @@
-import React, { useMemo, useState } from "react";
-import { View, StyleSheet, Text, ScrollView, TextInput, Pressable, Switch, Image, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, StyleSheet, Text, ScrollView, TextInput, Pressable, Switch, Image, KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform, ActivityIndicator } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { PrimaryButton } from "@/components/PrimaryButton";
-import { MOCK_PROVIDERS, CATEGORY_COLORS } from "@/constants/mockData";
+import { CATEGORY_COLORS, type Provider } from "@/constants/mockData";
 import type { Category } from "@/constants/mockData";
+import { fetchProviderById } from "@/lib/providers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useService } from "@/contexts/ServiceContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
@@ -36,12 +37,27 @@ export default function RequestFlowScreen() {
   const [step, setStep] = useState(1);
   const totalSteps = 4;
   const { providerId } = useLocalSearchParams<{ providerId?: string }>();
-  const provider = providerId ? MOCK_PROVIDERS.find((p) => p.id === providerId) : null;
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [loadingProvider, setLoadingProvider] = useState(!!providerId);
+  const [providerNotFound, setProviderNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!providerId) return;
+    setLoadingProvider(true);
+    setProviderNotFound(false);
+    fetchProviderById(providerId).then((data) => {
+      setProvider(data);
+      setLoadingProvider(false);
+      if (!data) setProviderNotFound(true);
+    });
+  }, [providerId]);
+
   const accent = provider?.color || c.primary;
   const category: Category = provider?.cat || "Frete";
-  // Use portfolio data for own provider (p-1), otherwise fall back to mockData helpers count
+  // Use portfolio data for own provider (logged-in user), otherwise fall back to fetched helpers count
+  const isOwnProviderProfile = provider?.id === user?.id;
   const providerSupportsHelpers = provider
-    ? (provider.id === "p-1" ? portfolio.supportsHelpers : provider.helpers > 0)
+    ? (isOwnProviderProfile ? portfolio.supportsHelpers : provider.helpers > 0)
     : true; // quando sem prestador fixo, mostra a opção
   const catColor = CATEGORY_COLORS[category];
 
@@ -122,6 +138,36 @@ export default function RequestFlowScreen() {
   const togglePhoto = (uri: string) => {
     setPhotos((prev) => (prev.includes(uri) ? prev.filter((p) => p !== uri) : prev.length >= 5 ? prev : [...prev, uri]));
   };
+
+  // ── Loading / error guards (only when a specific providerId was requested) ─
+  if (loadingProvider) {
+    return (
+      <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
+        <ActivityIndicator size="large" color={c.primary} />
+        <Text style={{ marginTop: 12, color: c.textSecondary, fontSize: 14 }}>Carregando prestador…</Text>
+      </View>
+    );
+  }
+
+  if (providerNotFound) {
+    return (
+      <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }]}>
+        <Ionicons name="alert-circle-outline" size={48} color={c.error ?? "#FF3B30"} />
+        <Text style={{ marginTop: 16, fontSize: 18, fontWeight: "700", color: c.text, textAlign: "center" }}>
+          Prestador não encontrado
+        </Text>
+        <Text style={{ marginTop: 8, fontSize: 14, color: c.textSecondary, textAlign: "center" }}>
+          Este prestador pode estar offline ou não está mais disponível.
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          style={{ marginTop: 24, backgroundColor: c.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Voltar</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView

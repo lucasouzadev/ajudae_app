@@ -245,7 +245,7 @@ async function fire(event: NotificationEvent, vars?: Vars): Promise<void> {
 const NotificationContext = createContext<NotificationContextType | null>(null);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const { role } = useAuth();
+  const { role } = useAuthSafe();
   const { active } = useService();
   const { notifications, requestNotifications } = usePermissions();
   const [pushToken, setPushToken] = useState<string | null>(null);

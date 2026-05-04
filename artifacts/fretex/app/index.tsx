@@ -1,13 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Haptics from "expo-haptics";
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl, Modal, TextInput } from "react-native";
+import * as Location from "expo-location";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl, Modal, TextInput, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { supabase } from "@/lib/supabase";
 import { useService } from "@/contexts/ServiceContext";
-import { MOCK_PROVIDERS, FILTERS, CATEGORY_COLORS, type Category, type Provider } from "@/constants/mockData";
+import { FILTERS, CATEGORY_COLORS, type Category, type Provider } from "@/constants/mockData";
+import { fetchOnlineProviders } from "@/lib/providers";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
@@ -414,9 +418,11 @@ function BadgeRow() {
 }
 
 /* 6. Recent reviews carousel */
-const RECENT_REVIEWS = MOCK_PROVIDERS[0].reviews.concat([
+const RECENT_REVIEWS = [
+  { author: "Juliana M.", text: "Chegou cedo, embalou tudo com cuidado e subiu quatro andares sem perder o ritmo.", rating: 5, when: "há 2 dias" },
+  { author: "Thiago P.", text: "Foi transparente no valor final e explicou cada etapa antes de carregar.", rating: 5, when: "há 1 semana" },
   { author: "Sandra L.", text: "Pontual e muito cuidadoso com os móveis. Super indico!", rating: 5, when: "hoje" },
-]).slice(0, 3);
+];
 
 function RecentReviews() {
   const c = colors.light;
@@ -1468,6 +1474,8 @@ function ClienteHome() {
   const { active: activeService } = useService();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapRealRef>(null);
+  const isMountedRef = useRef(true);
+  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; }; }, []);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Todos");
   const [active, setActive] = useState<Provider | null>(null);   // pin focado (1º toque)
   const sheetHeightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
@@ -1479,10 +1487,29 @@ function ClienteHome() {
   const [locating, setLocating] = useState(false);
   const spinAnim = useRef(new Animated.Value(0)).current;
   const spinLoop = useRef<Animated.CompositeAnimation | null>(null);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingProviders(true);
+    fetchOnlineProviders().then((data) => {
+      if (mounted) {
+        setProviders(data);
+        setLoadingProviders(false);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1200);
+    fetchOnlineProviders().then((data) => {
+      if (isMountedRef.current) {
+        setProviders(data);
+        setRefreshing(false);
+      }
+    });
   };
 
   const handleLocate = () => {
@@ -1505,17 +1532,17 @@ function ClienteHome() {
   const locateSpin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   const filtered = useMemo(
-    () => (filter === "Todos" ? MOCK_PROVIDERS : MOCK_PROVIDERS.filter((p) => p.cat === filter)),
-    [filter]
+    () => (filter === "Todos" ? providers : providers.filter((p) => p.cat === filter)),
+    [filter, providers]
   );
 
   const counts = useMemo(() => {
-    const result: Record<string, number> = { Todos: MOCK_PROVIDERS.length };
+    const result: Record<string, number> = { Todos: providers.length };
     (["Mudança", "Frete", "Entrega"] as Category[]).forEach((k) => {
-      result[k] = MOCK_PROVIDERS.filter((p) => p.cat === k).length;
+      result[k] = providers.filter((p) => p.cat === k).length;
     });
     return result;
-  }, []);
+  }, [providers]);
 
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
 
@@ -1559,10 +1586,7 @@ function ClienteHome() {
             <Animated.View
               style={{
                 transform: [{
-                  rotate: locateSpin.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ["0deg", "360deg"],
-                  }),
+                  rotate: locateSpin,
                 }],
               }}
             >
@@ -1783,9 +1807,11 @@ function PrestadorHome() {
   const c = colors.light;
   const router = useRouter();
   const { user } = useAuth();
+  const { location: locationPerm } = usePermissions();
   const { active: activeService } = useService();
   const insets = useSafeAreaInsets();
-  const [online, setOnline] = useState(true);
+  const [online, setOnline] = useState(false);
+  const [onlineLoading, setOnlineLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -1818,6 +1844,76 @@ function PrestadorHome() {
     const t = setTimeout(() => setDataLoading(false), 900);
     return () => clearTimeout(t);
   }, []);
+
+  // Load real online state from Supabase on mount
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("providers")
+      .select("active")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn("[PrestadorHome] Erro ao carregar status online:", error.message);
+          return;
+        }
+        if (data) setOnline(data.active ?? false);
+      });
+  }, [user?.id]);
+
+  const handleToggleOnline = async () => {
+    if (!user?.id || !user?.verified) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    const next = !online;
+    setOnlineLoading(true);
+    try {
+      let lat = -22.9068;
+      let lng = -43.1729;
+      if (next) {
+        // Try to get current position when going online
+        try {
+          if (locationPerm.granted) {
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+            lat = pos.coords.latitude;
+            lng = pos.coords.longitude;
+          } else {
+            const last = await Location.getLastKnownPositionAsync();
+            if (last) {
+              lat = last.coords.latitude;
+              lng = last.coords.longitude;
+            }
+          }
+        } catch {
+          // Fallback to Rio de Janeiro defaults — non-fatal
+        }
+      }
+      const { data: updated, error } = await supabase
+        .from("providers")
+        .update({
+          active: next,
+          ...(next ? { location_lat: lat, location_lng: lng, location_updated_at: new Date().toISOString() } : {}),
+        })
+        .eq("id", user.id)
+        .select("id");
+      if (error) {
+        console.warn("[PrestadorHome] Erro ao atualizar status online:", error.message);
+        Alert.alert("Erro", "Não foi possível atualizar seu status. Tente novamente.");
+      } else if (!updated || updated.length === 0) {
+        console.warn("[PrestadorHome] Nenhuma linha de provider encontrada para id:", user.id);
+        Alert.alert(
+          "Perfil não encontrado",
+          "Seu perfil de prestador não foi localizado. Verifique seu cadastro ou contate o suporte."
+        );
+      } else {
+        setOnline(next);
+      }
+    } catch (err: unknown) {
+      console.warn("[PrestadorHome] Erro inesperado no toggle online:", err);
+    } finally {
+      setOnlineLoading(false);
+    }
+  };
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
@@ -1932,18 +2028,14 @@ function PrestadorHome() {
       >
         {/* 1. Online toggle — forte e com cor */}
         <Pressable
-          onPress={() => {
-            if (!user?.verified) return;
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            setOnline((v) => !v);
-          }}
-          disabled={!user?.verified}
+          onPress={handleToggleOnline}
+          disabled={!user?.verified || onlineLoading}
           style={[
             styles.onlineRow,
             online && user?.verified
               ? { backgroundColor: c.success, borderColor: "#15803D" }
               : { backgroundColor: c.card, borderColor: c.border },
-            { opacity: user?.verified ? 1 : 0.6 },
+            { opacity: user?.verified && !onlineLoading ? 1 : 0.6 },
           ]}
         >
           <View style={[styles.onlineDot, {

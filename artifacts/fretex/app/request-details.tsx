@@ -8,7 +8,7 @@ import * as Haptics from "expo-haptics";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useService } from "@/contexts/ServiceContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { MOCK_PROVIDERS, CATEGORY_COLORS } from "@/constants/mockData";
+import { CATEGORY_COLORS } from "@/constants/mockData";
 
 const PHOTOS = [
   "https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=400&q=80",
@@ -67,17 +67,17 @@ export default function RequestDetailsScreen() {
     setAccepting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
 
-    // pull a matching mock provider profile (or build one from the user)
-    const candidate = MOCK_PROVIDERS.find((p) => p.cat === active.category) || MOCK_PROVIDERS[0];
-    const initials = (user?.name || candidate.name).split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+    // Use the logged-in user's data as the provider (they ARE the provider accepting)
+    const providerName = user?.name || "Prestador";
+    const initials = providerName.split(" ").map((p: string) => p[0]).slice(0, 2).join("").toUpperCase();
     await assignProvider({
-      providerId: user?.id || candidate.id,
-      providerName: user?.name || candidate.name,
+      providerId: user?.id || "",
+      providerName,
       providerInitials: initials,
       providerColor: CATEGORY_COLORS[active.category],
-      providerVehicle: candidate.vehicle,
-      providerRating: candidate.rating,
-      providerKm: candidate.km,
+      providerVehicle: "Veículo",
+      providerRating: 0,
+      providerKm: 0,
     });
     setTimeout(() => router.replace("/job"), 250);
   };

@@ -19,7 +19,8 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
-import { MOCK_PROVIDERS, MOCK_POSTINGS, FILTERS, CATEGORIES, type Category } from "@/constants/mockData";
+import { MOCK_POSTINGS, FILTERS, CATEGORIES, type Category, type Provider } from "@/constants/mockData";
+import { fetchOnlineProviders } from "@/lib/providers";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { Skeleton } from "@/components/Skeleton";
 import { TopNav } from "@/components/TopNav";
@@ -377,19 +378,32 @@ function ClienteMarketplace() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [mapExpanded, setMapExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 900);
     return () => clearTimeout(t);
   }, []);
+  useEffect(() => {
+    let mounted = true;
+    setLoadingProviders(true);
+    fetchOnlineProviders().then((data) => {
+      if (mounted) {
+        setProviders(data);
+        setLoadingProviders(false);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const filtered = useMemo(() => {
-    let list = filter === "Todos" ? MOCK_PROVIDERS : MOCK_PROVIDERS.filter((p) => p.cat === filter);
+    let list = filter === "Todos" ? providers : providers.filter((p) => p.cat === filter);
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter((p) => p.name.toLowerCase().includes(q) || p.area.toLowerCase().includes(q));
     }
     return list;
-  }, [filter, query]);
+  }, [filter, query, providers]);
 
   const onlinePins: MapPin[] = useMemo(
     () =>
@@ -598,17 +612,31 @@ function PrestadorMarketplace() {
   const [activePin, setActivePin] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
   const [mapExpanded, setMapExpanded] = useState(false);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingProviders(true);
+    fetchOnlineProviders().then((data) => {
+      if (mounted) {
+        setProviders(data);
+        setLoadingProviders(false);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
 
   const filtered = useMemo(() => {
-    let list = filter === "Todos" ? MOCK_PROVIDERS : MOCK_PROVIDERS.filter((p) => p.cat === filter);
+    let list = filter === "Todos" ? providers : providers.filter((p) => p.cat === filter);
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter((p) => p.name.toLowerCase().includes(q) || p.area.toLowerCase().includes(q));
     }
     return list;
-  }, [filter, query]);
+  }, [filter, query, providers]);
 
   const peerPins: MapPin[] = useMemo(
     () =>

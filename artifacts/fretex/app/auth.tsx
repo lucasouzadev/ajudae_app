@@ -448,14 +448,6 @@ export default function AuthScreen() {
           </Pressable>
         </View>
 
-        {IS_DEMO && (
-          <View style={[s.demoHint, { backgroundColor: "#FEF3C7", borderColor: "#FCD34D" }]}>
-            <Text style={[s.demoHintTxt, { color: "#92400E" }]}>
-              Demo — cliente@ajudae.com ou prestador@ajudae.com · senha: 123456
-            </Text>
-          </View>
-        )}
-
         <Text style={[s.terms, { color: c.softMuted }]}>
           Ao continuar, você concorda com os{" "}
           <Text style={{ color: c.sub }}>Termos de Uso</Text> e a{" "}

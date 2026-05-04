@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
-import { MOCK_PROVIDERS } from "@/constants/mockData";
+import { CATEGORY_COLORS, type Provider } from "@/constants/mockData";
+import { fetchProviderById } from "@/lib/providers";
 
 /* ─── Seções disponíveis para edição ────────────────────────────────────── */
 const PORTFOLIO_SECTIONS = [
@@ -34,9 +35,19 @@ export default function PortfolioScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const [providerData, setProviderData] = useState<Provider | null>(null);
 
-  const provider = MOCK_PROVIDERS[0]; // prestador logado (mock)
-  const onColor = provider.color === "#FFCC00" ? "#1A1714" : "#fff";
+  useEffect(() => {
+    if (user?.id) {
+      fetchProviderById(user.id).then((data) => {
+        if (data) setProviderData(data);
+      });
+    }
+  }, [user?.id]);
+
+  // Fallback color until real data loads
+  const providerColor = providerData?.color ?? CATEGORY_COLORS.Mudança;
+  const onColor = providerColor === "#FFCC00" ? "#1A1714" : "#fff";
 
   const [tab, setTab] = useState<"preview" | "edit">("preview");
   const { portfolio, setPortfolio } = usePortfolio();
@@ -45,7 +56,7 @@ export default function PortfolioScreen() {
     <View style={{ flex: 1, backgroundColor: c.background }}>
       {/* Header hero */}
       <LinearGradient
-        colors={[provider.color, `${provider.color}BB`]}
+        colors={[providerColor, `${providerColor}BB`]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[s.hero, { paddingTop: insets.top + 8 }]}
@@ -62,11 +73,11 @@ export default function PortfolioScreen() {
 
         <View style={s.heroBody}>
           <View style={[s.avatar, { borderColor: "rgba(255,255,255,0.5)" }]}>
-            <Text style={[s.avatarText, { color: onColor }]}>{provider.ini}</Text>
+            <Text style={[s.avatarText, { color: onColor }]}>{providerData?.ini ?? (user?.name || "P").split(" ").map((p) => p[0]).slice(0, 2).join("")}</Text>
           </View>
-          <Text style={[s.name, { color: onColor }]}>{user?.name || provider.name}</Text>
+          <Text style={[s.name, { color: onColor }]}>{user?.name || providerData?.name || "Prestador"}</Text>
           <Text style={[s.heroSub, { color: `${onColor}CC` }]}>
-            {provider.cat} · ★ {provider.rating} · {provider.jobs} serviços
+            {providerData?.cat ?? "Frete"} · ★ {providerData?.rating ?? "—"} · {providerData?.jobs ?? 0} serviços
           </Text>
         </View>
 
@@ -92,7 +103,7 @@ export default function PortfolioScreen() {
       </LinearGradient>
 
       {tab === "preview"
-        ? <PortfolioPreview portfolio={portfolio} provider={provider} c={c} insets={insets} />
+        ? <PortfolioPreview portfolio={portfolio} providerColor={providerColor} c={c} insets={insets} />
         : <PortfolioEdit portfolio={portfolio} onChange={setPortfolio} c={c} insets={insets} />
       }
     </View>
@@ -100,8 +111,8 @@ export default function PortfolioScreen() {
 }
 
 /* ─── Preview ────────────────────────────────────────────────────────────── */
-function PortfolioPreview({ portfolio, provider, c, insets }: any) {
-  const accentText = provider.color === "#FFCC00" ? "#8B6F00" : provider.color;
+function PortfolioPreview({ portfolio, providerColor, c, insets }: any) {
+  const accentText = providerColor === "#FFCC00" ? "#8B6F00" : providerColor;
 
   return (
     <ScrollView
@@ -112,8 +123,8 @@ function PortfolioPreview({ portfolio, provider, c, insets }: any) {
       {portfolio.bio ? (
         <View style={[s.previewCard, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={s.previewCardHead}>
-            <View style={[s.previewIconWrap, { backgroundColor: `${provider.color}18` }]}>
-              <Ionicons name="person-outline" size={15} color={provider.color} />
+            <View style={[s.previewIconWrap, { backgroundColor: `${providerColor}18` }]}>
+              <Ionicons name="person-outline" size={15} color={providerColor} />
             </View>
             <Text style={[s.previewCardTitle, { color: c.text }]}>Sobre mim</Text>
           </View>
@@ -126,8 +137,8 @@ function PortfolioPreview({ portfolio, provider, c, insets }: any) {
       {/* Ajudantes */}
       <View style={[s.previewCard, { backgroundColor: c.card, borderColor: c.border }]}>
         <View style={s.previewCardHead}>
-          <View style={[s.previewIconWrap, { backgroundColor: `${provider.color}18` }]}>
-            <Ionicons name="people-outline" size={15} color={provider.color} />
+          <View style={[s.previewIconWrap, { backgroundColor: `${providerColor}18` }]}>
+            <Ionicons name="people-outline" size={15} color={providerColor} />
           </View>
           <Text style={[s.previewCardTitle, { color: c.text }]}>Ajudantes</Text>
           <View style={[s.helperBadge, { backgroundColor: portfolio.supportsHelpers ? `${c.success}18` : `${c.softMuted}18` }]}>
@@ -146,11 +157,11 @@ function PortfolioPreview({ portfolio, provider, c, insets }: any) {
       {/* Promoção */}
       {portfolio.promoText ? (
         <LinearGradient
-          colors={[`${provider.color}22`, `${provider.color}08`]}
-          style={[s.promoCard, { borderColor: `${provider.color}55` }]}
+          colors={[`${providerColor}22`, `${providerColor}08`]}
+          style={[s.promoCard, { borderColor: `${providerColor}55` }]}
         >
-          <View style={[s.promoBadge, { backgroundColor: provider.color }]}>
-            <Text style={[s.promoBadgeText, { color: provider.color === "#FFCC00" ? "#1A1714" : "#fff" }]}>
+          <View style={[s.promoBadge, { backgroundColor: providerColor }]}>
+            <Text style={[s.promoBadgeText, { color: providerColor === "#FFCC00" ? "#1A1714" : "#fff" }]}>
               PROMOÇÃO
             </Text>
           </View>
@@ -166,8 +177,8 @@ function PortfolioPreview({ portfolio, provider, c, insets }: any) {
       {/* Serviços em destaque */}
       <View style={[s.previewCard, { backgroundColor: c.card, borderColor: c.border }]}>
         <View style={s.previewCardHead}>
-          <View style={[s.previewIconWrap, { backgroundColor: `${provider.color}18` }]}>
-            <Ionicons name="list-outline" size={15} color={provider.color} />
+          <View style={[s.previewIconWrap, { backgroundColor: `${providerColor}18` }]}>
+            <Ionicons name="list-outline" size={15} color={providerColor} />
           </View>
           <Text style={[s.previewCardTitle, { color: c.text }]}>Serviços</Text>
           {portfolio.services.length < 3 && (
@@ -200,8 +211,8 @@ function PortfolioPreview({ portfolio, provider, c, insets }: any) {
       {/* Fotos — placeholder (feature futura) */}
       <View style={[s.previewCard, { backgroundColor: c.card, borderColor: c.border }]}>
         <View style={s.previewCardHead}>
-          <View style={[s.previewIconWrap, { backgroundColor: `${provider.color}18` }]}>
-            <Ionicons name="images-outline" size={15} color={provider.color} />
+          <View style={[s.previewIconWrap, { backgroundColor: `${providerColor}18` }]}>
+            <Ionicons name="images-outline" size={15} color={providerColor} />
           </View>
           <Text style={[s.previewCardTitle, { color: c.text }]}>Fotos do trabalho</Text>
           <View style={[s.comingSoonBadge, { backgroundColor: c.borderLight }]}>
