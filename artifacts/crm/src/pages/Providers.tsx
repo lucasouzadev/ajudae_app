@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { sanitizeText } from "@/lib/security";
 
 type ValidationStatus = "not_started" | "submitted" | "approved" | "rejected";
 
@@ -7,7 +8,6 @@ interface Provider {
   id: string;
   name: string;
   email: string;
-  phone: string;
   service_type: string;
   onboarding_status: ValidationStatus;
   active: boolean;
@@ -22,30 +22,42 @@ const STATUS_LABELS: Record<ValidationStatus, { label: string; cls: string }> = 
   rejected: { label: "Reprovado", cls: "bg-red-100 text-red-700" },
 };
 
+const SEARCH_MAX_LEN = 200;
+
 export function Providers() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ValidationStatus | "all">("all");
-  const [search, setSearch] = useState("");
+  const [rawSearch, setRawSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  /* Sanitize search input to prevent ReDoS and XSS */
+  const search = rawSearch.trim().slice(0, SEARCH_MAX_LEN);
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("providers")
-        .select("id, active, rating_avg, service_type, onboarding_status, created_at, profiles(id, name, email, phone)")
+        .select("id, active, rating_avg, service_type, onboarding_status, created_at, profiles(name, email)")
         .order("created_at", { ascending: false });
+
+      if (error) {
+        setLoadError("Não foi possível carregar a lista. Recarregue a página.");
+        setLoading(false);
+        return;
+      }
 
       if (data) {
         setProviders(
           data.map((row: any) => ({
             id: row.id,
-            name: row.profiles?.name ?? "—",
-            email: row.profiles?.email ?? "—",
-            phone: row.profiles?.phone ?? "—",
-            service_type: row.service_type ?? "—",
+            name: sanitizeText(row.profiles?.name ?? ""),
+            email: sanitizeText(row.profiles?.email ?? ""),
+            service_type: sanitizeText(row.service_type ?? ""),
             onboarding_status: (row.onboarding_status ?? "not_started") as ValidationStatus,
-            active: row.active,
-            rating_avg: row.rating_avg ?? 0,
+            active: Boolean(row.active),
+            rating_avg: Number(row.rating_avg) || 0,
             created_at: row.created_at,
           }))
         );
@@ -55,12 +67,15 @@ export function Providers() {
     load();
   }, []);
 
+  /* Fixed string search (no regex) to prevent ReDoS */
   const filtered = providers.filter((p) => {
-    const matchesFilter = filter === "all" || p.onboarding_status === filter;
-    const matchesSearch = !search ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.email.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
+    if (filter !== "all" && p.onboarding_status !== filter) return false;
+    if (!search) return true;
+    const needle = search.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(needle) ||
+      p.email.toLowerCase().includes(needle)
+    );
   });
 
   return (
@@ -73,10 +88,12 @@ export function Providers() {
       {/* Filters */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <input
+          ref={searchRef}
           type="search"
           placeholder="Buscar por nome ou e-mail…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={rawSearch}
+          maxLength={SEARCH_MAX_LEN}
+          onChange={(e) => setRawSearch(e.target.value)}
           className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100"
         />
         <div className="flex gap-2">
@@ -102,6 +119,8 @@ export function Providers() {
           <div className="flex items-center justify-center py-16 text-slate-400">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent" />
           </div>
+        ) : loadError ? (
+          <div className="p-8 text-center text-sm text-red-600">{loadError}</div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-400">
             <span className="text-4xl">🚚</span>
@@ -124,19 +143,25 @@ export function Providers() {
               {filtered.map((p, i) => {
                 const st = STATUS_LABELS[p.onboarding_status];
                 return (
-                  <tr key={p.id} className={`border-b border-slate-50 transition hover:bg-slate-50 ${i % 2 === 0 ? "" : "bg-slate-50/30"}`}>
+                  <tr
+                    key={p.id}
+                    className={`border-b border-slate-50 transition hover:bg-slate-50 ${i % 2 === 0 ? "" : "bg-slate-50/30"}`}
+                  >
                     <td className="px-5 py-3">
-                      <div className="font-medium text-slate-900">{p.name}</div>
-                      <div className="text-xs text-slate-400">{p.email}</div>
+                      <div className="font-medium text-slate-900">{p.name || "—"}</div>
+                      <div className="text-xs text-slate-400">{p.email || "—"}</div>
                     </td>
-                    <td className="px-5 py-3 capitalize text-slate-600">{p.service_type}</td>
+                    <td className="px-5 py-3 capitalize text-slate-600">{p.service_type || "—"}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-medium ${st.cls}`}>
                         {st.label}
                       </span>
                     </td>
                     <td className="px-5 py-3">
-                      <span className={`inline-block h-2 w-2 rounded-full ${p.active ? "bg-green-400" : "bg-slate-300"}`} />
+                      <span
+                        className={`inline-block h-2 w-2 rounded-full ${p.active ? "bg-green-400" : "bg-slate-300"}`}
+                        title={p.active ? "Online" : "Offline"}
+                      />
                     </td>
                     <td className="px-5 py-3 text-slate-600">
                       {p.rating_avg > 0 ? `⭐ ${p.rating_avg.toFixed(1)}` : "—"}
@@ -145,11 +170,12 @@ export function Providers() {
                       {new Date(p.created_at).toLocaleDateString("pt-BR")}
                     </td>
                     <td className="px-5 py-3">
+                      {/* Route to Documents with search param instead of non-existent /providers/:id */}
                       <a
-                        href={`/providers/${p.id}`}
+                        href={`/documents?provider=${encodeURIComponent(p.id)}`}
                         className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-yellow-400 hover:bg-yellow-50"
                       >
-                        Ver
+                        Documentos
                       </a>
                     </td>
                   </tr>

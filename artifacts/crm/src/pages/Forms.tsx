@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { sanitizeText } from "@/lib/security";
 
 interface FormSubmission {
   id: string;
@@ -13,47 +14,59 @@ interface FormSubmission {
   vehicle_type: string;
   contact_method: string;
   contact_availability: string;
-  birth_date: string;
   onboarding_status: string;
   validation_notes: string;
   created_at: string;
 }
 
+const STATUS_COLOR: Record<string, string> = {
+  submitted: "bg-yellow-100 text-yellow-700",
+  approved: "bg-green-100 text-green-700",
+  rejected: "bg-red-100 text-red-700",
+  not_started: "bg-slate-100 text-slate-500",
+};
+
 export function Forms() {
   const [forms, setForms] = useState<FormSubmission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FormSubmission | null>(null);
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("providers")
         .select(`
           id, service_type, service_category, vehicle_model, vehicle_year, vehicle_plate,
-          vehicle_type, contact_method, contact_availability, birth_date,
+          vehicle_type, contact_method, contact_availability,
           onboarding_status, validation_notes, created_at,
           profiles(name, email)
         `)
         .not("onboarding_status", "eq", "not_started")
         .order("created_at", { ascending: false });
 
+      if (error) {
+        setLoadError("Não foi possível carregar os formulários. Recarregue a página.");
+        setLoading(false);
+        return;
+      }
+
       if (data) {
         setForms(
           data.map((row: any) => ({
             id: row.id,
-            provider_name: row.profiles?.name ?? "—",
-            provider_email: row.profiles?.email ?? "—",
-            service_type: row.service_type ?? "—",
-            service_category: row.service_category ?? "—",
-            vehicle_model: row.vehicle_model ?? "—",
-            vehicle_year: row.vehicle_year ?? 0,
-            vehicle_plate: row.vehicle_plate ?? "—",
-            vehicle_type: row.vehicle_type ?? "—",
-            contact_method: row.contact_method ?? "—",
-            contact_availability: row.contact_availability ?? "—",
-            birth_date: row.birth_date ?? "",
-            onboarding_status: row.onboarding_status ?? "—",
-            validation_notes: row.validation_notes ?? "",
+            provider_name: sanitizeText(row.profiles?.name ?? ""),
+            provider_email: sanitizeText(row.profiles?.email ?? ""),
+            service_type: sanitizeText(row.service_type ?? ""),
+            service_category: sanitizeText(row.service_category ?? ""),
+            vehicle_model: sanitizeText(row.vehicle_model ?? ""),
+            vehicle_year: Number(row.vehicle_year) || 0,
+            vehicle_plate: sanitizeText(row.vehicle_plate ?? ""),
+            vehicle_type: sanitizeText(row.vehicle_type ?? ""),
+            contact_method: sanitizeText(row.contact_method ?? ""),
+            contact_availability: sanitizeText(row.contact_availability ?? ""),
+            onboarding_status: sanitizeText(row.onboarding_status ?? ""),
+            validation_notes: sanitizeText(row.validation_notes ?? ""),
             created_at: row.created_at,
           }))
         );
@@ -62,13 +75,6 @@ export function Forms() {
     }
     load();
   }, []);
-
-  const STATUS_COLOR: Record<string, string> = {
-    submitted: "bg-yellow-100 text-yellow-700",
-    approved: "bg-green-100 text-green-700",
-    rejected: "bg-red-100 text-red-700",
-    not_started: "bg-slate-100 text-slate-500",
-  };
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -82,6 +88,8 @@ export function Forms() {
             <div className="flex items-center justify-center py-12">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent" />
             </div>
+          ) : loadError ? (
+            <div className="p-4 text-center text-sm text-red-600">{loadError}</div>
           ) : forms.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-slate-400">
               <span className="text-3xl">📋</span>
@@ -95,13 +103,13 @@ export function Forms() {
                     onClick={() => setSelected(f)}
                     className={`w-full p-4 text-left transition hover:bg-slate-50 ${selected?.id === f.id ? "bg-yellow-50" : ""}`}
                   >
-                    <div className="font-medium text-slate-900">{f.provider_name}</div>
-                    <div className="text-xs text-slate-400">{f.provider_email}</div>
+                    <div className="font-medium text-slate-900">{f.provider_name || "—"}</div>
+                    <div className="text-xs text-slate-400">{f.provider_email || "—"}</div>
                     <div className="mt-1 flex items-center gap-2">
                       <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[f.onboarding_status] ?? "bg-slate-100 text-slate-500"}`}>
                         {f.onboarding_status}
                       </span>
-                      <span className="text-xs capitalize text-slate-500">{f.service_type}</span>
+                      <span className="text-xs capitalize text-slate-500">{f.service_type || "—"}</span>
                     </div>
                   </button>
                 </li>
@@ -119,9 +127,9 @@ export function Forms() {
           </div>
         ) : (
           <div className="mx-auto max-w-2xl">
-            <h2 className="mb-1 text-xl font-bold text-slate-900">{selected.provider_name}</h2>
+            <h2 className="mb-1 text-xl font-bold text-slate-900">{selected.provider_name || "—"}</h2>
             <p className="mb-5 text-sm text-slate-500">
-              {selected.provider_email} · enviado em {new Date(selected.created_at).toLocaleDateString("pt-BR")}
+              {selected.provider_email || "—"} · enviado em {new Date(selected.created_at).toLocaleDateString("pt-BR")}
             </p>
 
             {[
@@ -136,7 +144,7 @@ export function Forms() {
                 title: "Veículo",
                 rows: [
                   ["Modelo", selected.vehicle_model],
-                  ["Ano", String(selected.vehicle_year || "—")],
+                  ["Ano", selected.vehicle_year > 0 ? String(selected.vehicle_year) : "—"],
                   ["Placa", selected.vehicle_plate],
                   ["Tipo", selected.vehicle_type],
                 ],
@@ -167,7 +175,8 @@ export function Forms() {
             {selected.validation_notes && (
               <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
                 <div className="mb-1 text-xs font-bold uppercase tracking-wider text-yellow-700">Observações</div>
-                <p className="text-sm text-slate-700">{selected.validation_notes}</p>
+                {/* sanitizeText strips HTML; whitespace-pre-line is safe here */}
+                <p className="whitespace-pre-line text-sm text-slate-700">{selected.validation_notes}</p>
               </div>
             )}
           </div>

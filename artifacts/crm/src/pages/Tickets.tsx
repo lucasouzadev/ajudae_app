@@ -1,20 +1,19 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { sanitizeText } from "@/lib/security";
 
 type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
-type TicketCategory = "payment" | "service" | "account" | "technical" | "other";
 
 interface Ticket {
   id: string;
   title: string;
   description: string;
   status: TicketStatus;
-  category: TicketCategory;
+  category: string;
   priority: "low" | "medium" | "high";
   user_name: string;
   user_email: string;
   created_at: string;
-  updated_at: string;
 }
 
 const STATUS = {
@@ -33,29 +32,37 @@ const PRIORITY = {
 export function Tickets() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("open");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actioning, setActioning] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("support_tickets")
-        .select("id, title, description, status, category, priority, created_at, updated_at, profiles(name, email)")
+        .select("id, title, description, status, category, priority, created_at, profiles(name, email)")
         .order("created_at", { ascending: false });
+
+      if (error) {
+        setLoadError("Não foi possível carregar os tickets. Recarregue a página.");
+        setLoading(false);
+        return;
+      }
 
       if (data) {
         setTickets(
           data.map((row: any) => ({
             id: row.id,
-            title: row.title ?? "Sem título",
-            description: row.description ?? "",
-            status: row.status as TicketStatus,
-            category: row.category as TicketCategory,
-            priority: row.priority ?? "medium",
-            user_name: row.profiles?.name ?? "—",
-            user_email: row.profiles?.email ?? "—",
+            title: sanitizeText(row.title ?? "Sem título"),
+            description: sanitizeText(row.description ?? ""),
+            status: (row.status ?? "open") as TicketStatus,
+            category: sanitizeText(row.category ?? ""),
+            priority: (row.priority ?? "medium") as Ticket["priority"],
+            user_name: sanitizeText(row.profiles?.name ?? ""),
+            user_email: sanitizeText(row.profiles?.email ?? ""),
             created_at: row.created_at,
-            updated_at: row.updated_at,
           }))
         );
       }
@@ -64,10 +71,32 @@ export function Tickets() {
     load();
   }, []);
 
-  async function updateTicketStatus(id: string, status: TicketStatus) {
-    await supabase.from("support_tickets").update({ status }).eq("id", id);
-    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
-    if (selected?.id === id) setSelected((p) => p ? { ...p, status } : p);
+  async function updateTicketStatus(id: string, nextStatus: TicketStatus) {
+    if (actioning) return;
+    setActioning(true);
+    setActionError(null);
+
+    const previousStatus = tickets.find((t) => t.id === id)?.status;
+
+    /* Optimistic update */
+    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
+    if (selected?.id === id) setSelected((p) => p ? { ...p, status: nextStatus } : p);
+
+    const { error } = await supabase
+      .from("support_tickets")
+      .update({ status: nextStatus })
+      .eq("id", id);
+
+    if (error) {
+      /* Rollback on failure */
+      if (previousStatus) {
+        setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status: previousStatus } : t)));
+        if (selected?.id === id) setSelected((p) => p ? { ...p, status: previousStatus } : p);
+      }
+      setActionError("Não foi possível atualizar o status. Tente novamente.");
+    }
+
+    setActioning(false);
   }
 
   const filtered = tickets.filter((t) => statusFilter === "all" || t.status === statusFilter);
@@ -97,6 +126,8 @@ export function Tickets() {
             <div className="flex items-center justify-center py-12">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent" />
             </div>
+          ) : loadError ? (
+            <div className="p-4 text-center text-sm text-red-600">{loadError}</div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-slate-400">
               <span className="text-3xl">🎉</span>
@@ -107,7 +138,7 @@ export function Tickets() {
               {filtered.map((t) => (
                 <li key={t.id}>
                   <button
-                    onClick={() => setSelected(t)}
+                    onClick={() => { setSelected(t); setActionError(null); }}
                     className={`w-full p-4 text-left transition hover:bg-slate-50 ${selected?.id === t.id ? "bg-yellow-50" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -118,7 +149,7 @@ export function Tickets() {
                       <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS[t.status].cls}`}>
                         {STATUS[t.status].label}
                       </span>
-                      <span className="text-xs text-slate-400">{t.user_name}</span>
+                      <span className="text-xs text-slate-400">{t.user_name || "—"}</span>
                     </div>
                   </button>
                 </li>
@@ -146,17 +177,28 @@ export function Tickets() {
             </div>
             <h2 className="mb-1 text-xl font-bold text-slate-900">{selected.title}</h2>
             <p className="mb-4 text-sm text-slate-500">
-              {selected.user_name} · {selected.user_email} · {new Date(selected.created_at).toLocaleString("pt-BR")}
+              {selected.user_name || "—"} · {selected.user_email || "—"} ·{" "}
+              {new Date(selected.created_at).toLocaleString("pt-BR")}
             </p>
             <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{selected.description || "Sem descrição."}</p>
+              {/* Content is sanitized in load(); whitespace-pre-line is safe on sanitized text */}
+              <p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">
+                {selected.description || "Sem descrição."}
+              </p>
             </div>
+
+            {actionError && (
+              <div role="alert" className="mb-4 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+                <span className="text-red-500">⚠</span>
+                <p className="text-sm text-red-700">{actionError}</p>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               {(["open", "in_progress", "resolved", "closed"] as TicketStatus[]).map((s) => (
                 <button
                   key={s}
-                  disabled={selected.status === s}
+                  disabled={selected.status === s || actioning}
                   onClick={() => updateTicketStatus(selected.id, s)}
                   className={`rounded-xl border px-4 py-2 text-sm font-medium transition disabled:opacity-40 ${
                     selected.status === s

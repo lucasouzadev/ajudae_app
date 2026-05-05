@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { getSignedUrls, sanitizeText } from "@/lib/security";
 
 interface DocRecord {
   id: string;
@@ -15,16 +16,30 @@ interface DocRecord {
   submitted_at: string;
 }
 
+type SignedUrls = Record<string, string | null>;
+
+const BUCKET = "provider-docs";
+
+const DOC_FIELDS: { key: keyof DocRecord; label: string }[] = [
+  { key: "doc_rg_url", label: "RG / Identidade" },
+  { key: "doc_residence_url", label: "Comprovante de Residência" },
+  { key: "doc_cnh_url", label: "CNH" },
+  { key: "doc_crlv_url", label: "CRLV" },
+  { key: "doc_selfie_url", label: "Selfie" },
+];
 
 export function Documents() {
   const [docs, setDocs] = useState<DocRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<DocRecord | null>(null);
+  const [signedUrls, setSignedUrls] = useState<SignedUrls>({});
+  const [signingUrls, setSigningUrls] = useState(false);
   const [actioning, setActioning] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("providers")
         .select(`
           id, service_type, onboarding_status,
@@ -35,13 +50,19 @@ export function Documents() {
         .eq("onboarding_status", "submitted")
         .order("updated_at", { ascending: true });
 
+      if (error) {
+        console.error("[Documents] fetch error:", error.code);
+        setLoading(false);
+        return;
+      }
+
       if (data) {
         setDocs(
           data.map((row: any) => ({
             id: row.id,
-            provider_name: row.profiles?.name ?? "—",
-            provider_email: row.profiles?.email ?? "—",
-            service_type: row.service_type ?? "—",
+            provider_name: sanitizeText(row.profiles?.name ?? ""),
+            provider_email: sanitizeText(row.profiles?.email ?? ""),
+            service_type: sanitizeText(row.service_type ?? ""),
             doc_rg_url: row.doc_rg_url ?? "",
             doc_residence_url: row.doc_residence_url ?? "",
             doc_cnh_url: row.doc_cnh_url ?? "",
@@ -57,11 +78,44 @@ export function Documents() {
     load();
   }, []);
 
+  /* Fetch signed URLs every time a provider is selected.
+     Signed URLs expire in 5 min — never expose raw storage paths to the DOM. */
+  async function selectProvider(doc: DocRecord) {
+    setSelected(doc);
+    setSignedUrls({});
+    setActionError(null);
+    setSigningUrls(true);
+
+    const paths: Record<string, string> = {};
+    for (const { key } of DOC_FIELDS) {
+      const val = doc[key] as string;
+      if (val) paths[key as string] = val;
+    }
+
+    const urls = await getSignedUrls(BUCKET, paths);
+    setSignedUrls(urls);
+    setSigningUrls(false);
+  }
+
   async function updateStatus(id: string, status: "approved" | "rejected") {
+    if (actioning) return;
     setActioning(true);
-    await supabase.from("providers").update({ onboarding_status: status }).eq("id", id);
+    setActionError(null);
+
+    const { error } = await supabase
+      .from("providers")
+      .update({ onboarding_status: status })
+      .eq("id", id);
+
+    if (error) {
+      setActionError("Não foi possível atualizar o status. Tente novamente.");
+      setActioning(false);
+      return;
+    }
+
     setDocs((prev) => prev.filter((d) => d.id !== id));
     setSelected(null);
+    setSignedUrls({});
     setActioning(false);
   }
 
@@ -88,12 +142,12 @@ export function Documents() {
             {docs.map((doc) => (
               <li key={doc.id}>
                 <button
-                  onClick={() => setSelected(doc)}
+                  onClick={() => selectProvider(doc)}
                   className={`w-full p-4 text-left transition hover:bg-slate-50 ${selected?.id === doc.id ? "bg-yellow-50" : ""}`}
                 >
-                  <div className="font-medium text-slate-900">{doc.provider_name}</div>
-                  <div className="text-xs text-slate-400">{doc.provider_email}</div>
-                  <div className="mt-1 text-xs font-medium capitalize text-slate-500">{doc.service_type}</div>
+                  <div className="font-medium text-slate-900">{doc.provider_name || "—"}</div>
+                  <div className="text-xs text-slate-400">{doc.provider_email || "—"}</div>
+                  <div className="mt-1 text-xs font-medium capitalize text-slate-500">{doc.service_type || "—"}</div>
                 </button>
               </li>
             ))}
@@ -113,21 +167,23 @@ export function Documents() {
             <div className="mb-6 flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{selected.provider_name}</h2>
-                <p className="text-sm text-slate-500">{selected.provider_email} · {selected.service_type}</p>
+                <p className="text-sm text-slate-500">
+                  {selected.provider_email} · {selected.service_type}
+                </p>
                 <p className="mt-1 text-xs text-slate-400">
                   Enviado em {new Date(selected.submitted_at).toLocaleString("pt-BR")}
                 </p>
               </div>
               <div className="flex gap-3">
                 <button
-                  disabled={actioning}
+                  disabled={actioning || signingUrls}
                   onClick={() => updateStatus(selected.id, "rejected")}
                   className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                 >
                   Reprovar
                 </button>
                 <button
-                  disabled={actioning}
+                  disabled={actioning || signingUrls}
                   onClick={() => updateStatus(selected.id, "approved")}
                   className="rounded-xl bg-green-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-600 disabled:opacity-50"
                 >
@@ -136,49 +192,70 @@ export function Documents() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: "RG / Identidade", url: selected.doc_rg_url },
-                { label: "Comprovante de residência", url: selected.doc_residence_url },
-                { label: "CNH", url: selected.doc_cnh_url },
-                { label: "CRLV", url: selected.doc_crlv_url },
-                { label: "Selfie", url: selected.doc_selfie_url },
-              ].map(({ label, url }) => {
-                const { data } = supabase.storage.from("provider-docs").getPublicUrl(url);
-                return (
-                  <div key={label} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500">
-                      {label}
-                    </div>
-                    {url ? (
-                      <a href={data.publicUrl} target="_blank" rel="noopener noreferrer" className="block">
-                        <img
-                          src={data.publicUrl}
-                          alt={label}
-                          className="h-48 w-full object-cover transition hover:opacity-90"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                        />
-                      </a>
-                    ) : (
-                      <div className="flex h-48 items-center justify-center text-sm text-slate-400">
-                        Não enviado
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            {actionError && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+                <span className="text-red-500">⚠</span>
+                <p className="text-sm text-red-700">{actionError}</p>
+              </div>
+            )}
+
+            {/* Note about signed URL expiry */}
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5">
+              <span className="text-base">🔒</span>
+              <p className="text-xs text-blue-700">
+                Links de documentos expiram em 5 minutos por segurança. Recarregue o painel caso expire.
+              </p>
             </div>
+
+            {signingUrls ? (
+              <div className="flex items-center justify-center gap-3 py-16 text-slate-400">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent" />
+                <span className="text-sm">Carregando documentos com acesso seguro...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {DOC_FIELDS.map(({ key, label }) => {
+                  const signedUrl = signedUrls[key as string];
+                  return (
+                    <div key={key as string} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+                        {label}
+                      </div>
+                      {signedUrl ? (
+                        <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="block">
+                          <img
+                            src={signedUrl}
+                            alt={label}
+                            className="h-48 w-full object-cover transition hover:opacity-90"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = "none";
+                              target.parentElement!.innerHTML =
+                                '<div class="flex h-48 items-center justify-center text-sm text-slate-400">Erro ao carregar</div>';
+                            }}
+                          />
+                        </a>
+                      ) : (
+                        <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+                          {(selected[key] as string) ? "Erro ao gerar link seguro" : "Não enviado"}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="mt-6 flex justify-end gap-3">
               <button
-                disabled={actioning}
+                disabled={actioning || signingUrls}
                 onClick={() => updateStatus(selected.id, "rejected")}
                 className="rounded-xl border border-red-200 bg-red-50 px-6 py-2.5 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50"
               >
                 ✕ Reprovar prestador
               </button>
               <button
-                disabled={actioning}
+                disabled={actioning || signingUrls}
                 onClick={() => updateStatus(selected.id, "approved")}
                 className="rounded-xl bg-green-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-green-600 disabled:opacity-50"
               >

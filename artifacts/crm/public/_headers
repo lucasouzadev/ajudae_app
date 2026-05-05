@@ -1,0 +1,31 @@
+/*
+  # Prevent clickjacking: no iframes allowed
+  X-Frame-Options: DENY
+
+  # Block MIME-type sniffing
+  X-Content-Type-Options: nosniff
+
+  # Enforce HTTPS for 1 year, include subdomains
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+  # Limit referrer information to origin only
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Disable browser APIs not needed by the CRM
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+  # Content Security Policy
+  # - default: only same origin
+  # - scripts: only same origin (no eval, no inline)
+  # - styles: same origin + unsafe-inline (required by Tailwind)
+  # - images: same origin, data URIs, and Supabase storage (signed URLs)
+  # - connect: same origin + Supabase API + Supabase auth
+  # - frame-ancestors: none (reinforces X-Frame-Options)
+  # - form-action: only self
+  # - base-uri: only self (prevents base tag hijacking)
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; manifest-src 'self'
+
+  # Prevent cross-origin info leaks
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
