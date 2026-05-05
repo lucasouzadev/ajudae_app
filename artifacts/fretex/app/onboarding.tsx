@@ -13,6 +13,7 @@ import {
   ScrollView,
   Image,
   Alert,
+  Modal,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -101,6 +102,17 @@ function FieldError({ msg }: { msg?: string }) {
   );
 }
 
+function FieldSuccess({ show }: { show: boolean }) {
+  const c = colors.light;
+  if (!show) return null;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5 }}>
+      <Ionicons name="checkmark-circle" size={12} color={c.success} />
+      <Text style={{ fontSize: 11, fontFamily: fonts.sans.medium, color: c.success }}>OK</Text>
+    </View>
+  );
+}
+
 function Label({ text, required }: { text: string; required?: boolean }) {
   const c = colors.light;
   return (
@@ -112,29 +124,37 @@ function Label({ text, required }: { text: string; required?: boolean }) {
 }
 
 function Input({
-  value, onChangeText, placeholder, keyboardType, maxLength, secureTextEntry, error, style,
+  value, onChangeText, placeholder, keyboardType, maxLength, secureTextEntry, error, success, hint, style, autoCapitalize,
 }: {
   value: string; onChangeText: (t: string) => void; placeholder?: string;
-  keyboardType?: any; maxLength?: number; secureTextEntry?: boolean; error?: boolean; style?: any;
+  keyboardType?: any; maxLength?: number; secureTextEntry?: boolean;
+  error?: string; success?: boolean; hint?: string; style?: any; autoCapitalize?: any;
 }) {
   const c = colors.light;
+  const borderColor = error ? ERROR_COLOR : success ? c.success : c.border;
   return (
-    <TextInput
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      placeholderTextColor={c.softMuted}
-      keyboardType={keyboardType}
-      maxLength={maxLength}
-      secureTextEntry={secureTextEntry}
-      autoCapitalize="none"
-      autoCorrect={false}
-      style={[{
-        height: 50, borderRadius: 14, borderWidth: 1, paddingHorizontal: 16,
-        fontSize: 14, fontFamily: fonts.sans.medium,
-        backgroundColor: c.card, borderColor: error ? ERROR_COLOR : c.border, color: c.text,
-      }, style]}
-    />
+    <>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={c.softMuted}
+        keyboardType={keyboardType}
+        maxLength={maxLength}
+        secureTextEntry={secureTextEntry}
+        autoCapitalize={autoCapitalize ?? "none"}
+        autoCorrect={false}
+        style={[{
+          height: 50, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 16,
+          fontSize: 14, fontFamily: fonts.sans.medium,
+          backgroundColor: c.card, borderColor, color: c.text,
+        }, style]}
+      />
+      {hint && !error && !success && (
+        <Text style={{ fontSize: 10, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 4 }}>{hint}</Text>
+      )}
+      {error ? <FieldError msg={error} /> : <FieldSuccess show={!!success && value.length > 0} />}
+    </>
   );
 }
 
@@ -273,6 +293,7 @@ function ProviderOnboarding() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ProviderFormData | "foto" | "qualityChecks", string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [showPhotoSource, setShowPhotoSource] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -291,45 +312,56 @@ function ProviderOnboarding() {
   /* ── Validation ── */
   const validateStep1 = (): boolean => {
     const errs: typeof errors = {};
-    if (!form.nome.trim()) errs.nome = "Nome obrigatório.";
+    if (!form.nome.trim())
+      errs.nome = "Nome completo é obrigatório.";
     else if (form.nome.trim().split(/\s+/).filter((w) => w.length >= 2).length < 2)
-      errs.nome = "Informe nome e sobrenome.";
-    if (!validateCPF(form.cpf)) errs.cpf = "CPF inválido.";
-    if (!validateDate(form.dataNasc)) errs.dataNasc = "Data inválida.";
-    if (form.telefone.replace(/\D/g, "").length < 10) errs.telefone = "Telefone inválido.";
-    if (!EMAIL_RE.test(form.email.trim())) errs.email = "E-mail inválido.";
-    if (!form.fotoUri) errs.foto = "Envie sua foto de perfil.";
+      errs.nome = "Informe nome e sobrenome (mínimo 2 palavras).";
+    if (!validateCPF(form.cpf))
+      errs.cpf = "CPF inválido — verifique os dígitos informados.";
+    if (!validateDate(form.dataNasc))
+      errs.dataNasc = "Data inválida. Use o formato DD/MM/AAAA.";
+    if (form.telefone.replace(/\D/g, "").length < 10)
+      errs.telefone = "Telefone inválido. Inclua o DDD (ex: 21 99999-0000).";
+    if (!EMAIL_RE.test(form.email.trim()))
+      errs.email = "E-mail inválido (ex: nome@dominio.com).";
+    if (!form.fotoUri)
+      errs.foto = "Foto de perfil obrigatória — use galeria ou câmera.";
     if (Object.keys(errs).length) { setErrors(errs); return false; }
     return true;
   };
 
   const validateStep2 = (): boolean => {
     const errs: typeof errors = {};
-    if (!form.tipoServico) errs.tipoServico = "Selecione o tipo de serviço.";
-    if (!form.categoria) errs.categoria = "Selecione a categoria.";
+    if (!form.tipoServico) errs.tipoServico = "Selecione o tipo de serviço que você oferece.";
+    if (!form.categoria) errs.categoria = "Selecione a categoria do serviço.";
     if (Object.keys(errs).length) { setErrors(errs); return false; }
     return true;
   };
 
   const validateStep3 = (): boolean => {
     const errs: typeof errors = {};
-    if (!form.docRgUri) errs.docRgUri = "Envie o documento de identidade.";
-    if (!form.docResidenciaUri) errs.docResidenciaUri = "Envie o comprovante de residência.";
-    if (!form.docCnhUri) errs.docCnhUri = "Envie a CNH.";
-    if (!form.qualityChecks.every(Boolean)) errs.qualityChecks = "Confirme todos os critérios de qualidade.";
+    if (!form.docRgUri) errs.docRgUri = "RG ou documento de identidade é obrigatório.";
+    if (!form.docResidenciaUri) errs.docResidenciaUri = "Comprovante de residência (máx. 90 dias) é obrigatório.";
+    if (!form.docCnhUri) errs.docCnhUri = "CNH dentro da validade é obrigatória.";
+    if (!form.qualityChecks.every(Boolean)) errs.qualityChecks = "Confirme todos os 4 critérios de qualidade para continuar.";
     if (Object.keys(errs).length) { setErrors(errs); return false; }
     return true;
   };
 
   const validateStep4 = (): boolean => {
     const errs: typeof errors = {};
-    if (!form.veiculoModelo.trim()) errs.veiculoModelo = "Modelo obrigatório.";
+    if (!form.veiculoModelo.trim())
+      errs.veiculoModelo = "Modelo do veículo é obrigatório (ex: Fiat Strada).";
     if (!form.veiculoAno || parseInt(form.veiculoAno) < 1990 || parseInt(form.veiculoAno) > new Date().getFullYear() + 1)
-      errs.veiculoAno = "Ano inválido.";
-    if (!validatePlate(form.veiculoPlaca)) errs.veiculoPlaca = "Placa inválida (ex: ABC-1234).";
-    if (!form.veiculoTipo) errs.veiculoTipo = "Selecione o tipo de veículo.";
-    if (!form.contatoMetodo) errs.contatoMetodo = "Selecione o método de verificação.";
-    if (!form.contatoDisponibilidade) errs.contatoDisponibilidade = "Selecione sua disponibilidade.";
+      errs.veiculoAno = `Ano inválido — informe entre 1990 e ${new Date().getFullYear() + 1}.`;
+    if (!validatePlate(form.veiculoPlaca))
+      errs.veiculoPlaca = "Placa inválida. Use ABC-1234 (antiga) ou ABC1D23 (Mercosul).";
+    if (!form.veiculoTipo)
+      errs.veiculoTipo = "Selecione o tipo do veículo utilizado.";
+    if (!form.contatoMetodo)
+      errs.contatoMetodo = "Selecione como prefere ser contactado pela equipe.";
+    if (!form.contatoDisponibilidade)
+      errs.contatoDisponibilidade = "Selecione seu horário disponível para contato.";
     if (Object.keys(errs).length) { setErrors(errs); return false; }
     return true;
   };
@@ -348,8 +380,8 @@ function ProviderOnboarding() {
     transition(step - 1);
   };
 
-  /* ── Image picker ── */
-  const pickPhoto = async () => {
+  /* ── Image pickers ── */
+  const pickPhotoFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permissão necessária", "Precisamos de acesso à galeria para selecionar sua foto.");
@@ -357,6 +389,24 @@ function ProviderOnboarding() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaType.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      set("fotoUri", result.assets[0].uri);
+    }
+  };
+
+  const pickPhotoFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permissão necessária", "Precisamos de acesso à câmera para tirar a foto.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaType.Images,
+      cameraType: ImagePicker.CameraType.front,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -493,10 +543,12 @@ function ProviderOnboarding() {
                   value={form.nome}
                   onChangeText={(t) => set("nome", sanitize(t))}
                   placeholder="Ex.: João da Silva"
+                  autoCapitalize="words"
                   maxLength={100}
-                  error={!!errors.nome}
+                  error={errors.nome}
+                  success={!errors.nome && form.nome.trim().split(/\s+/).filter((w) => w.length >= 2).length >= 2}
+                  hint="Como aparece nos documentos oficiais"
                 />
-                <FieldError msg={errors.nome} />
 
                 <View style={{ flexDirection: "row", gap: 12 }}>
                   <View style={{ flex: 1 }}>
@@ -507,9 +559,9 @@ function ProviderOnboarding() {
                       placeholder="000.000.000-00"
                       keyboardType="numeric"
                       maxLength={14}
-                      error={!!errors.cpf}
+                      error={errors.cpf}
+                      success={!errors.cpf && validateCPF(form.cpf)}
                     />
-                    <FieldError msg={errors.cpf} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Label text="NASCIMENTO" required />
@@ -519,24 +571,26 @@ function ProviderOnboarding() {
                       placeholder="DD/MM/AAAA"
                       keyboardType="numeric"
                       maxLength={10}
-                      error={!!errors.dataNasc}
+                      error={errors.dataNasc}
+                      success={!errors.dataNasc && validateDate(form.dataNasc)}
+                      hint="+18 anos"
                     />
-                    <FieldError msg={errors.dataNasc} />
                   </View>
                 </View>
 
                 <View style={{ flexDirection: "row", gap: 12 }}>
                   <View style={{ flex: 1 }}>
-                    <Label text="TELEFONE (WHATSAPP)" required />
+                    <Label text="TELEFONE / WHATSAPP" required />
                     <Input
                       value={form.telefone}
                       onChangeText={(t) => set("telefone", maskPhone(t))}
                       placeholder="(00) 00000-0000"
                       keyboardType="phone-pad"
                       maxLength={15}
-                      error={!!errors.telefone}
+                      error={errors.telefone}
+                      success={!errors.telefone && form.telefone.replace(/\D/g, "").length >= 10}
+                      hint="Com DDD"
                     />
-                    <FieldError msg={errors.telefone} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Label text="EMAIL" required />
@@ -546,38 +600,50 @@ function ProviderOnboarding() {
                       placeholder="email@exemplo.com"
                       keyboardType="email-address"
                       maxLength={100}
-                      error={!!errors.email}
+                      error={errors.email}
+                      success={!errors.email && EMAIL_RE.test(form.email.trim())}
                     />
-                    <FieldError msg={errors.email} />
                   </View>
                 </View>
 
                 {/* Foto de perfil */}
                 <View style={[prov.sectionDivider, { borderColor: c.border }]} />
                 <Text style={[prov.sectionTitle, { color: c.text }]}>Foto de perfil</Text>
+                <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginBottom: 12 }}>
+                  Use a câmera frontal para uma selfie ou escolha da galeria.
+                </Text>
 
                 <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
-                  <Pressable onPress={pickPhoto} style={[prov.photoCircle, {
-                    borderColor: form.fotoUri ? c.blue : c.border,
-                    backgroundColor: form.fotoUri ? "transparent" : c.card,
-                  }]}>
+                  <Pressable
+                    onPress={() => setShowPhotoSource(true)}
+                    style={[prov.photoCircle, {
+                      borderColor: errors.foto ? ERROR_COLOR : form.fotoUri ? c.blue : c.border,
+                      backgroundColor: form.fotoUri ? "transparent" : c.card,
+                    }]}
+                  >
                     {form.fotoUri
                       ? <Image source={{ uri: form.fotoUri }} style={{ width: 72, height: 72, borderRadius: 36 }} />
-                      : <Ionicons name="camera" size={28} color={c.softMuted} />
+                      : <Ionicons name="camera" size={28} color={errors.foto ? ERROR_COLOR : c.softMuted} />
                     }
                   </Pressable>
-                  <View style={{ flex: 1, gap: 6 }}>
+                  <View style={{ flex: 1, gap: 8 }}>
                     <Pressable
-                      onPress={pickPhoto}
+                      onPress={() => { setShowPhotoSource(false); setTimeout(pickPhotoFromCamera, 100); }}
+                      style={[prov.photoBtn, { borderColor: c.blue, backgroundColor: `${c.blue}0F` }]}
+                    >
+                      <Ionicons name="camera" size={15} color={c.blue} />
+                      <Text style={{ fontSize: 12, fontFamily: fonts.sans.medium, color: c.blue }}>Tirar foto agora</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={pickPhotoFromGallery}
                       style={[prov.photoBtn, { borderColor: form.fotoUri ? c.blue : c.border, backgroundColor: form.fotoUri ? `${c.blue}0F` : c.card }]}
                     >
                       <Ionicons name={form.fotoUri ? "checkmark-circle" : "image-outline"} size={15} color={form.fotoUri ? c.blue : c.softMuted} />
                       <Text style={{ fontSize: 12, fontFamily: fonts.sans.medium, color: form.fotoUri ? c.blue : c.softMuted }}>
-                        {form.fotoUri ? "Foto selecionada" : "Selecionar da galeria"}
+                        {form.fotoUri ? "Foto selecionada ✓" : "Selecionar da galeria"}
                       </Text>
                     </Pressable>
                     {[
-                      "Foto real do prestador",
                       "Rosto visível e centralizado",
                       "Nítida e bem iluminada",
                     ].map((r) => (
@@ -746,10 +812,11 @@ function ProviderOnboarding() {
                       value={form.veiculoModelo}
                       onChangeText={(t) => set("veiculoModelo", sanitize(t))}
                       placeholder="Ex.: Fiat Strada"
+                      autoCapitalize="words"
                       maxLength={60}
-                      error={!!errors.veiculoModelo}
+                      error={errors.veiculoModelo}
+                      success={!errors.veiculoModelo && form.veiculoModelo.trim().length > 0}
                     />
-                    <FieldError msg={errors.veiculoModelo} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Label text="ANO" required />
@@ -759,26 +826,23 @@ function ProviderOnboarding() {
                       placeholder="AAAA"
                       keyboardType="numeric"
                       maxLength={4}
-                      error={!!errors.veiculoAno}
+                      error={errors.veiculoAno}
+                      success={!errors.veiculoAno && form.veiculoAno.length === 4 && parseInt(form.veiculoAno) >= 1990}
                     />
-                    <FieldError msg={errors.veiculoAno} />
                   </View>
                 </View>
 
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Label text="PLACA" required />
-                    <Input
-                      value={form.veiculoPlaca}
-                      onChangeText={(t) => set("veiculoPlaca", maskPlate(t))}
-                      placeholder="ABC-1234"
-                      maxLength={8}
-                      error={!!errors.veiculoPlaca}
-                      style={{ textTransform: "uppercase" }}
-                    />
-                    <FieldError msg={errors.veiculoPlaca} />
-                  </View>
-                </View>
+                <Label text="PLACA" required />
+                <Input
+                  value={form.veiculoPlaca}
+                  onChangeText={(t) => set("veiculoPlaca", maskPlate(t))}
+                  placeholder="ABC-1234"
+                  autoCapitalize="characters"
+                  maxLength={8}
+                  error={errors.veiculoPlaca}
+                  success={!errors.veiculoPlaca && validatePlate(form.veiculoPlaca)}
+                  hint="Formato antigo (ABC-1234) ou Mercosul (ABC1D23)"
+                />
 
                 <Label text="TIPO DO VEÍCULO" required />
                 <SelectRow
@@ -801,17 +865,27 @@ function ProviderOnboarding() {
                     { value: "whatsapp", label: "WhatsApp" },
                   ]}
                   value={form.contatoMetodo}
-                  onSelect={(v) => set("contatoMetodo", v)}
+                  onSelect={(v) => { set("contatoMetodo", v); }}
                 />
-                <FieldError msg={errors.contatoMetodo} />
+                {errors.contatoMetodo && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 }}>
+                    <Ionicons name="alert-circle" size={12} color={ERROR_COLOR} />
+                    <Text style={{ fontSize: 11, fontFamily: fonts.sans.medium, color: ERROR_COLOR }}>{errors.contatoMetodo}</Text>
+                  </View>
+                )}
 
-                <Label text="DISPONIBILIDADE" required />
+                <Label text="DISPONIBILIDADE PARA CONTATO" required />
                 <SelectRow
                   options={DISPONIBILIDADE}
                   value={form.contatoDisponibilidade}
-                  onSelect={(v) => set("contatoDisponibilidade", v)}
+                  onSelect={(v) => { set("contatoDisponibilidade", v); }}
                 />
-                <FieldError msg={errors.contatoDisponibilidade} />
+                {errors.contatoDisponibilidade && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 }}>
+                    <Ionicons name="alert-circle" size={12} color={ERROR_COLOR} />
+                    <Text style={{ fontSize: 11, fontFamily: fonts.sans.medium, color: ERROR_COLOR }}>{errors.contatoDisponibilidade}</Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -905,6 +979,46 @@ function ProviderOnboarding() {
             <Ionicons name={step < 5 ? "arrow-forward" : "checkmark-circle"} size={16} color="#fff" />
           </Pressable>
         </View>
+
+        {/* Photo source picker */}
+        <Modal visible={showPhotoSource} transparent animationType="fade" onRequestClose={() => setShowPhotoSource(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }} onPress={() => setShowPhotoSource(false)}>
+            <View style={{ backgroundColor: c.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 }}>
+              <Text style={{ fontSize: 16, fontFamily: fonts.sans.bold, color: c.text, textAlign: "center", marginBottom: 4 }}>
+                Foto de perfil
+              </Text>
+              <Pressable
+                onPress={() => { setShowPhotoSource(false); setTimeout(pickPhotoFromCamera, 300); }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: `${c.blue}18`, alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="camera" size={22} color={c.blue} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Tirar foto agora</Text>
+                  <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted }}>Use a câmera frontal para a selfie de perfil</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
+              </Pressable>
+              <Pressable
+                onPress={() => { setShowPhotoSource(false); setTimeout(pickPhotoFromGallery, 300); }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: `${c.blue}18`, alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="images" size={22} color={c.blue} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Escolher da galeria</Text>
+                  <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted }}>Selecione uma foto existente</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
+              </Pressable>
+              <Pressable onPress={() => setShowPhotoSource(false)} style={{ padding: 14, borderRadius: 14, alignItems: "center" }}>
+                <Text style={{ fontSize: 14, fontFamily: fonts.sans.medium, color: c.softMuted }}>Cancelar</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
