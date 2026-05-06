@@ -5,7 +5,6 @@ import { getSignedUrls, sanitizeText } from "@/lib/security";
 interface DocRecord {
   id: string;
   provider_name: string;
-  provider_email: string;
   service_type: string;
   doc_rg_url: string;
   doc_residence_url: string;
@@ -29,6 +28,7 @@ const DOC_FIELDS: { key: keyof DocRecord; label: string }[] = [
 ];
 
 export function Documents() {
+  const [showDetail, setShowDetail] = useState(false);
   const [docs, setDocs] = useState<DocRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<DocRecord | null>(null);
@@ -45,7 +45,7 @@ export function Documents() {
           id, service_type, onboarding_status,
           doc_rg_url, doc_residence_url, doc_cnh_url, doc_crlv_url, doc_selfie_url,
           updated_at,
-          profiles(name, email)
+          profiles(name)
         `)
         .eq("onboarding_status", "submitted")
         .order("updated_at", { ascending: true });
@@ -61,7 +61,6 @@ export function Documents() {
           data.map((row: any) => ({
             id: row.id,
             provider_name: sanitizeText(row.profiles?.name ?? ""),
-            provider_email: sanitizeText(row.profiles?.email ?? ""),
             service_type: sanitizeText(row.service_type ?? ""),
             doc_rg_url: row.doc_rg_url ?? "",
             doc_residence_url: row.doc_residence_url ?? "",
@@ -81,6 +80,7 @@ export function Documents() {
   /* Fetch signed URLs every time a provider is selected.
      Signed URLs expire in 5 min — never expose raw storage paths to the DOM. */
   async function selectProvider(doc: DocRecord) {
+    setShowDetail(true);
     setSelected(doc);
     setSignedUrls({});
     setActionError(null);
@@ -122,7 +122,7 @@ export function Documents() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* List */}
-      <div className="flex w-80 flex-shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white">
+      <div className={`flex flex-col overflow-y-auto border-r border-slate-200 bg-white ${showDetail ? "hidden md:flex md:w-80 md:flex-shrink-0" : "w-full md:w-80 md:flex-shrink-0"}`}>
         <div className="border-b border-slate-100 p-5">
           <h1 className="text-lg font-bold text-slate-900">Documentos</h1>
           <p className="text-xs text-slate-500">{docs.length} aguardando análise</p>
@@ -146,7 +146,6 @@ export function Documents() {
                   className={`w-full p-4 text-left transition hover:bg-slate-50 ${selected?.id === doc.id ? "bg-yellow-50" : ""}`}
                 >
                   <div className="font-medium text-slate-900">{doc.provider_name || "—"}</div>
-                  <div className="text-xs text-slate-400">{doc.provider_email || "—"}</div>
                   <div className="mt-1 text-xs font-medium capitalize text-slate-500">{doc.service_type || "—"}</div>
                 </button>
               </li>
@@ -156,19 +155,20 @@ export function Documents() {
       </div>
 
       {/* Detail */}
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className={`flex-1 overflow-y-auto ${showDetail ? "block" : "hidden md:block"}`}>
         {!selected ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
             <span className="text-5xl">📄</span>
             <span className="text-sm">Selecione um prestador para analisar</span>
           </div>
         ) : (
-          <div className="mx-auto max-w-2xl">
+          <div className="mx-auto max-w-2xl p-4 sm:p-8">
+            <button onClick={() => setShowDetail(false)} className="mb-4 flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 md:hidden">← Voltar</button>
             <div className="mb-6 flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{selected.provider_name}</h2>
                 <p className="text-sm text-slate-500">
-                  {selected.provider_email} · {selected.service_type}
+                  {selected.service_type}
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
                   Enviado em {new Date(selected.submitted_at).toLocaleString("pt-BR")}

@@ -29,8 +29,8 @@ export function Dashboard() {
         const [providers, pending, tickets, services] = await Promise.all([
           supabase.from("providers").select("id", { count: "exact", head: true }),
           supabase.from("providers").select("id", { count: "exact", head: true }).eq("onboarding_status", "submitted"),
-          supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
-          supabase.from("services").select("id", { count: "exact", head: true }).in("status", ["pending", "in_progress"]),
+          supabase.from("tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
+          supabase.from("requests").select("id", { count: "exact", head: true }).in("status", ["requested", "accepted", "en_route", "in_progress"]),
         ]);
 
         if (providers.error || pending.error || tickets.error || services.error) {
@@ -54,7 +54,7 @@ export function Dashboard() {
   }, []);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
         <p className="text-sm text-slate-500">Visão geral da operação do Ajudaê</p>
