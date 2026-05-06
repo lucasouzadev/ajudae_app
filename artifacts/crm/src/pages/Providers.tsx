@@ -70,9 +70,7 @@ export function Providers() {
     if (filter !== "all" && p.onboarding_status !== filter) return false;
     if (!search) return true;
     const needle = search.toLowerCase();
-    return (
-      p.name.toLowerCase().includes(needle) ||
-    );
+    return p.name.toLowerCase().includes(needle);
   });
 
   return (
