@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ajudaê CRM</title>
+
+    <!-- Prevent indexing: this is an internal admin panel -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
+
+    <!-- CSP fallback (meta tag) — servers send the header version which takes precedence -->
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'" />
+
+    <!-- Clickjacking prevention (meta fallback) -->
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+
+    <!-- Referrer -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
