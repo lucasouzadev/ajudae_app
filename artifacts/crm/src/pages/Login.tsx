@@ -49,11 +49,6 @@ export function Login() {
             A
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Ajudaê CRM</h1>
-          <p className="text-center text-sm text-slate-500">
-            Painel de administração interno.
-            <br />
-            Acesso exclusivo — credenciais gerenciadas pelo Supabase.
-          </p>
         </div>
 
         {/* Form */}
@@ -118,10 +113,6 @@ export function Login() {
             {submitting ? "Verificando..." : isLocked ? `Bloqueado — aguarde ${waitSeconds}s` : "Entrar"}
           </button>
         </form>
-
-        <p className="mt-4 text-center text-xs text-slate-400">
-          Sem acesso? Solicite ao administrador do Supabase.
-        </p>
       </div>
     </div>
   );
