@@ -309,7 +309,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
 export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlayProps) {
   const c = colors.light;
   const insets = useSafeAreaInsets();
-  const { role, switchRole, logout } = useAuth();
+  const { role, logout } = useAuth();
   const translateY = useRef(new Animated.Value(-1000)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -331,8 +331,6 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
 
   const accent = role === "cliente" ? c.primary : c.blue;
   const roleLabel = role === "cliente" ? "Cliente" : "Prestador";
-  const otherRole = role === "cliente" ? "prestador" : "cliente";
-  const otherLabel = otherRole === "cliente" ? "Cliente" : "Prestador";
 
   return (
     <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
@@ -396,23 +394,6 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
                   <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
                 </Pressable>
               ))}
-
-              <Pressable
-                onPress={() => {
-                  switchRole(otherRole as "cliente" | "prestador");
-                  onClose();
-                }}
-                style={[styles.item, { borderBottomColor: c.borderLight }]}
-              >
-                <View style={[styles.itemIcon, { backgroundColor: c.primaryLight }]}>
-                  <Ionicons name="swap-horizontal" size={18} color={c.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.itemLabel, { color: c.text }]}>Trocar para {otherLabel}</Text>
-                  <Text style={[styles.itemSub, { color: c.softMuted }]}>Mude o tipo de conta</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={c.softMuted} />
-              </Pressable>
 
               <Pressable
                 onPress={async () => {

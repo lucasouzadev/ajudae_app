@@ -1544,6 +1544,18 @@ function ClienteHome() {
     return result;
   }, [providers]);
 
+  // Anima o sheet para EMPTY_H quando não há prestadores, COLLAPSED_H quando chegam
+  useEffect(() => {
+    if (loadingProviders) return;
+    const target = providers.length === 0 ? EMPTY_H : COLLAPSED_H;
+    Animated.spring(sheetHeightAnim, {
+      toValue: target,
+      tension: 60,
+      friction: 14,
+      useNativeDriver: false,
+    }).start();
+  }, [providers.length, loadingProviders]);
+
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
 
   return (
@@ -1576,24 +1588,29 @@ function ClienteHome() {
             }
           }}
         />
+      </Animated.View>
 
-        {/* Botão de localização — sempre 16px acima da borda inferior do mapa */}
-        <View style={{ position: "absolute", right: 16, bottom: 16, zIndex: 25 }}>
-          <Pressable
-            style={[styles.locateBtn, { backgroundColor: locating ? c.blue : c.card }, shadows.md]}
-            onPress={handleLocate}
-          >
-            <Animated.View
-              style={{
-                transform: [{
-                  rotate: locateSpin,
-                }],
-              }}
-            >
-              <Ionicons name="locate" size={20} color={locating ? "#fff" : c.blue} />
-            </Animated.View>
-          </Pressable>
-        </View>
+      {/* Botão de localização — acima dos chips de filtro, animado com o sheet */}
+      <Animated.View
+        style={{
+          position: "absolute",
+          right: 16,
+          bottom: sheetHeightAnim.interpolate({
+            inputRange: [EMPTY_H, COLLAPSED_H],
+            outputRange: [EMPTY_H + CHIP_ROW_H + 12, COLLAPSED_H + CHIP_ROW_H + 12],
+            extrapolate: "clamp",
+          }),
+          zIndex: 40,
+        }}
+      >
+        <Pressable
+          style={[styles.locateBtn, { backgroundColor: locating ? c.blue : c.card }, shadows.md]}
+          onPress={handleLocate}
+        >
+          <Animated.View style={{ transform: [{ rotate: locateSpin }] }}>
+            <Ionicons name="locate" size={20} color={locating ? "#fff" : c.blue} />
+          </Animated.View>
+        </Pressable>
       </Animated.View>
 
       <TopNav
@@ -1654,9 +1671,9 @@ function ClienteHome() {
         </Pressable>
       ) : null}
 
-      {/* Floating filter chips — fades out as sheet rises */}
+      {/* Floating filter chips — visible only when sheet is at COLLAPSED_H (providers present) */}
       <Animated.View
-        pointerEvents="box-none"
+        pointerEvents={loadingProviders || providers.length === 0 ? "none" : "box-none"}
         style={{
           position: "absolute",
           bottom: COLLAPSED_H + 8,
@@ -1665,8 +1682,8 @@ function ClienteHome() {
           zIndex: 32,
           height: CHIP_ROW_H,
           opacity: sheetHeightAnim.interpolate({
-            inputRange: [COLLAPSED_H, COLLAPSED_H + 60],
-            outputRange: [1, 0],
+            inputRange: [EMPTY_H, COLLAPSED_H, COLLAPSED_H + 60],
+            outputRange: [0, 1, 0],
             extrapolate: "clamp",
           }),
         }}
@@ -1760,6 +1777,7 @@ function ClienteHome() {
       {/* Bottom draggable sheet */}
       <ProvidersSheet
         providers={filtered}
+        loading={loadingProviders}
         active={active}
         onSelect={(p) => {
           if (active?.id === p.id) {
@@ -2715,13 +2733,15 @@ const styles = StyleSheet.create({
 
 /* ─── Draggable providers sheet ─────────────────────────────────────── */
 const SCREEN_H = Dimensions.get("window").height;
-const COLLAPSED_H = 196;  // mapa maior quando sheet compacto
+const COLLAPSED_H = 180;  // sheet colapsado com prestadores
+const EMPTY_H     = 100;  // sheet colapsado sem prestadores / carregando
 const CHIP_ROW_H  = 52;   // altura da faixa flutuante de filtros
 const MINI_CARD_H = 82;   // altura fixa dos mini cards no carrossel
-const EXPANDED_H = Math.min(SCREEN_H * 0.58, 460);
+const EXPANDED_H  = Math.min(SCREEN_H * 0.58, 460);
 
 function ProvidersSheet({
   providers,
+  loading,
   active,
   onSelect,
   onOpenProfile,
@@ -2730,6 +2750,7 @@ function ProvidersSheet({
   heightAnim,
 }: {
   providers: Provider[];
+  loading?: boolean;
   active: Provider | null;
   onSelect: (p: Provider) => void;
   onOpenProfile: (p: Provider) => void;
@@ -2738,14 +2759,21 @@ function ProvidersSheet({
   heightAnim: Animated.Value;
 }) {
   const c = colors.light;
-  const startH = useRef(COLLAPSED_H);
+  const isEmpty = !loading && providers.length === 0;
+  const minH = isEmpty ? EMPTY_H : COLLAPSED_H;
+  const startH = useRef(minH);
   const [expanded, setExpanded] = useState(false);
+
+  // Quando providers aparecem/somem, reseta o estado de expandido
+  useEffect(() => {
+    if (expanded) setExpanded(false);
+  }, [isEmpty]);
 
   const snap = (target: number) => {
     Animated.spring(heightAnim, {
       toValue: target,
-      tension: 70,
-      friction: 13,
+      tension: 80,
+      friction: 12,
       useNativeDriver: false,
     }).start();
     startH.current = target;
@@ -2757,26 +2785,29 @@ function ProvidersSheet({
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderGrant: () => {
-        // capture current animated value
         // @ts-expect-error access internal
         startH.current = (heightAnim as any)._value ?? startH.current;
         heightAnim.stopAnimation();
       },
       onPanResponderMove: (_, g) => {
-        const next = Math.max(COLLAPSED_H, Math.min(EXPANDED_H, startH.current - g.dy));
+        // @ts-expect-error access internal
+        const currentMin = isEmpty ? EMPTY_H : COLLAPSED_H;
+        const next = Math.max(currentMin, Math.min(EXPANDED_H, startH.current - g.dy));
         heightAnim.setValue(next);
       },
       onPanResponderRelease: (_, g) => {
-        const mid = (COLLAPSED_H + EXPANDED_H) / 2;
+        // @ts-expect-error access internal
+        const currentMin = isEmpty ? EMPTY_H : COLLAPSED_H;
+        const mid = (currentMin + EXPANDED_H) / 2;
         // @ts-expect-error access internal
         const value = (heightAnim as any)._value ?? startH.current;
-        const target = g.vy < -0.5 ? EXPANDED_H : g.vy > 0.5 ? COLLAPSED_H : value > mid ? EXPANDED_H : COLLAPSED_H;
+        const target = g.vy < -0.5 ? EXPANDED_H : g.vy > 0.5 ? currentMin : value > mid ? EXPANDED_H : currentMin;
         snap(target);
       },
     }),
   ).current;
 
-  const toggle = () => snap(expanded ? COLLAPSED_H : EXPANDED_H);
+  const toggle = () => snap(expanded ? minH : EXPANDED_H);
 
   return (
     <Animated.View
@@ -2792,27 +2823,57 @@ function ProvidersSheet({
         <View style={sheetStyles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={[sheetStyles.headerTitle, { color: c.text }]}>
-              {expanded ? "Prestadores na sua área" : "Perto de você"}
+              {loading ? "Buscando prestadores…" : expanded ? "Prestadores na sua área" : "Perto de você"}
             </Text>
             <Text style={[sheetStyles.headerSub, { color: c.softMuted }]}>
-              {providers.length} disponíveis · {expanded ? "deslize para baixo" : "puxe para ver lista"}
+              {loading
+                ? "Aguarde um momento"
+                : providers.length === 0
+                ? "Nenhum disponível agora · atualize em instantes"
+                : `${providers.length} disponíveis · ${expanded ? "deslize para baixo" : "puxe para ver lista"}`}
             </Text>
           </View>
-          <Pressable onPress={toggle} style={[sheetStyles.toggleBtn, { backgroundColor: c.background, borderColor: c.borderLight }]}>
-            <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={16} color={c.text} />
-          </Pressable>
+          {!loading && (
+            <Pressable onPress={toggle} style={[sheetStyles.toggleBtn, { backgroundColor: c.background, borderColor: c.borderLight }]}>
+              <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={16} color={c.text} />
+            </Pressable>
+          )}
         </View>
       </View>
 
       {/* Body — carrossel e lista em posição absoluta dentro do sheet, sem overflow */}
       <View style={{ flex: 1, position: "relative" }}>
+
+      {/* Loading skeleton */}
+      {loading && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 18, gap: 10 }}
+        >
+          {[0, 1, 2].map((i) => (
+            <View
+              key={i}
+              style={[
+                styles.providerMiniCard,
+                { backgroundColor: c.borderLight, borderColor: c.borderLight, width: 130, height: MINI_CARD_H },
+              ]}
+            >
+              <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: c.border, marginBottom: 8 }} />
+              <View style={{ width: 80, height: 10, borderRadius: 5, backgroundColor: c.border, marginBottom: 6 }} />
+              <View style={{ width: 56, height: 8, borderRadius: 4, backgroundColor: c.border }} />
+            </View>
+          ))}
+        </ScrollView>
+      )}
+
       <Animated.View
         pointerEvents={expanded ? "none" : "auto"}
         style={{
           position: "absolute",
           left: 0, right: 0, top: 0,
           height: MINI_CARD_H + 22,
-          opacity: heightAnim.interpolate({
+          opacity: loading ? 0 : heightAnim.interpolate({
             inputRange: [COLLAPSED_H, COLLAPSED_H + 50],
             outputRange: [1, 0],
             extrapolate: "clamp",

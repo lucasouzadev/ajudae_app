@@ -125,6 +125,7 @@ function AuthGate() {
         <Stack.Screen name="start-pin" options={{ presentation: "modal", gestureEnabled: false }} />
         <Stack.Screen name="confirm-start-pin" options={{ presentation: "modal" }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="reset-password" options={{ headerShown: false, gestureEnabled: false }} />
       </Stack>
     </>
   );

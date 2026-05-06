@@ -217,7 +217,7 @@ function LGPDScreen({
         <Text style={[s.lgpdTitle, { color: c.text, fontFamily: fonts.serif.bold }]}>
           Sua privacidade importa
         </Text>
-        <Text style={[s.lgpdSub, { color: c.muted, fontFamily: fonts.sans.regular }]}>
+        <Text style={[s.lgpdSub, { color: c.sub, fontFamily: fonts.sans.regular }]}>
           Em conformidade com a LGPD (Lei 13.709/2018)
         </Text>
       </View>
@@ -241,14 +241,14 @@ function LGPDScreen({
               <Text style={[s.dataTitle, { color: c.text, fontFamily: fonts.sans.semibold }]}>
                 {item.title}
               </Text>
-              <Text style={[s.dataDesc, { color: c.muted, fontFamily: fonts.sans.regular }]}>
+              <Text style={[s.dataDesc, { color: c.sub, fontFamily: fonts.sans.regular }]}>
                 {item.desc}
               </Text>
             </View>
           </View>
         ))}
 
-        <Text style={[s.lgpdNotice, { color: c.muted, fontFamily: fonts.sans.regular }]}>
+        <Text style={[s.lgpdNotice, { color: c.sub, fontFamily: fonts.sans.regular }]}>
           Seus dados{" "}
           <Text style={{ fontFamily: fonts.sans.semibold, color: c.text }}>
             não são vendidos
@@ -279,7 +279,7 @@ function LGPDScreen({
             Aceitar e continuar
           </Text>
         </Pressable>
-        <Text style={[s.lgpdFooterNote, { color: c.softMuted, fontFamily: fonts.sans.regular }]}>
+        <Text style={[s.lgpdFooterNote, { color: c.sub, fontFamily: fonts.sans.regular }]}>
           Ao aceitar, você concorda com os termos acima. Sem aceite não é possível usar o Ajudaê.
         </Text>
       </View>
@@ -330,7 +330,7 @@ function PermissionScreen({
       <Text style={[s.permTitle, { color: c.text, fontFamily: fonts.serif.bold }]}>
         {title}
       </Text>
-      <Text style={[s.permDesc, { color: c.muted, fontFamily: fonts.sans.regular }]}>
+      <Text style={[s.permDesc, { color: c.sub, fontFamily: fonts.sans.regular }]}>
         {description}
       </Text>
 

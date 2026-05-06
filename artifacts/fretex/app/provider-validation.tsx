@@ -262,7 +262,7 @@ export default function ProviderValidationScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ['images'],
       quality: 0.9,
     });
 
