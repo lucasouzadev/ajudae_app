@@ -2,12 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { sanitizeText } from "@/lib/security";
 
-type ValidationStatus = "not_started" | "submitted" | "approved" | "rejected";
+type ValidationStatus = "incomplete" | "submitted" | "approved" | "rejected";
 
 interface Provider {
   id: string;
   name: string;
-  email: string;
   service_type: string;
   onboarding_status: ValidationStatus;
   active: boolean;
@@ -16,7 +15,7 @@ interface Provider {
 }
 
 const STATUS_LABELS: Record<ValidationStatus, { label: string; cls: string }> = {
-  not_started: { label: "Não enviou", cls: "bg-slate-100 text-slate-600" },
+  incomplete: { label: "Não enviou", cls: "bg-slate-100 text-slate-600" },
   submitted: { label: "Aguardando análise", cls: "bg-yellow-100 text-yellow-700" },
   approved: { label: "Aprovado", cls: "bg-green-100 text-green-700" },
   rejected: { label: "Reprovado", cls: "bg-red-100 text-red-700" },
@@ -39,7 +38,7 @@ export function Providers() {
     async function load() {
       const { data, error } = await supabase
         .from("providers")
-        .select("id, active, rating_avg, service_type, onboarding_status, created_at, profiles(name, email)")
+        .select("id, active, rating_avg, service_type, onboarding_status, created_at, profiles(name)")
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -53,9 +52,8 @@ export function Providers() {
           data.map((row: any) => ({
             id: row.id,
             name: sanitizeText(row.profiles?.name ?? ""),
-            email: sanitizeText(row.profiles?.email ?? ""),
             service_type: sanitizeText(row.service_type ?? ""),
-            onboarding_status: (row.onboarding_status ?? "not_started") as ValidationStatus,
+            onboarding_status: (row.onboarding_status ?? "incomplete") as ValidationStatus,
             active: Boolean(row.active),
             rating_avg: Number(row.rating_avg) || 0,
             created_at: row.created_at,
@@ -74,12 +72,11 @@ export function Providers() {
     const needle = search.toLowerCase();
     return (
       p.name.toLowerCase().includes(needle) ||
-      p.email.toLowerCase().includes(needle)
     );
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Prestadores</h1>
         <p className="text-sm text-slate-500">Gerencie e valide os cadastros de prestadores</p>
@@ -97,7 +94,7 @@ export function Providers() {
           className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100"
         />
         <div className="flex gap-2">
-          {(["all", "submitted", "approved", "rejected", "not_started"] as const).map((s) => (
+          {(["all", "submitted", "approved", "rejected", "incomplete"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setFilter(s)}
@@ -114,7 +111,7 @@ export function Providers() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center py-16 text-slate-400">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-yellow-400 border-t-transparent" />
@@ -149,7 +146,6 @@ export function Providers() {
                   >
                     <td className="px-5 py-3">
                       <div className="font-medium text-slate-900">{p.name || "—"}</div>
-                      <div className="text-xs text-slate-400">{p.email || "—"}</div>
                     </td>
                     <td className="px-5 py-3 capitalize text-slate-600">{p.service_type || "—"}</td>
                     <td className="px-5 py-3">

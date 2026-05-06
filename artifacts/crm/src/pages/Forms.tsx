@@ -5,7 +5,6 @@ import { sanitizeText } from "@/lib/security";
 interface FormSubmission {
   id: string;
   provider_name: string;
-  provider_email: string;
   service_type: string;
   service_category: string;
   vehicle_model: string;
@@ -27,6 +26,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export function Forms() {
+  const [showDetail, setShowDetail] = useState(false);
   const [forms, setForms] = useState<FormSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -40,9 +40,9 @@ export function Forms() {
           id, service_type, service_category, vehicle_model, vehicle_year, vehicle_plate,
           vehicle_type, contact_method, contact_availability,
           onboarding_status, validation_notes, created_at,
-          profiles(name, email)
+          profiles(name)
         `)
-        .not("onboarding_status", "eq", "not_started")
+        .in("onboarding_status", ["submitted", "approved", "rejected"])
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -56,7 +56,6 @@ export function Forms() {
           data.map((row: any) => ({
             id: row.id,
             provider_name: sanitizeText(row.profiles?.name ?? ""),
-            provider_email: sanitizeText(row.profiles?.email ?? ""),
             service_type: sanitizeText(row.service_type ?? ""),
             service_category: sanitizeText(row.service_category ?? ""),
             vehicle_model: sanitizeText(row.vehicle_model ?? ""),
@@ -78,7 +77,7 @@ export function Forms() {
 
   return (
     <div className="flex h-full overflow-hidden">
-      <div className="flex w-80 flex-shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white">
+      <div className={`flex flex-col overflow-hidden border-r border-slate-200 bg-white ${showDetail ? "hidden md:flex md:w-80 md:flex-shrink-0" : "w-full md:w-80 md:flex-shrink-0"}`}>
         <div className="border-b border-slate-100 p-5">
           <h1 className="text-lg font-bold text-slate-900">Formulários</h1>
           <p className="text-xs text-slate-500">{forms.length} envios recebidos</p>
@@ -104,7 +103,6 @@ export function Forms() {
                     className={`w-full p-4 text-left transition hover:bg-slate-50 ${selected?.id === f.id ? "bg-yellow-50" : ""}`}
                   >
                     <div className="font-medium text-slate-900">{f.provider_name || "—"}</div>
-                    <div className="text-xs text-slate-400">{f.provider_email || "—"}</div>
                     <div className="mt-1 flex items-center gap-2">
                       <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[f.onboarding_status] ?? "bg-slate-100 text-slate-500"}`}>
                         {f.onboarding_status}
@@ -119,17 +117,18 @@ export function Forms() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className={`flex-1 overflow-y-auto ${showDetail ? "block" : "hidden md:block"}`}>
         {!selected ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
             <span className="text-5xl">📋</span>
             <span className="text-sm">Selecione um formulário para ver detalhes</span>
           </div>
         ) : (
-          <div className="mx-auto max-w-2xl">
+          <div className="mx-auto max-w-2xl p-4 sm:p-8">
+            <button onClick={() => setShowDetail(false)} className="mb-4 flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 md:hidden">← Voltar</button>
             <h2 className="mb-1 text-xl font-bold text-slate-900">{selected.provider_name || "—"}</h2>
             <p className="mb-5 text-sm text-slate-500">
-              {selected.provider_email || "—"} · enviado em {new Date(selected.created_at).toLocaleDateString("pt-BR")}
+              {selected.provider_name || "—"} · enviado em {new Date(selected.created_at).toLocaleDateString("pt-BR")}
             </p>
 
             {[
