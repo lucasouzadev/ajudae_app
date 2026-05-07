@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated, PanResponder, Dimensions, RefreshControl, Modal, TextInput, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, Easing, PanResponder, Dimensions, RefreshControl, Modal, TextInput, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -1521,7 +1521,8 @@ function ClienteHome() {
       Animated.timing(spinAnim, { toValue: 1, duration: 700, useNativeDriver: true })
     );
     spinLoop.current.start();
-    mapRef.current?.recenter().finally(() => {
+    // ?? Promise.resolve() garante que .finally() nunca recebe undefined
+    (mapRef.current?.recenter() ?? Promise.resolve()).finally(() => {
       spinLoop.current?.stop();
       spinAnim.setValue(0);
       setLocating(false);
@@ -1548,10 +1549,10 @@ function ClienteHome() {
   useEffect(() => {
     if (loadingProviders) return;
     const target = providers.length === 0 ? EMPTY_H : COLLAPSED_H;
-    Animated.spring(sheetHeightAnim, {
+    Animated.timing(sheetHeightAnim, {
       toValue: target,
-      tension: 60,
-      friction: 14,
+      duration: 350,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
   }, [providers.length, loadingProviders]);
@@ -1604,8 +1605,18 @@ function ClienteHome() {
         }}
       >
         <Pressable
-          style={[styles.locateBtn, { backgroundColor: locating ? c.blue : c.card }, shadows.md]}
+          style={({ pressed }) => [
+            styles.locateBtn,
+            {
+              backgroundColor: locating ? c.blue : c.card,
+              borderWidth: 1.5,
+              borderColor: locating ? c.blue : c.blue,
+              opacity: pressed ? 0.75 : 1,
+            },
+            shadows.md,
+          ]}
           onPress={handleLocate}
+          hitSlop={8}
         >
           <Animated.View style={{ transform: [{ rotate: locateSpin }] }}>
             <Ionicons name="locate" size={20} color={locating ? "#fff" : c.blue} />
@@ -2770,10 +2781,10 @@ function ProvidersSheet({
   }, [isEmpty]);
 
   const snap = (target: number) => {
-    Animated.spring(heightAnim, {
+    Animated.timing(heightAnim, {
       toValue: target,
-      tension: 80,
-      friction: 12,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
     startH.current = target;
