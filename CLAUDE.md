@@ -1,32 +1,33 @@
 # Ajudaê — Claude Context File
 
 **Project:** Ajudaê Marketplace (Mudança, Frete, Entrega)  
-**Type:** React Native (Expo) — Dual-role mobile app (Cliente + Prestador)  
-**Stack:** TypeScript, React Native, Expo SDK 54, Supabase (Auth + DB + Edge Functions), expo-notifications  
-**Status:** MVP Test Closed Sprint — QA fechado com backend Supabase real  
-**Stage:** ~90% MVP — providers reais em integração; pagamento e chat ainda pendentes
+**Type:** React Native (Expo) mobile app + CRM Web admin  
+**Stack:** TypeScript, React Native, Expo SDK 54, Supabase (Auth + DB + Edge Functions), expo-notifications; CRM: Vite + React 19 + Tailwind v4  
+**Status:** MVP Test Closed — CRM web operacional; formulário do prestador paginado  
+**Stage:** ~92% MVP — CRM em produção (Cloudflare Pages); pagamento e chat pendentes
 
 ---
 
 ## Project Overview
 
-Ajudaê is a **two-sided marketplace** for service delivery (moving, freight, delivery). The app has:
+Ajudaê is a **two-sided marketplace** for service delivery (moving, freight, delivery). The project has:
 
-- **Cliente (Customer)**: Creates service requests, tracks in real-time, confirms dual-PINs, rates providers
-- **Prestador (Service Provider)**: Accepts jobs, delivers services, generates PINs, manages portfolio + pricing
+- **App Mobile** (`artifacts/fretex`): React Native/Expo — dual-role (Cliente + Prestador)
+- **CRM Web** (`artifacts/crm`): Vite/React — painel admin interno (acesso exclusivo via Supabase role=admin)
 
 ### Key Documents
 
 | File | Purpose |
 |------|---------|
-| `arquitetura/HANDOFF_2026-05-04_MVP_CLOSED_SPRINT.md` | **Latest** handoff — sprint bugs, providers reais, QA manual (2026-05-04) |
-| `arquitetura/HANDOFF_2026-05-04.md` | Handoff anterior — bug fixes, notifications, permissions |
-| `arquitetura/HANDOFF_2026-04-28.md` | UI Layer v2 handoff — design decisions, API contracts |
-| `arquitetura/PRD.md` | Product Requirements Document — estado real, fluxos, critérios de aceite |
-| `arquitetura/BETA_ROADMAP.md` | Roadmap 24 meses — 4 fases com estimativas e dependências |
+| `arquitetura/HANDOFF_2026-05-06.md` | **Latest** handoff — CRM web, formulários paginados, security hardening |
+| `arquitetura/HANDOFF_2026-05-04_MVP_CLOSED_SPRINT.md` | Sprint anterior — providers reais, QA manual |
+| `arquitetura/HANDOFF_2026-05-04.md` | Handoff — bug fixes, notifications, permissions |
+| `arquitetura/HANDOFF_2026-04-28.md` | UI Layer v2 — design decisions, API contracts |
+| `arquitetura/PRD.md` | Product Requirements Document |
+| `arquitetura/BETA_ROADMAP.md` | Roadmap 24 meses — 4 fases |
 | `arquitetura/MVP_STATUS.md` | Feature completeness by screen |
 | `arquitetura/CPO_ASSESSMENT.md` | Product assessment + roadmap |
-| `arquitetura/PROGRESS.md` | Implementation tracker (33 items) |
+| `arquitetura/PROGRESS.md` | Implementation tracker |
 
 ---
 
@@ -36,55 +37,92 @@ Ajudaê is a **two-sided marketplace** for service delivery (moving, freight, de
 
 - Senhas, e-mails de contas de teste, chaves de API e tokens não entram em nenhum arquivo do repositório
 - Usar `.env.local` (não commitado) para variáveis de ambiente locais
+- `.claude/settings.local.json` está no `.gitignore` — nunca remover essa entrada (pode conter tokens)
 - Credenciais de QA são documentadas fora do repositório (ex: gerenciador de senhas da equipe)
 - Se encontrar credencial hardcoded no código, remover imediatamente antes de qualquer commit
+- **Atenção:** a `anon key` do Supabase ajudae_banco foi exposta em git history (2026-05-06) e deve ser rotacionada
 
 ---
 
 ## Architecture Quick Ref
 
+### App Mobile (`artifacts/fretex`)
+
 ```
 artifacts/fretex/
 ├── app/
-│   ├── index.tsx              # ClienteHome + PrestadorHome (dual-role)
-│   ├── marketplace.tsx        # Marketplace list + MapExpandModal
-│   ├── provider/[id].tsx      # Provider profile (syncs with PortfolioContext)
-│   ├── request.tsx            # Create service request (helper toggle aware)
-│   ├── track.tsx              # Track active service
-│   ├── confirm-start-pin.tsx  # Client PIN input (4 digits)
-│   ├── otp-modal.tsx          # Show PIN completion (6 digits)
-│   ├── job.tsx                # Provider job details
-│   ├── start-pin.tsx          # Show PIN start (provider side)
-│   ├── job-otp.tsx            # Provider PIN input (6 digits)
-│   ├── rate.tsx               # Post-service rating
-│   ├── portfolio.tsx          # Provider portfolio editor
+│   ├── index.tsx                  # ClienteHome + PrestadorHome (dual-role)
+│   ├── marketplace.tsx            # Marketplace list + MapExpandModal
+│   ├── provider/[id].tsx          # Provider profile (syncs with PortfolioContext)
+│   ├── request.tsx                # Create service request
+│   ├── track.tsx                  # Track active service
+│   ├── confirm-start-pin.tsx      # Client PIN input (4 digits)
+│   ├── otp-modal.tsx              # Show PIN completion (6 digits)
+│   ├── job.tsx                    # Provider job details
+│   ├── start-pin.tsx              # Show PIN start (provider side)
+│   ├── job-otp.tsx                # Provider PIN input (6 digits)
+│   ├── rate.tsx                   # Post-service rating
+│   ├── portfolio.tsx              # Provider portfolio editor
+│   ├── provider-validation.tsx    # Formulário prestador — 5 etapas paginadas ← atualizado
 │   └── [auth, inbox, support, ticket, payment, onboarding, etc.]
 ├── components/
-│   ├── MapReal.tsx            # react-native-maps MapView with recenter()
-│   ├── MarketMap.tsx          # Reusable map + pin UI
-│   ├── ProviderPin.tsx        # Individual pin visual
-│   ├── TopNav.tsx             # Header with badges
-│   ├── ProfileOverlay.tsx     # Profile menu (permission toggles wired)
-│   ├── PermissionGate.tsx     # LGPD modal + OS permission onboarding
-│   ├── SideSheet.tsx          # Side navigation
+│   ├── MapReal.tsx                # react-native-maps MapView with recenter()
+│   ├── MarketMap.tsx              # Reusable map + pin UI
+│   ├── ProviderPin.tsx            # Individual pin visual
+│   ├── TopNav.tsx                 # Header with badges
+│   ├── ProfileOverlay.tsx         # Profile menu (permission toggles wired)
+│   ├── PermissionGate.tsx         # LGPD modal + OS permission onboarding
+│   ├── SideSheet.tsx              # Side navigation
 │   └── [other components]
 ├── contexts/
-│   ├── AuthContext.tsx         # Role + user state (Supabase Auth)
-│   ├── PermissionsContext.tsx  # OS permissions + LGPD + Supabase sync
-│   ├── NotificationContext.tsx # Push notifications — 22-event catalog
-│   ├── PortfolioContext.tsx    # Cross-screen portfolio state (local, não persistido no DB)
-│   ├── ServiceContext.tsx      # Active service state (djb2 hash, Edge Fns)
-│   ├── RequestsContext.tsx     # Service requests list
-│   ├── PaymentsContext.tsx     # Payment state
-│   └── SupportContext.tsx      # Support tickets
+│   ├── AuthContext.tsx            # Role + user state (Supabase Auth)
+│   ├── PermissionsContext.tsx     # OS permissions + LGPD + Supabase sync
+│   ├── NotificationContext.tsx    # Push notifications — 22-event catalog
+│   ├── PortfolioContext.tsx       # Cross-screen portfolio state
+│   ├── ServiceContext.tsx         # Active service state (djb2 hash, Edge Fns)
+│   ├── RequestsContext.tsx        # Service requests list
+│   ├── PaymentsContext.tsx        # Payment state
+│   └── SupportContext.tsx         # Support tickets
 ├── lib/
-│   └── providers.ts            # Query real de prestadores no Supabase (substitui MOCK_PROVIDERS)
+│   └── providers.ts              # Query real de prestadores no Supabase
 └── constants/
-    ├── mockData.tsx            # Categorias e dados auxiliares (MOCK_PROVIDERS removido)
-    └── colors.tsx              # Design tokens
+    ├── mockData.tsx              # Categorias e dados auxiliares (MOCK_PROVIDERS removido)
+    └── colors.tsx                # Design tokens
 ```
 
-### Provider Tree (order matters)
+### CRM Web (`artifacts/crm`)
+
+```
+artifacts/crm/
+├── src/
+│   ├── App.tsx                   # Rotas protegidas
+│   ├── components/
+│   │   ├── Layout.tsx            # Sidebar responsiva com hamburger mobile
+│   │   └── ProtectedRoute.tsx    # Guarda session + adminVerified
+│   ├── contexts/
+│   │   └── AuthContext.tsx       # Auth + role=admin check + rate limiter (5/15min)
+│   ├── lib/
+│   │   ├── supabase.ts           # Client VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+│   │   └── security.ts           # sanitizeText, getSignedUrl(s) — 300s TTL
+│   └── pages/
+│       ├── Login.tsx             # Form sem hints de sistema
+│       ├── Dashboard.tsx         # KPIs: providers, tickets, requests ativos
+│       ├── Providers.tsx         # Lista com busca + filtro por status
+│       ├── Documents.tsx         # Análise docs com signed URLs (5min)
+│       ├── Tickets.tsx           # Gestão de tickets (tabela: tickets)
+│       └── Forms.tsx             # Formulários de onboarding
+├── public/
+│   └── _headers                  # Cloudflare Pages: CSP, HSTS, X-Frame-Options, etc.
+├── vercel.json                   # Mesmos headers para Vercel
+└── .env.example                  # Template: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+```
+
+**Deploy:** Cloudflare Pages  
+**Build:** `pnpm --filter @workspace/crm run build`  
+**Output:** `artifacts/crm/dist`  
+**Supabase project:** ajudae_banco (`https://rlehpgvvevarpkkamied.supabase.co`)
+
+### Provider Tree — App Mobile (order matters)
 
 ```
 AuthProvider
@@ -99,7 +137,7 @@ AuthProvider
                                           └─ PermissionGate   ← LGPD + perm screens
 ```
 
-### Core Flows
+### Core Flows — App Mobile
 
 | Role | Flow | Status |
 |------|------|--------|
@@ -108,120 +146,116 @@ AuthProvider
 | **Both** | Dual-PIN offline validation (djb2 hash, max 5 attempts → dispute) | ✅ 100% |
 | **Both** | Push notifications on every state change (22 events, foreground only) | ✅ 100% |
 | **Both** | LGPD consent + OS permission onboarding | ✅ 100% |
+| **Prestador** | Formulário de onboarding paginado (5 etapas, validação por campo) | ✅ 100% |
+
+### Core Flows — CRM Web
+
+| Página | Status |
+|--------|--------|
+| Login com role check (admin only) + rate limiting | ✅ |
+| Dashboard com KPIs reais | ✅ |
+| Lista de prestadores com busca | ✅ |
+| Análise de documentos (signed URLs) + Aprovar/Reprovar | ✅ |
+| Gestão de tickets (mudar status) | ✅ |
+| Visualização de formulários de onboarding | ✅ |
+| Responsividade mobile (hamburger + painéis alternados) | ✅ |
 
 ---
 
 ## Provider Real Data
 
-A partir desta sprint, a lista de prestadores vem do Supabase diretamente — não há mais dados mockados.
-
-### Como usar `lib/providers.ts`
+A lista de prestadores vem do Supabase diretamente — não há mais dados mockados.
 
 ```typescript
 import { fetchNearbyProviders } from '@/lib/providers';
-
-// Busca prestadores online (active = true), ordenados por rating
 const providers = await fetchNearbyProviders();
-
-// O retorno segue o shape:
-// {
-//   id: string,
-//   name: string,           // profiles.name
-//   service_type: string,   // 'frete' | 'mudanca' | 'entrega'
-//   rating_avg: number,
-//   rating_count: number,
-//   location_lat: number,
-//   location_lng: number,
-//   active: boolean
-// }
+// { id, name, service_type, rating_avg, rating_count, location_lat, location_lng, active }
 ```
 
-**Regras importantes:**
+**Regras:**
 - Só exibir prestadores com `active = true`
-- Prestador com serviço ativo não deve aparecer para novos clientes (a ser implementado no filtro quando serviços reais estiverem integrados)
-- Coordenadas são reais do banco — não usar coordenadas SVG/mock para novos desenvolvimentos
 - Se a query retornar vazio, exibir estado vazio no mapa (não usar fallback para dados mock)
+
+---
+
+## CRM — Schema do Banco (ajudae_banco)
+
+Tabelas usadas pelo CRM e seus nomes reais:
+
+| Tabela | Uso |
+|--------|-----|
+| `providers` | Lista de prestadores, documentos, formulários |
+| `profiles` | Join para nome (`profiles(name)`) — **sem coluna email** |
+| `tickets` | Tickets de suporte (status: open/in_review/resolved/closed) |
+| `requests` | Pedidos de serviço (status: requested/accepted/en_route/in_progress/...) |
+
+**Migration aplicada:**
+```sql
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user'
+  CHECK (role IN ('user', 'admin'));
+```
 
 ---
 
 ## Rules & Patterns
 
-### When to Use Superpowers Skills
-
-1. **Before any feature/fix:** Check for `/test-driven-development`, `/feature-dev`, `/systematic-debugging`
-2. **Before code review:** Use `/superpowers:requesting-code-review` if major changes
-3. **On bugs:** Always start with `/systematic-debugging`
-
-### Code Patterns
+### Code Patterns — App Mobile
 
 - **Safe Area:** Always use `useSafeAreaInsets()` for modals + overlays
 - **Styling:** Inline `StyleSheet.create()` at bottom of file; use `colors.light` for theming
 - **Icons:** Use `Ionicons` (default) or `MaterialCommunityIcons` from `@expo/vector-icons`
 - **Haptics:** `expo-haptics` for Light (UX), Medium (actions), NotificationSuccess (submits)
-- **Permissions:** Always use `usePermissions()` — never call `Location` / `ImagePicker` / `Notifications` permission APIs directly in components
+- **Permissions:** Always use `usePermissions()` — never call `Location` / `ImagePicker` / `Notifications` APIs directly
 - **Notifications:** Use `useNotification().send(event, vars)` to fire a push notification
 - **Portfolio state:** Use `usePortfolio()` — never local state for provider profile data
-- **Animations:** `Animated` API (not Reanimated) for layout-affecting animations; `useNativeDriver: false` when animating layout props
-- **Provider data:** Use `lib/providers.ts` — never referenciar `MOCK_PROVIDERS` em código novo
+- **Animations:** `Animated` API (not Reanimated); `useNativeDriver: false` when animating layout props
+- **Provider data:** Use `lib/providers.ts` — never reference `MOCK_PROVIDERS`
 
-### File Size Limits
+### Code Patterns — CRM Web
+
+- **Auth guard:** Usar `ProtectedRoute` — nunca acessar dados sem `session && adminVerified`
+- **DB output:** Sempre passar por `sanitizeText()` antes de entrar no estado React
+- **Document URLs:** Sempre usar `getSignedUrl()` / `getSignedUrls()` — nunca `getPublicUrl()`
+- **Search:** Usar `String.includes()` — nunca regex em input do usuário (ReDoS)
+
+### File Size Limits — App Mobile
 
 - Screens (`app/*.tsx`): Keep under 2500 lines; extract components to `components/` beyond
 - Components: Typically 300–600 lines; split if logic gets complex
-
-### Accessibility & Safe Areas
-
-- All fullscreen modals need `View` with `height: safeTop` at top
-- Use `position: "absolute"` + `zIndex` carefully in overlays
-- Bottom buttons: account for `insets.bottom` (iPhone X+ notch)
 
 ---
 
 ## Common Tasks
 
-### Adding a New Screen
+### Adding a New Screen (App Mobile)
 
 1. Create `app/newscreen.tsx`
 2. Use `useAuth()` for role-gating
 3. Add to router in `_layout.tsx` (Expo Router auto-discovers `app/*.tsx`)
 4. Extract components if exceeds 400 lines
 
-### Requesting a Permission
+### Adding a New Admin to the CRM
+
+```sql
+-- Executar no SQL Editor do Supabase (ajudae_banco)
+UPDATE profiles SET role = 'admin'
+WHERE id = (SELECT id FROM auth.users WHERE email = 'novo-admin@exemplo.com');
+```
+
+### Requesting a Permission (App Mobile)
 
 ```typescript
-// Never call expo-location directly — always go through the context:
 const { requestLocation, requestCamera, requestNotifications, openSettings } = usePermissions();
-
-// Check state before requesting
 if (location.granted) { /* use location */ }
 else if (location.canAsk) { await requestLocation(); }
-else { openSettings(); /* permanently denied */ }
+else { openSettings(); }
 ```
-
-### Firing a Push Notification
-
-```typescript
-const { send } = useNotification();
-// From any screen/context inside NotificationProvider:
-await send('service_accepted', { name: provider.name });
-await send('new_message', { name: 'João', preview: 'Estou a caminho...' });
-```
-
-**Atenção:** `send()` só funciona com o app em foreground. Para push com app fechado, o backend precisa chamar a Expo Push API diretamente usando o `push_token` salvo em `profiles`. Ver `arquitetura/HANDOFF_2026-05-04_MVP_CLOSED_SPRINT.md` para o contrato de API.
-
-### Fixing Overlapping Components
-
-- Check `position: "absolute"` + `top`/`bottom` + `zIndex`
-- Use `insets.top` / `insets.bottom` for safe areas
-- Map container uses `bottom: sheetHeightAnim` to shrink as sheet rises
 
 ### Testing Flows
 
-1. Expo Go: `npx expo start` → QR scan on device
-2. Dual-device: Switch auth roles via ProfileOverlay logout
-3. Notifications: All service state changes fire automatically; use `send()` to test manually
-4. Permissions: Reset via device Settings → App → Permissions
-5. Providers reais: verificar tabela `providers` no Supabase — deve haver ao menos 1 registro com `active = true` para o mapa não aparecer vazio no QA
+1. **App:** `npx expo start` → QR scan; dual-device para trocar roles
+2. **CRM:** Deploy no Cloudflare Pages ou `pnpm --filter @workspace/crm run dev`
+3. **Providers reais:** verificar tabela `providers` no Supabase — ao menos 1 com `active = true`
 
 ---
 
@@ -230,53 +264,43 @@ await send('new_message', { name: 'João', preview: 'Estou a caminho...' });
 | Item | Status |
 |------|--------|
 | Supabase Auth (signup, login, OTP) | ✅ Integrado |
-| Profile → `geolocation_requested`, `camera_requested`, `notifications_requested`, `lgpd_accepted` sync | ✅ Integrado |
+| Profile sync (permissions, LGPD) | ✅ Integrado |
 | Service creation via Edge Function `request_create` | ✅ Integrado |
 | Service status via Edge Function `request_update_status` | ✅ Integrado |
 | PIN verification via Edge Function `request_complete_with_otp` | ✅ Integrado |
-| `MOCK_PROVIDERS` → query real Supabase (`lib/providers.ts`) | ✅ Em integração nesta sprint |
-| Toggle online do prestador → `providers.active` no banco | ✅ Em integração nesta sprint |
-| Map coordinates SVG → GPS real (Supabase `location_lat`/`lng`) | ⏳ Parcial — colunas existem no DB, frontend ainda adaptando |
-| Real-time WebSocket `/providers/positions` | ❌ Pendente (Fase 1.3 do roadmap) |
-| Pix/Stripe payment processing | ❌ Pendente (Fase 1.1 do roadmap) |
-| Chat WebSocket (Supabase Realtime) | ❌ Pendente (Fase 1.2 do roadmap) |
-| Push em background (push_token salvo no banco + servidor envia) | ❌ Pendente (Fase 1.5 do roadmap) |
-| DELETE /users/me (LGPD Art. 18) | ❌ Pendente (Fase 1.4 do roadmap) |
+| `MOCK_PROVIDERS` → query real Supabase (`lib/providers.ts`) | ✅ Integrado |
+| Toggle online do prestador → `providers.active` | ✅ Integrado |
+| CRM Web — login, role check, todas as páginas | ✅ Integrado |
+| `profiles.role` migration (admin access) | ✅ Aplicado em ajudae_banco |
+| Map coordinates SVG → GPS real | ⏳ Parcial — colunas existem, frontend adaptando |
+| Real-time WebSocket `/providers/positions` | ❌ Pendente (Fase 1.3) |
+| Pix/Stripe payment processing | ❌ Pendente (Fase 1.1) |
+| Chat WebSocket (Supabase Realtime) | ❌ Pendente (Fase 1.2) |
+| Push em background (push_token + servidor) | ❌ Pendente (Fase 1.5) |
+| DELETE /users/me (LGPD Art. 18) | ❌ Pendente (Fase 1.4) |
 | djb2 hash → HMAC-SHA256 (`expo-crypto`) | ❌ Migração pré-produção (Fase 2.1) |
-| Image picker → S3/GCS bucket upload | ❌ Pendente (Fase 2.2 do roadmap) |
-| `PortfolioContext` → `PATCH /providers/me/portfolio` | ❌ Pendente (Fase 3.4 do roadmap) |
+| Image picker → S3/GCS bucket upload | ❌ Pendente (Fase 2.2) |
+| `PortfolioContext` → `PATCH /providers/me/portfolio` | ❌ Pendente (Fase 3.4) |
 
 ---
 
+## Recent Changes (2026-05-06)
+
+- ✅ CRM Web criado em `artifacts/crm` — Vite + React + Tailwind v4 + Supabase
+- ✅ Formulário do prestador (`provider-validation.tsx`) reescrito em 5 etapas paginadas com validação por campo, máscaras e câmera
+- ✅ `onboarding.tsx` — mensagens de erro descritivas + câmera para foto de perfil
+- ✅ Security hardening no CRM: CSP, HSTS, signed URLs, sanitização, rate limiting, TOCTOU fix
+- ✅ Schema corrigido: `support_tickets→tickets`, `services→requests`, `profiles(name,email)→profiles(name)`, `not_started→incomplete`
+- ✅ Responsividade mobile no CRM (hamburger sidebar, painéis alternados)
+- ✅ `.claude/settings.local.json` removido do tracking git + adicionado ao `.gitignore`
+- ⚠️ `anon key` do ajudae_banco exposta — **rotacionar no Supabase dashboard**
+
 ## Recent Changes (2026-05-04)
 
-### Sprint MVP Test Closed — Bugs Corrigidos
-
-- ✅ Duplicate `locating` state removido — erro de bundling Metro corrigido
-- ✅ `expo-notifications` crash no bundling corrigido em `NotificationContext`
-- ✅ `useAuth` fora do `AuthProvider` corrigido — hook movido para dentro da árvore correta
-
-### Sprint MVP Test Closed — Implementações
-
-- ✅ `lib/providers.ts` criado — query real na tabela `providers` do Supabase (substitui `MOCK_PROVIDERS`)
+- ✅ `lib/providers.ts` — query real na tabela `providers` (substitui `MOCK_PROVIDERS`)
 - ✅ Toggle online do prestador atualiza `providers.active` no banco
-- ✅ Credenciais demo hardcoded removidas do código
-- ✅ Métricas do dashboard do prestador (`rating_avg`, `rating_count`) lidas do banco
-
-### Session 3 — Permissions & LGPD (handoff anterior)
-
-- ✅ `PermissionsContext` — single source of truth for all OS permissions + `lgpd_accepted`; syncs to Supabase `profiles` on every change
-- ✅ `PermissionGate` — blocking LGPD consent modal + sequential permission onboarding (location → notifications)
-- ✅ `ProfileOverlay` Configurações: toggles show live OS state; permanently-denied → "Abrir Configurações" (`Linking.openSettings()`)
-- ✅ `AuthContext.completeOnboarding` now persists `geolocation_requested` + `last_consent_update` to DB
-- ✅ `NotificationContext` simplified — delegates all permission management to `PermissionsContext`
-
-### Session 2 — Push Notifications (handoff anterior)
-
-- ✅ `NotificationContext` with 22-event catalog (service lifecycle, PIN failures, job events, chat, payments, auth)
-- ✅ Reactive service state watcher — auto-fires on every `status`, `startPinAttempts`, `conclusionAttempts` change
-- ✅ 3 Android notification channels (`ajudae-default`, `ajudae-service`, `ajudae-jobs`)
-- ✅ Notification tap → navigates to relevant screen via `AuthGate` listener
+- ✅ Credenciais demo hardcoded removidas
+- ✅ Métricas do dashboard do prestador lidas do banco
 
 ---
 
@@ -284,39 +308,30 @@ await send('new_message', { name: 'João', preview: 'Estou a caminho...' });
 
 | Item | Severity | Recomendação |
 |------|----------|-------------|
-| `djb2` vs HMAC-SHA256 no dual-PIN | **Alta** | Migrar antes da produção via `expo-crypto` (Fase 2.1 do roadmap) |
-| Push apenas foreground (app aberto) | **Alta** | Backend precisa salvar `push_token` e chamar Expo Push API (Fase 1.5) |
-| `PortfolioContext` não persistido no Supabase | Média | Wire `PATCH /providers/me/portfolio` quando endpoint pronto (Fase 3.4) |
-| Coordenadas SVG no mapa vs GPS real | **Alta** | Conectar `location_lat`/`lng` reais do banco ao mapa (em progresso) |
-| `lib/providers.ts` sem cache | Média | Adicionar cache local (SWR ou React Query) antes da beta — query a cada render |
-| Prestador online com serviço ativo aparece no mapa | Média | Adicionar filtro na query: excluir prestadores com serviço ativo |
-| `PortfolioSheet` inline em `index.tsx` | Baixa | Extrair para `components/PortfolioSheet.tsx` (arquivo próximo de 2500 linhas) |
+| `anon key` ajudae_banco exposta em git history | **Crítica** | Rotacionar no Supabase dashboard imediatamente |
+| Cloudflare Access sem domínio customizado | Alta | Registrar domínio para habilitar Zero Trust |
+| Bucket `provider-docs` deve ser privado | Alta | Configurar no Supabase Storage |
+| `djb2` vs HMAC-SHA256 no dual-PIN | Alta | Migrar via `expo-crypto` antes da produção (Fase 2.1) |
+| Push apenas foreground | Alta | Backend salvar `push_token` e chamar Expo Push API (Fase 1.5) |
+| `PortfolioContext` não persistido | Média | Wire `PATCH /providers/me/portfolio` (Fase 3.4) |
+| Coordenadas SVG no mapa vs GPS real | Alta | Conectar `location_lat`/`lng` ao mapa |
+| `lib/providers.ts` sem cache | Média | Adicionar SWR ou React Query antes da beta |
+| CRM sem paginação nas listas | Baixa | Adicionar quando volume crescer |
+| `PortfolioSheet` inline em `index.tsx` | Baixa | Extrair para `components/PortfolioSheet.tsx` |
 | `MapExpandModal` inline em `marketplace.tsx` | Baixa | Extrair para `components/MapExpandModal.tsx` |
-| Camera permission não solicitada no onboarding (prestador) | Baixa | Adicionar etapa de câmera no `PermissionGate` para role `provider` |
-
----
-
-## CPO Notes (Product Priorities)
-
-1. **Agora:** QA fechado com 2 dispositivos reais — validar fluxo completo com dados reais do Supabase
-2. **Semana 1:** Concluir integração de providers reais; corrigir bugs de QA
-3. **Semana 2–4 (Fase 1):** Pagamento Pix, Chat, GPS ao vivo, DELETE /users/me, Push background
-4. **Mês 3–6 (Fase 2):** HMAC-SHA256, upload fotos, histórico real, disputas, rating real
-5. **Mês 6–12 (Fase 3):** PostGIS, push servidor por área, dashboard analítico, portfólio no banco, KYC
-
-Ver `arquitetura/BETA_ROADMAP.md` para detalhamento completo.
 
 ---
 
 ## Quick Links
 
-- **Expo Go:** `npx expo start` then scan QR
-- **Git:** Feature branches off `main`; branch atual: `claude/fix-provider-profile-sync-DOXXR`
-- **Supabase:** Edge Functions para `request_create`, `request_update_status`, `request_complete_with_otp`
-- **Tests:** QA manual via Expo Go com 2 celulares — ver `arquitetura/HANDOFF_2026-05-04_MVP_CLOSED_SPRINT.md`
+- **App Mobile:** `npx expo start` → scan QR
+- **CRM Dev:** `pnpm --filter @workspace/crm run dev`
+- **CRM Prod:** Cloudflare Pages (ajudae-app.pages.dev)
+- **Git:** branch atual: `main` (PR #15 mergeado)
+- **Supabase ajudae_banco:** `https://rlehpgvvevarpkkamied.supabase.co`
+- **Handoff mais recente:** `arquitetura/HANDOFF_2026-05-06.md`
 - **Roadmap:** `arquitetura/BETA_ROADMAP.md`
-- **PRD:** `arquitetura/PRD.md`
 
 ---
 
-_Last Updated: 2026-05-04 — Sprint MVP Test Closed (providers reais + remoção de mocks)_
+_Last Updated: 2026-05-06 — CRM Web + formulários paginados + security hardening_

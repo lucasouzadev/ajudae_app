@@ -1,5 +1,5 @@
 # MVP_STATUS.md — Ajudaê
-> Estado atual do app para testes fechados. Atualizado em 2026-05-04.
+> Estado atual do app para testes fechados. Atualizado em 2026-05-06.
 
 ---
 
@@ -15,7 +15,7 @@ O app está **pronto para testes fechados com backend real**. Todos os fluxos cr
 | Push notifications | ✅ 22 eventos — todos os fluxos cobertos |
 | LGPD / permissões OS | ✅ Implementado com sync no DB |
 | Backend real (Auth + Edge Fns) | ✅ Supabase integrado |
-| MOCK_PROVIDERS → API real | ❌ Pendente (`GET /providers/nearby`) |
+| MOCK_PROVIDERS → API real | ✅ Integrado (`lib/providers.ts`) |
 | Mapa real (GPS) | ❌ SVG estático (react-native-maps pronto para coords reais) |
 | Pagamento real | ❌ Mock visual |
 | Chat em tempo real | ❌ Dados estáticos |
@@ -30,7 +30,7 @@ O app está **pronto para testes fechados com backend real**. Todos os fluxos cr
 | Telas (`app/*.tsx`) | 21 |
 | Componentes (`components/`) | 27 |
 | Contextos (`contexts/`) | 8 (Auth, Permissions, Notifications, Portfolio, Service, Requests, Payments, Support) |
-| Branch de desenvolvimento | `claude/fix-provider-profile-sync-DOXXR` |
+| Branch de desenvolvimento | `main` (PR #15 mergeado) |
 | Branch de produção | `main` |
 
 ---
@@ -254,11 +254,12 @@ As notificações disparam automaticamente ao alterar `ServiceContext`. Toque na
 | Documento | Conteúdo |
 |---|---|
 | `arquitetura/PROGRESS.md` | 33 itens implementados com detalhe técnico |
-| `arquitetura/HANDOFF_2026-05-04.md` | Handoff da sessão atual (bugs, notificações, LGPD) |
+| `arquitetura/HANDOFF_2026-05-06.md` | **Latest** — CRM Web, formulários, security hardening |
+| `arquitetura/HANDOFF_2026-05-04.md` | Handoff anterior (bugs, notificações, LGPD) |
 | `arquitetura/HANDOFF_2026-04-28.md` | Handoff UI Layer v2 (contratos de API, decisões de design) |
 | `arquitetura/PIN_SYSTEM.md` | Sistema dual-PIN detalhado |
 | `arquitetura/Comissionados/Documentos Técnicos/DB_SCHEMA.md` | Schema do banco de dados |
 
 ---
 
-_Ajudaê — MVP Status v2.0 — 2026-05-04 — Notificações + LGPD completos, ~90% MVP testável_
+_Ajudaê — MVP Status v3.0 — 2026-05-06 — CRM Web em produção + formulários paginados, ~92% MVP testável_
