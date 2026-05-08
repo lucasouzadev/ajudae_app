@@ -1,17 +1,18 @@
 import Constants from "expo-constants";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuthSafe } from "./AuthContext";
 import { usePermissions, type AppLanguage } from "./PermissionsContext";
 import { useService, type ServiceStatus } from "./ServiceContext";
 import { supabase } from "@/lib/supabase";
+import colors, { fonts, shadows } from "@/constants/colors";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
-  if (Constants.appOwnership !== "expo") {
-    Notifications = require("expo-notifications");
-  }
+  Notifications = require("expo-notifications");
 } catch (e) {
 }
 
@@ -54,7 +55,8 @@ export type NotificationEvent =
   | "payment_authorized"
   | "payout_processed"
   | "email_confirmed"
-  | "provider_verified";
+  | "provider_verified"
+  | "provider_validation_received";
 
 type Vars = Record<string, string | number>;
 type NotificationCategory = "orders" | "messages" | "payments" | "account" | "marketing";
@@ -70,6 +72,8 @@ export interface NotificationContextType {
   pushToken: string | null;
   isRegisteringPushToken: boolean;
   pushRegistrationError: string | null;
+  bannerStatusBarColor: string | null;
+  bannerStatusBarStyle: "light" | "dark" | null;
   requestPermission: () => Promise<boolean>;
   refreshPushToken: () => Promise<string | null>;
   send: (event: NotificationEvent, vars?: Vars) => Promise<void>;
@@ -99,7 +103,17 @@ const EVENT_CATEGORY: Record<NotificationEvent, NotificationCategory> = {
   payout_processed: "payments",
   email_confirmed: "account",
   provider_verified: "account",
+  provider_validation_received: "account",
 };
+
+interface ForegroundBannerState {
+  title: string;
+  body: string;
+  backgroundColor: string;
+  textColor: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  statusBarStyle: "light" | "dark";
+}
 
 function getCatalog(language: AppLanguage): Record<NotificationEvent, (v?: Vars) => NotificationPayload> {
   if (language === "en-US") {
@@ -127,6 +141,7 @@ function getCatalog(language: AppLanguage): Record<NotificationEvent, (v?: Vars)
       payout_processed: (v) => ({ title: "Payout processed", body: v?.value ? `R$ ${v.value} was transferred to your account.` : "Your payout is available.", data: { screen: "index" } }),
       email_confirmed: () => ({ title: "Email confirmed", body: "Your account is active.", data: { screen: "index" } }),
       provider_verified: () => ({ title: "Profile verified", body: "You can now accept requests on Ajudae.", data: { screen: "index" } }),
+      provider_validation_received: () => ({ title: "Documents received", body: "Our team received your documents and started the verification review.", data: { screen: "index" } }),
     };
   }
 
@@ -155,6 +170,7 @@ function getCatalog(language: AppLanguage): Record<NotificationEvent, (v?: Vars)
       payout_processed: (v) => ({ title: "Retiro procesado", body: v?.value ? `R$ ${v.value} fue transferido a tu cuenta.` : "Tu retiro está disponible.", data: { screen: "index" } }),
       email_confirmed: () => ({ title: "Correo confirmado", body: "Tu cuenta está activa.", data: { screen: "index" } }),
       provider_verified: () => ({ title: "Perfil verificado", body: "Ya puedes aceptar pedidos en Ajudae.", data: { screen: "index" } }),
+      provider_validation_received: () => ({ title: "Documentos recebidos", body: "Nuestro equipo recibió tus documentos y ya inició el análisis de validación.", data: { screen: "index" } }),
     };
   }
 
@@ -182,12 +198,45 @@ function getCatalog(language: AppLanguage): Record<NotificationEvent, (v?: Vars)
     payout_processed: (v) => ({ title: "Saque processado!", body: v?.value ? `R$ ${v.value} foi transferido para sua conta.` : "Seu saque está disponível.", data: { screen: "index" } }),
     email_confirmed: () => ({ title: "E-mail confirmado!", body: "Bem-vindo ao Ajudaê! Sua conta está ativa.", data: { screen: "index" } }),
     provider_verified: () => ({ title: "Perfil verificado!", body: "Parabéns! Você pode começar a aceitar pedidos no Ajudaê.", data: { screen: "index" } }),
+    provider_validation_received: () => ({ title: "Documentos recebidos", body: "Nossa equipe recebeu seus documentos e iniciou a análise da sua validação.", data: { screen: "index" } }),
   };
 }
 
-async function fire(event: NotificationEvent, language: AppLanguage, vars?: Vars): Promise<void> {
-  if (!Notifications) return;
+function getForegroundBanner(event: NotificationEvent, payload: NotificationPayload): ForegroundBannerState | null {
+  if (event !== "provider_validation_received") {
+    return null;
+  }
+
+  return {
+    title: payload.title,
+    body: payload.body,
+    backgroundColor: "#FACC15",
+    textColor: "#1A1714",
+    icon: "notifications",
+    statusBarStyle: "dark",
+  };
+}
+
+async function fire(
+  event: NotificationEvent,
+  language: AppLanguage,
+  showForegroundBanner: (banner: ForegroundBannerState) => void,
+  vars?: Vars,
+): Promise<void> {
   const payload = getCatalog(language)[event](vars);
+  const foregroundBanner = getForegroundBanner(event, payload);
+
+  if (foregroundBanner && AppState.currentState === "active") {
+    showForegroundBanner(foregroundBanner);
+    return;
+  }
+
+  if (!Notifications) {
+    if (foregroundBanner) {
+      showForegroundBanner(foregroundBanner);
+    }
+    return;
+  }
 
   let channelId = "ajudae-default";
   if (
@@ -226,9 +275,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     notificationPreferences,
     appLanguage,
   } = usePermissions();
+  const insets = useSafeAreaInsets();
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [isRegisteringPushToken, setIsRegisteringPushToken] = useState(false);
   const [pushRegistrationError, setPushRegistrationError] = useState<string | null>(null);
+  const [banner, setBanner] = useState<ForegroundBannerState | null>(null);
 
   const prevStatus = useRef<ServiceStatus | null>(null);
   const prevStartAttempts = useRef(0);
@@ -236,8 +287,51 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const isInitialLoad = useRef(true);
   const roleRef = useRef(role);
   const previousProviderVerified = useRef<boolean>(Boolean(user?.provider?.verified));
+  const bannerTranslate = useRef(new Animated.Value(-140)).current;
+  const bannerOpacity = useRef(new Animated.Value(0)).current;
+  const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { roleRef.current = role; }, [role]);
+
+  useEffect(() => {
+    return () => {
+      if (bannerTimeoutRef.current) {
+        clearTimeout(bannerTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const dismissBanner = () => {
+    if (bannerTimeoutRef.current) {
+      clearTimeout(bannerTimeoutRef.current);
+      bannerTimeoutRef.current = null;
+    }
+    Animated.parallel([
+      Animated.timing(bannerTranslate, { toValue: -140, duration: 200, useNativeDriver: true }),
+      Animated.timing(bannerOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => {
+      setBanner(null);
+    });
+  };
+
+  const showForegroundBanner = (nextBanner: ForegroundBannerState) => {
+    if (bannerTimeoutRef.current) {
+      clearTimeout(bannerTimeoutRef.current);
+      bannerTimeoutRef.current = null;
+    }
+    setBanner(nextBanner);
+    bannerTranslate.setValue(-140);
+    bannerOpacity.setValue(0);
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.spring(bannerTranslate, { toValue: 0, tension: 120, friction: 18, useNativeDriver: true }),
+        Animated.timing(bannerOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+      ]).start();
+    });
+    bannerTimeoutRef.current = setTimeout(() => {
+      dismissBanner();
+    }, 4200);
+  };
 
   const canSendEvent = (event: NotificationEvent) =>
     notificationPreferences[EVENT_CATEGORY[event]];
@@ -312,7 +406,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       role === "prestador" &&
       canSendEvent("provider_verified")
     ) {
-      fire("provider_verified", appLanguage).catch(() => {});
+      fire("provider_verified", appLanguage, showForegroundBanner).catch(() => {});
     }
 
     previousProviderVerified.current = currentVerified;
@@ -366,7 +460,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           disputed: "service_disputed",
         };
         const evt = map[active.status];
-        if (evt && canSendEvent(evt)) fire(evt, appLanguage, vars);
+        if (evt && canSendEvent(evt)) fire(evt, appLanguage, showForegroundBanner, vars);
       } else {
         const map: Partial<Record<ServiceStatus, NotificationEvent>> = {
           requested: "new_job_request",
@@ -378,25 +472,25 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           disputed: "job_disputed",
         };
         const evt = map[active.status];
-        if (evt && canSendEvent(evt)) fire(evt, appLanguage, vars);
+        if (evt && canSendEvent(evt)) fire(evt, appLanguage, showForegroundBanner, vars);
       }
     }
 
     if (startAttemptsUp) {
       if (isPinDispute) {
         const evt = currentRole === "cliente" ? "pin_start_disputed" : "job_disputed";
-        if (canSendEvent(evt)) fire(evt, appLanguage, vars);
+        if (canSendEvent(evt)) fire(evt, appLanguage, showForegroundBanner, vars);
       } else if (canSendEvent("pin_start_wrong")) {
-        fire("pin_start_wrong", appLanguage, { ...vars, left: 5 - active.startPinAttempts });
+        fire("pin_start_wrong", appLanguage, showForegroundBanner, { ...vars, left: 5 - active.startPinAttempts });
       }
     }
 
     if (endAttemptsUp) {
       if (isPinDispute) {
         const evt = currentRole === "cliente" ? "pin_end_disputed" : "job_disputed";
-        if (canSendEvent(evt)) fire(evt, appLanguage, vars);
+        if (canSendEvent(evt)) fire(evt, appLanguage, showForegroundBanner, vars);
       } else if (canSendEvent("pin_end_wrong")) {
-        fire("pin_end_wrong", appLanguage, { ...vars, left: 5 - active.conclusionAttempts });
+        fire("pin_end_wrong", appLanguage, showForegroundBanner, { ...vars, left: 5 - active.conclusionAttempts });
       }
     }
   }, [active?.status, active?.startPinAttempts, active?.conclusionAttempts, appLanguage, notificationPreferences]);
@@ -406,7 +500,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const send = async (event: NotificationEvent, vars?: Vars): Promise<void> => {
     if (!canSendEvent(event)) return;
-    await fire(event, appLanguage, vars);
+    await fire(event, appLanguage, showForegroundBanner, vars);
   };
 
   return (
@@ -416,12 +510,42 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         pushToken,
         isRegisteringPushToken,
         pushRegistrationError,
+        bannerStatusBarColor: banner?.backgroundColor ?? null,
+        bannerStatusBarStyle: banner?.statusBarStyle ?? null,
         requestPermission,
         refreshPushToken,
         send,
       }}
     >
       {children}
+      {banner ? (
+        <Animated.View
+          pointerEvents="box-none"
+          style={[
+            styles.bannerShell,
+            {
+              paddingTop: insets.top + 8,
+              opacity: bannerOpacity,
+              transform: [{ translateY: bannerTranslate }],
+            },
+          ]}
+        >
+          <View style={[styles.bannerCard, { backgroundColor: banner.backgroundColor }, shadows.xl]}>
+            <View style={styles.bannerContent}>
+              <View style={[styles.bannerIconWrap, { backgroundColor: "rgba(255,255,255,0.28)" }]}>
+                <Ionicons name={banner.icon} size={16} color={banner.textColor} />
+              </View>
+              <View style={styles.bannerTextWrap}>
+                <Text style={[styles.bannerTitle, { color: banner.textColor }]}>{banner.title}</Text>
+                <Text style={[styles.bannerBody, { color: banner.textColor }]}>{banner.body}</Text>
+              </View>
+              <Pressable onPress={dismissBanner} hitSlop={10} style={styles.bannerClose}>
+                <Ionicons name="close" size={16} color={banner.textColor} />
+              </Pressable>
+            </View>
+          </View>
+        </Animated.View>
+      ) : null}
     </NotificationContext.Provider>
   );
 }
@@ -431,3 +555,48 @@ export function useNotification() {
   if (!ctx) throw new Error("useNotification must be used within NotificationProvider");
   return ctx;
 }
+
+const styles = StyleSheet.create({
+  bannerShell: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    zIndex: 40,
+  },
+  bannerCard: {
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    paddingTop: 12,
+  },
+  bannerContent: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  bannerIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bannerTextWrap: {
+    flex: 1,
+  },
+  bannerTitle: {
+    fontSize: 13,
+    fontFamily: fonts.sans.bold,
+  },
+  bannerBody: {
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: fonts.sans.medium,
+  },
+  bannerClose: {
+    marginTop: 2,
+  },
+});

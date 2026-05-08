@@ -28,7 +28,7 @@ import { PaymentsProvider } from "@/contexts/PaymentsContext";
 import { SupportProvider } from "@/contexts/SupportContext";
 import { ServiceProvider, useService } from "@/contexts/ServiceContext";
 import { PortfolioProvider } from "@/contexts/PortfolioContext";
-import { NotificationProvider } from "@/contexts/NotificationContext";
+import { NotificationProvider, useNotification } from "@/contexts/NotificationContext";
 import { PermissionsProvider, usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionGate } from "@/components/PermissionGate";
 import { StatusBar } from "expo-status-bar";
@@ -36,9 +36,7 @@ import colors from "@/constants/colors";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
-  if (Constants.appOwnership !== "expo") {
-    Notifications = require("expo-notifications");
-  }
+  Notifications = require("expo-notifications");
 } catch {
 }
 
@@ -50,12 +48,15 @@ function AuthGate() {
   const { isAuthenticated, isLoading, role, accountStatus } = useAuth();
   const { active } = useService();
   const { themeMode } = usePermissions();
+  const { bannerStatusBarColor, bannerStatusBarStyle } = useNotification();
   const segments = useSegments();
   const pathname = usePathname();
   const router = useRouter();
   const c = colors.light;
   const rootSegment = String(segments[0] ?? "");
   const currentSegment = String(segments[segments.length - 1] ?? "");
+  const authRedirectRef = React.useRef<string | null>(null);
+  const activeServiceRedirectRef = React.useRef<string | null>(null);
 
   const terminalStatuses = ["completed", "cancelled", "disputed"];
 
@@ -74,13 +75,24 @@ function AuthGate() {
     if (isLoading) return;
     const inAuthGroup = rootSegment === "auth";
     const inPending = rootSegment === "account-pending";
+    let target: string | null = null;
 
     if (accountStatus === "pending_email" && pathname !== "/account-pending") {
-      router.replace("/account-pending" as never);
+      target = "/account-pending";
     } else if (!isAuthenticated && pathname !== "/auth" && !inPending) {
-      router.replace("/auth" as never);
+      target = "/auth";
     } else if (isAuthenticated && (inAuthGroup || inPending) && pathname !== "/") {
-      router.replace("/" as never);
+      target = "/";
+    }
+
+    if (target && authRedirectRef.current !== target) {
+      authRedirectRef.current = target;
+      router.replace(target as never);
+      return;
+    }
+
+    if (!target || pathname === target) {
+      authRedirectRef.current = null;
     }
   }, [accountStatus, isAuthenticated, isLoading, pathname, rootSegment]);
 
@@ -94,15 +106,22 @@ function AuthGate() {
 
     if (!allowed.includes(currentSegment)) {
       const target = role === "prestador" ? "/job" : "/track";
-      if (pathname !== target) {
+      if (pathname !== target && activeServiceRedirectRef.current !== target) {
+        activeServiceRedirectRef.current = target;
         router.replace(target as never);
       }
+      return;
     }
+
+    activeServiceRedirectRef.current = null;
   }, [active, currentSegment, isAuthenticated, isLoading, pathname, role]);
 
   return (
     <>
-      <StatusBar style={themeMode === "dark" ? "light" : "dark"} backgroundColor={c.background} />
+      <StatusBar
+        style={bannerStatusBarStyle ?? (themeMode === "dark" ? "light" : "dark")}
+        backgroundColor={bannerStatusBarColor ?? c.background}
+      />
       <PermissionGate />
       <Stack screenOptions={{ headerShown: false, headerBackTitle: "Voltar", animation: "fade_from_bottom", contentStyle: { backgroundColor: c.background } }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />

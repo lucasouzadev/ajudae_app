@@ -40,8 +40,14 @@ export function PermissionGate() {
 
   const [step, setStep] = useState<Step | null>(null);
 
+  const finishOnboarding = async () => {
+    await AsyncStorage.setItem(ONBOARDING_KEY, "1");
+    setStep("done");
+  };
+
   useEffect(() => {
     if (!isAuthenticated || !ready) return;
+    if (step && step !== "done") return;
     let active = true;
 
     AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
@@ -52,14 +58,14 @@ export function PermissionGate() {
       if (!lgpdAccepted) {
         nextStep = "lgpd";
       } else if (!shown) {
-        if (!notifications.granted && notifications.canAsk) {
+        if (!notifications.granted) {
           nextStep = "notifications";
         } else if (!location.granted && location.canAsk) {
           nextStep = "location";
-        } else if (!backgroundLocation.granted && backgroundLocation.canAsk) {
+        } else if (location.granted && !backgroundLocation.granted && backgroundLocation.canAsk) {
           nextStep = "background-location";
         } else {
-          AsyncStorage.setItem(ONBOARDING_KEY, "1");
+          void AsyncStorage.setItem(ONBOARDING_KEY, "1");
         }
       }
 
@@ -69,31 +75,28 @@ export function PermissionGate() {
     return () => {
       active = false;
     };
-  }, [isAuthenticated, ready, lgpdAccepted, notifications.granted, notifications.canAsk, location.granted, location.canAsk, backgroundLocation.granted, backgroundLocation.canAsk]);
+  }, [isAuthenticated, ready, lgpdAccepted, notifications.granted, location.granted, location.canAsk, backgroundLocation.granted, backgroundLocation.canAsk, step]);
 
   const afterNotifications = () => {
     if (!location.granted && location.canAsk) {
       setStep("location");
-    } else if (!backgroundLocation.granted && backgroundLocation.canAsk) {
+    } else if (location.granted && !backgroundLocation.granted && backgroundLocation.canAsk) {
       setStep("background-location");
     } else {
-      AsyncStorage.setItem(ONBOARDING_KEY, "1");
-      setStep("done");
+      void finishOnboarding();
     }
   };
 
-  const afterLocation = () => {
-    if (!backgroundLocation.granted && backgroundLocation.canAsk) {
+  const afterLocation = (granted: boolean) => {
+    if (granted && !backgroundLocation.granted && backgroundLocation.canAsk) {
       setStep("background-location");
     } else {
-      AsyncStorage.setItem(ONBOARDING_KEY, "1");
-      setStep("done");
+      void finishOnboarding();
     }
   };
 
   const afterBackgroundLocation = () => {
-    AsyncStorage.setItem(ONBOARDING_KEY, "1");
-    setStep("done");
+    void finishOnboarding();
   };
 
   if (!step || step === "done") return null;
@@ -116,15 +119,14 @@ export function PermissionGate() {
             onAccept={async () => {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               await acceptLGPD();
-              if (!notifications.granted && notifications.canAsk) {
+              if (!notifications.granted) {
                 setStep("notifications");
               } else if (!location.granted && location.canAsk) {
                 setStep("location");
-              } else if (!backgroundLocation.granted && backgroundLocation.canAsk) {
+              } else if (location.granted && !backgroundLocation.granted && backgroundLocation.canAsk) {
                 setStep("background-location");
               } else {
-                AsyncStorage.setItem(ONBOARDING_KEY, "1");
-                setStep("done");
+                void finishOnboarding();
               }
             }}
           />
@@ -138,12 +140,16 @@ export function PermissionGate() {
             description={
               "Ative as notificações para acompanhar pedidos, mensagens, pagamentos e alertas importantes da conta.\n\nDepois você consegue ajustar cada categoria nas Configurações."
             }
-            allowLabel="Permitir notificações"
+            allowLabel={notifications.canAsk ? "Permitir notificações" : "Abrir ajustes"}
             c={c}
             insets={insets}
             onAllow={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              await requestNotifications();
+              if (notifications.canAsk) {
+                await requestNotifications();
+              } else {
+                Linking.openSettings();
+              }
               afterNotifications();
             }}
             onSkip={() => {
@@ -166,12 +172,12 @@ export function PermissionGate() {
             insets={insets}
             onAllow={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              await requestLocation();
-              afterLocation();
+              const granted = await requestLocation();
+              afterLocation(granted);
             }}
             onSkip={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              afterLocation();
+              afterLocation(location.granted);
             }}
           />
         )}

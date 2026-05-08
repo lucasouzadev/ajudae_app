@@ -4,6 +4,8 @@ import {
   Alert,
   Animated,
   Image,
+  InputAccessoryView,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -22,6 +24,7 @@ import * as Haptics from "expo-haptics";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotification } from "@/contexts/NotificationContext";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 type ServiceType = "frete" | "mudanca" | "entrega";
@@ -48,6 +51,19 @@ interface FormState {
   docCnh: string;
   docCrlv: string;
   docSelfie: string;
+}
+
+type DocumentField = keyof Pick<
+  FormState,
+  "docRg" | "docResidence" | "docCnh" | "docCrlv" | "docSelfie"
+>;
+
+interface LocalDocumentAsset {
+  uri: string;
+  base64?: string;
+  mimeType?: string;
+  fileName?: string;
+  displayName?: string;
 }
 
 const SERVICE_TYPES = [
@@ -91,6 +107,22 @@ const CONTACT_METHODS = [
   { value: "whatsapp" as ContactMethod, icon: "logo-whatsapp", label: "WhatsApp" },
   { value: "ligacao" as ContactMethod, icon: "call", label: "Ligação telefônica" },
 ];
+const KEYBOARD_ACCESSORY_ID = "provider-validation-keyboard-accessory";
+let DocumentPickerModule: typeof import("expo-document-picker") | null | undefined;
+
+function getDocumentPicker() {
+  if (DocumentPickerModule !== undefined) {
+    return DocumentPickerModule;
+  }
+
+  try {
+    DocumentPickerModule = require("expo-document-picker");
+  } catch {
+    DocumentPickerModule = null;
+  }
+
+  return DocumentPickerModule;
+}
 
 function sanitize(raw: string) {
   return raw.replace(/<[^>]*>/g, "").replace(/[<>"'`\\]/g, "").trimStart();
@@ -121,6 +153,65 @@ function maskPlate(raw: string) {
   const v = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
   if (v.length <= 3) return v;
   return `${v.slice(0, 3)}-${v.slice(3)}`;
+}
+
+function inferMimeType(uri: string, mimeType?: string) {
+  if (mimeType) {
+    return mimeType;
+  }
+
+  const clean = uri.split("?")[0].toLowerCase();
+  if (clean.endsWith(".pdf")) return "application/pdf";
+  if (clean.endsWith(".png")) return "image/png";
+  if (clean.endsWith(".webp")) return "image/webp";
+  if (clean.endsWith(".heic")) return "image/heic";
+  if (clean.endsWith(".heif")) return "image/heif";
+  return "image/jpeg";
+}
+
+function inferExtension(uri: string, mimeType?: string, fileName?: string) {
+  const cleanName = fileName?.split("?")[0].toLowerCase() ?? "";
+  if (cleanName.includes(".")) {
+    return cleanName.slice(cleanName.lastIndexOf(".") + 1).replace("jpeg", "jpg");
+  }
+
+  const cleanUri = uri.split("?")[0].toLowerCase();
+  if (cleanUri.includes(".")) {
+    return cleanUri.slice(cleanUri.lastIndexOf(".") + 1).replace("jpeg", "jpg");
+  }
+
+  return (mimeType?.split("/")[1] || "jpg").replace("jpeg", "jpg");
+}
+
+function base64ToUint8Array(base64: string) {
+  const clean = base64.replace(/\s/g, "");
+  const binary = globalThis.atob(clean);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function isImageMimeType(mimeType?: string) {
+  return mimeType?.startsWith("image/") ?? false;
+}
+
+function readUriAsBytes(uri: string) {
+  return new Promise<Uint8Array>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", uri, true);
+    xhr.responseType = "arraybuffer";
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300 && xhr.response) {
+        resolve(new Uint8Array(xhr.response));
+        return;
+      }
+      reject(new Error(`Falha ao ler arquivo local (${xhr.status || "sem status"})`));
+    };
+    xhr.onerror = () => reject(new Error("Falha ao ler arquivo local"));
+    xhr.send();
+  });
 }
 
 function validateCPF(cpf: string): boolean {
@@ -212,11 +303,11 @@ function Label({ text, required }: { text: string; required?: boolean }) {
 
 function StyledInput({
   value, onChangeText, placeholder, keyboardType, maxLength, autoCapitalize,
-  error, success, hint, onFocus,
+  error, success, hint, onFocus, inputAccessoryViewID,
 }: {
   value: string; onChangeText: (t: string) => void; placeholder?: string;
   keyboardType?: any; maxLength?: number; autoCapitalize?: any;
-  error?: string; success?: boolean; hint?: string; onFocus?: () => void;
+  error?: string; success?: boolean; hint?: string; onFocus?: () => void; inputAccessoryViewID?: string;
 }) {
   const c = colors.light;
   const borderColor = error ? ERROR_COLOR : success ? c.success : c.border;
@@ -232,6 +323,7 @@ function StyledInput({
         autoCapitalize={autoCapitalize ?? "none"}
         autoCorrect={false}
         onFocus={onFocus}
+        inputAccessoryViewID={inputAccessoryViewID ?? (Platform.OS === "ios" ? KEYBOARD_ACCESSORY_ID : undefined)}
         style={{
           height: 52, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 16,
           fontSize: 14, fontFamily: fonts.sans.medium,
@@ -332,17 +424,20 @@ function ServiceTypeCard({ options, value, onSelect, error }: {
 }
 
 function DocPickerRow({
-  label, required, uri, onPickGallery, onPickCamera, hint, error, isCamera,
+  label, required, uri, displayName, mimeType, onPickGallery, onPickDocument, onPickCamera, hint, error, isCamera,
 }: {
   label: string; required?: boolean; uri?: string;
-  onPickGallery: () => void; onPickCamera?: () => void;
+  displayName?: string; mimeType?: string;
+  onPickGallery: () => void; onPickDocument?: () => void; onPickCamera?: () => void;
   hint?: string; error?: string; isCamera?: boolean;
 }) {
   const c = colors.light;
   const [showSourcePicker, setShowSourcePicker] = useState(false);
+  const showImagePreview = !!uri && isImageMimeType(mimeType);
+  const resolvedLabel = displayName || uri?.split("/").pop() || "";
 
   const handlePress = () => {
-    if (isCamera && onPickCamera) {
+    if ((isCamera && onPickCamera) || onPickDocument) {
       setShowSourcePicker(true);
     } else {
       onPickGallery();
@@ -361,20 +456,35 @@ function DocPickerRow({
           flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, gap: 10,
         }}
       >
-        {uri ? (
+        {showImagePreview ? (
           <Image source={{ uri }} style={{ width: 38, height: 38, borderRadius: 8 }} resizeMode="cover" />
         ) : (
           <View style={{
             width: 38, height: 38, borderRadius: 10, backgroundColor: `${c.blue}18`,
             alignItems: "center", justifyContent: "center",
           }}>
-            <Ionicons name={isCamera ? "camera" : "document-outline"} size={18} color={c.blue} />
+            <Ionicons
+              name={
+                isCamera
+                  ? "camera"
+                  : mimeType === "application/pdf"
+                    ? "document-text"
+                    : "document-outline"
+              }
+              size={18}
+              color={c.blue}
+            />
           </View>
         )}
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, fontFamily: fonts.sans.medium, color: uri ? c.blue : c.text }}>
             {uri ? "Enviado ✓" : "Toque para selecionar"}
           </Text>
+          {uri ? (
+            <Text style={{ fontSize: 10, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 2 }} numberOfLines={1}>
+              {resolvedLabel}
+            </Text>
+          ) : null}
           {hint && !uri && (
             <Text style={{ fontSize: 10, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 2 }}>{hint}</Text>
           )}
@@ -383,6 +493,11 @@ function DocPickerRow({
               Galeria ou câmera
             </Text>
           )}
+          {!isCamera && !uri && onPickDocument ? (
+            <Text style={{ fontSize: 10, fontFamily: fonts.sans.regular, color: c.blue, marginTop: 2 }}>
+              Galeria ou PDF
+            </Text>
+          ) : null}
         </View>
         <Ionicons name={uri ? "checkmark-circle" : "chevron-forward"} size={16} color={uri ? c.blue : c.softMuted} />
       </Pressable>
@@ -392,21 +507,23 @@ function DocPickerRow({
         <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }} onPress={() => setShowSourcePicker(false)}>
           <View style={{ backgroundColor: c.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 }}>
             <Text style={{ fontSize: 16, fontFamily: fonts.sans.bold, color: c.text, textAlign: "center", marginBottom: 4 }}>
-              Escolher origem da foto
+              {isCamera ? "Escolher origem da foto" : "Escolher origem do arquivo"}
             </Text>
-            <Pressable
-              onPress={() => { setShowSourcePicker(false); setTimeout(onPickCamera!, 300); }}
-              style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}
-            >
-              <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: `${c.blue}18`, alignItems: "center", justifyContent: "center" }}>
-                <Ionicons name="camera" size={22} color={c.blue} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Tirar foto agora</Text>
-                <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted }}>Use a câmera frontal para a selfie</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
-            </Pressable>
+            {isCamera && onPickCamera ? (
+              <Pressable
+                onPress={() => { setShowSourcePicker(false); setTimeout(onPickCamera, 300); }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: `${c.blue}18`, alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="camera" size={22} color={c.blue} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Tirar foto agora</Text>
+                  <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted }}>Use a câmera frontal para a selfie</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => { setShowSourcePicker(false); setTimeout(onPickGallery, 300); }}
               style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}
@@ -420,6 +537,21 @@ function DocPickerRow({
               </View>
               <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
             </Pressable>
+            {!isCamera && onPickDocument ? (
+              <Pressable
+                onPress={() => { setShowSourcePicker(false); setTimeout(onPickDocument, 300); }}
+                style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: `${c.blue}18`, alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="document-text" size={22} color={c.blue} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Escolher arquivo ou PDF</Text>
+                  <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted }}>PDF ou imagem armazenada no aparelho</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => setShowSourcePicker(false)}
               style={{ padding: 14, borderRadius: 14, alignItems: "center" }}
@@ -467,13 +599,19 @@ export default function ProviderValidationScreen() {
   const c = colors.light;
   const insets = useSafeAreaInsets();
   const { user, role, refreshUser } = useAuth();
+  const { send } = useNotification();
 
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const scrollRef = useRef<ScrollView>(null);
-  const fieldPositions = useRef<Record<string, number>>({});
+  const contentRef = useRef<View>(null);
+  const fieldAnchors = useRef<Record<string, View | null>>({});
+  const localDocumentAssets = useRef<Partial<Record<DocumentField, LocalDocumentAsset>>>({});
+  const stepDirectionRef = useRef<"forward" | "back" | null>(null);
 
   const initialForm = useMemo<FormState>(() => ({
     fullName: user?.name || "",
@@ -506,7 +644,27 @@ export default function ProviderValidationScreen() {
 
   useEffect(() => {
     setForm(initialForm);
+    localDocumentAssets.current = {};
   }, [initialForm]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardVisible(true);
+      setKeyboardInset(event.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      setKeyboardInset(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   if (!user || role !== "prestador") {
     return (
@@ -526,28 +684,47 @@ export default function ProviderValidationScreen() {
     setErrors((p) => ({ ...p, [field]: "" }));
   }
 
-  function rememberFieldPosition(field: string, y: number) {
-    fieldPositions.current[field] = y;
-  }
+  const setFieldAnchor = (field: string) => (node: View | null) => {
+    fieldAnchors.current[field] = node;
+  };
 
   function focusField(field: string) {
-    const y = fieldPositions.current[field];
-    if (typeof y !== "number") return;
+    const anchor = fieldAnchors.current[field];
+    const content = contentRef.current;
+    if (!anchor || !content) return;
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ y: Math.max(y - 110, 0), animated: true });
+      anchor.measureLayout(
+        content,
+        (_x, y) => {
+          scrollRef.current?.scrollTo({ y: Math.max(y - 110, 0), animated: true });
+        },
+        () => {},
+      );
     });
   }
 
-  const transition = (next: number) => {
+  const transition = (next: number, direction: "forward" | "back") => {
+    stepDirectionRef.current = direction;
+    Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     Animated.timing(fadeAnim, { toValue: 0, duration: 140, useNativeDriver: true }).start(() => {
       setStep(next);
-      requestAnimationFrame(() => {
-        scrollRef.current?.scrollTo({ y: 0, animated: false });
-      });
       Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
     });
   };
+
+  useEffect(() => {
+    if (stepDirectionRef.current !== "forward") {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      stepDirectionRef.current = null;
+    }, 40);
+
+    return () => clearTimeout(timeout);
+  }, [step]);
 
   function validateStep1(): boolean {
     const e: Record<string, string> = {};
@@ -603,28 +780,92 @@ export default function ProviderValidationScreen() {
 
   function goNext() {
     if (step < 5 && !validators[step]?.()) return;
-    transition(step + 1);
+    transition(step + 1, "forward");
   }
 
   function goBack() {
-    if (step > 1) transition(step - 1);
+    Keyboard.dismiss();
+    if (step > 1) transition(step - 1, "back");
     else router.back();
   }
 
-  async function pickFromGallery(field: keyof Pick<FormState, "docRg" | "docResidence" | "docCnh" | "docCrlv" | "docSelfie">) {
+  function storeLocalDocument(field: DocumentField, asset: LocalDocumentAsset) {
+    localDocumentAssets.current[field] = asset;
+    setField(field, asset.uri);
+  }
+
+  function getDocumentMeta(field: DocumentField) {
+    const asset = localDocumentAssets.current[field];
+    if (asset) {
+      return {
+        displayName: asset.displayName || asset.fileName || asset.uri.split("/").pop() || "",
+        mimeType: asset.mimeType || inferMimeType(asset.uri, asset.mimeType),
+      };
+    }
+
+    const value = form[field];
+    if (!value) {
+      return { displayName: "", mimeType: undefined as string | undefined };
+    }
+
+    return {
+      displayName: value.split("/").pop() || value,
+      mimeType: inferMimeType(value),
+    };
+  }
+
+  async function pickFromGallery(field: DocumentField) {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (perm.status !== "granted") {
       Alert.alert("Permissão necessária", "Precisamos de acesso à galeria para anexar documentos.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       quality: 0.9,
       allowsEditing: true,
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setField(field, result.assets[0].uri);
+      const asset = result.assets[0];
+      storeLocalDocument(field, {
+        uri: asset.uri,
+        base64: asset.base64 ?? undefined,
+        mimeType: asset.mimeType ?? undefined,
+        fileName: asset.fileName ?? undefined,
+        displayName: asset.fileName ?? undefined,
+      });
     }
+  }
+
+  async function pickDocument(field: DocumentField) {
+    const documentPicker = getDocumentPicker();
+    if (!documentPicker) {
+      Alert.alert(
+        "Atualize o app",
+        "O envio de PDF e arquivos depende de uma versao mais recente do aplicativo. Por enquanto, selecione pela galeria.",
+      );
+      await pickFromGallery(field);
+      return;
+    }
+
+    const result = await documentPicker.getDocumentAsync({
+      multiple: false,
+      copyToCacheDirectory: true,
+      type: ["image/*", "application/pdf"],
+    });
+
+    if (result.canceled || !result.assets[0]) {
+      return;
+    }
+
+    const asset = result.assets[0];
+    storeLocalDocument(field, {
+      uri: asset.uri,
+      mimeType: asset.mimeType ?? undefined,
+      fileName: asset.name ?? undefined,
+      displayName: asset.name ?? undefined,
+    });
   }
 
   async function pickSelfieFromCamera() {
@@ -634,34 +875,108 @@ export default function ProviderValidationScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      cameraType: ImagePicker.CameraType.front,
+      mediaTypes: ["images"],
+      cameraType: "front" as ImagePicker.CameraType,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.9,
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setField("docSelfie", result.assets[0].uri);
+      const asset = result.assets[0];
+      storeLocalDocument("docSelfie", {
+        uri: asset.uri,
+        base64: asset.base64 ?? undefined,
+        mimeType: asset.mimeType ?? undefined,
+        fileName: asset.fileName ?? undefined,
+        displayName: asset.fileName ?? undefined,
+      });
     }
   }
 
   async function uploadDocument(name: string, value: string) {
     if (!/^(file|content|ph):/i.test(value)) return value;
-    let response: Response;
+    const fieldMap: Record<string, DocumentField> = {
+      rg: "docRg",
+      residence: "docResidence",
+      cnh: "docCnh",
+      crlv: "docCrlv",
+      selfie: "docSelfie",
+    };
+    const field = fieldMap[name];
+    const localAsset = field ? localDocumentAssets.current[field] : undefined;
+    const mimeType = inferMimeType(value, localAsset?.mimeType);
+    const ext = inferExtension(value, mimeType, localAsset?.fileName);
+    const path = `${providerUser.id}/${Date.now()}-${name}.${ext}`;
+    let bytes: Uint8Array;
+
     try {
-      response = await fetch(value);
+      if (localAsset?.base64) {
+        bytes = base64ToUint8Array(localAsset.base64);
+      } else {
+        bytes = await readUriAsBytes(localAsset?.uri || value);
+      }
     } catch {
       throw new Error(`Não foi possível ler o arquivo "${name}". Selecione novamente.`);
     }
-    const blob = await response.blob();
-    const ext = (blob.type.split("/")[1] || "jpg").replace("jpeg", "jpg");
-    const path = `${providerUser.id}/${Date.now()}-${name}.${ext}`;
-    const { error } = await supabase.storage.from("provider-docs").upload(path, blob, {
-      contentType: blob.type || "image/jpeg",
+
+    if (!bytes.byteLength) {
+      throw new Error(`O arquivo "${name}" foi recebido vazio. Selecione novamente antes de enviar.`);
+    }
+
+    const { error } = await supabase.storage.from("provider-docs").upload(path, bytes, {
+      contentType: mimeType,
       upsert: true,
     });
     if (error) throw error;
     return path;
+  }
+
+  async function persistValidationFallback(payload: Record<string, unknown>) {
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .update({
+        name: payload.full_name,
+        phone: payload.phone,
+        cpf: payload.cpf,
+      })
+      .eq("id", providerUser.id);
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    const { error: providerError } = await supabase
+      .from("providers")
+      .update({
+        cpf: payload.cpf,
+        birth_date: payload.birth_date,
+        service_type: payload.service_type,
+        service_category: payload.service_category,
+        vehicle_type: payload.vehicle_type,
+        vehicle_model: payload.vehicle_model,
+        vehicle_year: payload.vehicle_year,
+        vehicle_plate: payload.vehicle_plate,
+        contact_method: payload.contact_method,
+        contact_availability: payload.contact_availability,
+        doc_rg_url: payload.doc_rg_url,
+        doc_residence_url: payload.doc_residence_url,
+        doc_cnh_url: payload.doc_cnh_url,
+        doc_crlv_url: payload.doc_crlv_url || null,
+        doc_selfie_url: payload.doc_selfie_url,
+        onboarding_status: "submitted",
+        validation_notes: payload.validation_notes || null,
+        submitted_at: new Date().toISOString(),
+        verified: false,
+        active: false,
+        rejection_reason: null,
+        rejection_until: null,
+      })
+      .eq("id", providerUser.id);
+
+    if (providerError) {
+      throw providerError;
+    }
   }
 
   async function handleSubmit() {
@@ -676,33 +991,50 @@ export default function ProviderValidationScreen() {
         uploadDocument("selfie", form.docSelfie),
       ]);
 
-      const { error } = await supabase.functions.invoke("provider_validation_submit", {
-        body: {
-          full_name: form.fullName.trim(),
-          cpf: form.cpf.replace(/\D/g, ""),
-          birth_date: form.birthDate.split("/").reverse().join("-"),
-          phone: form.phone.replace(/\D/g, ""),
-          service_type: form.serviceType,
-          service_category: form.serviceCategory,
-          vehicle_type: form.vehicleType,
-          vehicle_model: form.vehicleModel.trim(),
-          vehicle_year: Number(form.vehicleYear),
-          vehicle_plate: form.vehiclePlate,
-          contact_method: form.contactMethod,
-          contact_availability: form.contactAvailability,
-          doc_rg_url: docRg,
-          doc_residence_url: docResidence,
-          doc_cnh_url: docCnh,
-          doc_crlv_url: docCrlv,
-          doc_selfie_url: docSelfie,
-          validation_notes: form.notes.trim(),
-        },
-      });
+      const payload = {
+        full_name: form.fullName.trim(),
+        cpf: form.cpf.replace(/\D/g, ""),
+        birth_date: form.birthDate.split("/").reverse().join("-"),
+        phone: form.phone.replace(/\D/g, ""),
+        service_type: form.serviceType,
+        service_category: form.serviceCategory,
+        vehicle_type: form.vehicleType,
+        vehicle_model: form.vehicleModel.trim(),
+        vehicle_year: Number(form.vehicleYear),
+        vehicle_plate: form.vehiclePlate.replace(/[^A-Z0-9]/gi, "").toUpperCase(),
+        contact_method: form.contactMethod,
+        contact_availability: form.contactAvailability,
+        doc_rg_url: docRg,
+        doc_residence_url: docResidence,
+        doc_cnh_url: docCnh,
+        doc_crlv_url: docCrlv,
+        doc_selfie_url: docSelfie,
+        validation_notes: form.notes.trim(),
+      };
 
-      if (error) throw error;
+      try {
+        const { error } = await supabase.functions.invoke("provider_validation_submit", {
+          body: payload,
+        });
+
+        if (error) throw error;
+      } catch (submitError) {
+        const message = submitError instanceof Error ? submitError.message : String(submitError);
+        const isNetworkFailure =
+          message.includes("Network request failed") ||
+          message.includes("Failed to fetch") ||
+          message.includes("fetch");
+
+        if (!isNetworkFailure) {
+          throw submitError;
+        }
+
+        await persistValidationFallback(payload);
+      }
+
       await refreshUser();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      Alert.alert("Validação enviada", "Recebemos seus documentos. Você será notificado por e-mail em até 24h.");
+      await send("provider_validation_received");
       router.replace("/");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Não foi possível enviar. Tente novamente.";
@@ -850,12 +1182,14 @@ export default function ProviderValidationScreen() {
 
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
           <KeyboardAwareScrollViewCompat
+            key={`step-${step}`}
             ref={scrollRef}
             bottomOffset={insets.bottom + 110}
             contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 90 }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            <View ref={contentRef}>
             {providerRejected && providerUser.provider?.rejection_reason ? (
               <View style={[st.infoBox, { backgroundColor: "#FEF2F2", borderColor: "#FECACA", marginBottom: 14 }]}>
                 <Ionicons name="alert-circle-outline" size={16} color={ERROR_COLOR} />
@@ -877,7 +1211,7 @@ export default function ProviderValidationScreen() {
                   <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.blue }}>CONTA</Text>
                 </View>
 
-                <View onLayout={(e) => rememberFieldPosition("fullName", e.nativeEvent.layout.y)}>
+                <View ref={setFieldAnchor("fullName")}>
                   <Label text="NOME COMPLETO" required />
                   <StyledInput
                     value={form.fullName}
@@ -893,7 +1227,7 @@ export default function ProviderValidationScreen() {
                 </View>
 
                 <View style={{ flexDirection: "row", gap: 12 }}>
-                  <View style={{ flex: 1 }} onLayout={(e) => rememberFieldPosition("cpf", e.nativeEvent.layout.y)}>
+                  <View style={{ flex: 1 }} ref={setFieldAnchor("cpf")}>
                     <Label text="CPF" required />
                     <StyledInput
                       value={form.cpf}
@@ -906,7 +1240,7 @@ export default function ProviderValidationScreen() {
                       onFocus={() => focusField("cpf")}
                     />
                   </View>
-                  <View style={{ flex: 1 }} onLayout={(e) => rememberFieldPosition("birthDate", e.nativeEvent.layout.y)}>
+                  <View style={{ flex: 1 }} ref={setFieldAnchor("birthDate")}>
                     <Label text="NASCIMENTO" required />
                     <StyledInput
                       value={form.birthDate}
@@ -922,7 +1256,7 @@ export default function ProviderValidationScreen() {
                   </View>
                 </View>
 
-                <View onLayout={(e) => rememberFieldPosition("phone", e.nativeEvent.layout.y)}>
+                <View ref={setFieldAnchor("phone")}>
                   <Label text="TELEFONE / WHATSAPP" required />
                   <StyledInput
                     value={form.phone}
@@ -944,7 +1278,7 @@ export default function ProviderValidationScreen() {
                 <Text style={[st.title, { color: c.text }]}>Serviço e veículo</Text>
                 <Text style={[st.sub, { color: c.sub }]}>Defina o tipo de serviço que você oferece e os dados do seu veículo.</Text>
 
-                <View onLayout={(e) => rememberFieldPosition("serviceType", e.nativeEvent.layout.y)}>
+                <View ref={setFieldAnchor("serviceType")}>
                   <Label text="TIPO DE SERVIÇO" required />
                   <ServiceTypeCard
                     options={SERVICE_TYPES}
@@ -959,7 +1293,7 @@ export default function ProviderValidationScreen() {
                 </View>
 
                 {form.serviceType && (
-                  <View onLayout={(e) => rememberFieldPosition("serviceCategory", e.nativeEvent.layout.y)}>
+                  <View ref={setFieldAnchor("serviceCategory")}>
                     <Label text="CATEGORIA" required />
                     <RadioRow
                       options={SERVICE_CATEGORIES[form.serviceType as ServiceType] || []}
@@ -975,7 +1309,7 @@ export default function ProviderValidationScreen() {
 
                 <View style={[st.divider, { borderColor: c.border }]} />
 
-                <View onLayout={(e) => rememberFieldPosition("vehicleType", e.nativeEvent.layout.y)}>
+                <View ref={setFieldAnchor("vehicleType")}>
                   <Label text="TIPO DE VEÍCULO" required />
                   <RadioRow
                     options={VEHICLE_TYPES.map((v) => ({ ...v, icon: undefined, label: `${v.icon} ${v.label}` }))}
@@ -989,7 +1323,7 @@ export default function ProviderValidationScreen() {
                 </View>
 
                 <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
-                  <View style={{ flex: 2 }} onLayout={(e) => rememberFieldPosition("vehicleModel", e.nativeEvent.layout.y)}>
+                  <View style={{ flex: 2 }} ref={setFieldAnchor("vehicleModel")}>
                     <Label text="MODELO" required />
                     <StyledInput
                       value={form.vehicleModel}
@@ -1002,7 +1336,7 @@ export default function ProviderValidationScreen() {
                       onFocus={() => focusField("vehicleModel")}
                     />
                   </View>
-                  <View style={{ flex: 1 }} onLayout={(e) => rememberFieldPosition("vehicleYear", e.nativeEvent.layout.y)}>
+                  <View style={{ flex: 1 }} ref={setFieldAnchor("vehicleYear")}>
                     <Label text="ANO" required />
                     <StyledInput
                       value={form.vehicleYear}
@@ -1017,7 +1351,7 @@ export default function ProviderValidationScreen() {
                   </View>
                 </View>
 
-                <View onLayout={(e) => rememberFieldPosition("vehiclePlate", e.nativeEvent.layout.y)}>
+                <View ref={setFieldAnchor("vehiclePlate")}>
                   <Label text="PLACA" required />
                   <StyledInput
                     value={form.vehiclePlate}
@@ -1039,7 +1373,7 @@ export default function ProviderValidationScreen() {
                 <Text style={[st.title, { color: c.text }]}>Contato e disponibilidade</Text>
                 <Text style={[st.sub, { color: c.sub }]}>Como prefere ser contatado pela nossa equipe antes da aprovação?</Text>
 
-                <View onLayout={(e) => rememberFieldPosition("contactMethod", e.nativeEvent.layout.y)}>
+                <View ref={setFieldAnchor("contactMethod")}>
                   <Label text="MÉTODO PREFERIDO" required />
                   <RadioRow
                     options={CONTACT_METHODS.map((m) => ({ ...m, icon: m.icon }))}
@@ -1052,7 +1386,7 @@ export default function ProviderValidationScreen() {
                   />
                 </View>
 
-                <View onLayout={(e) => rememberFieldPosition("contactAvailability", e.nativeEvent.layout.y)}>
+                <View ref={setFieldAnchor("contactAvailability")}>
                   <Label text="DISPONIBILIDADE PARA CONTATO" required />
                   <RadioRow
                     options={AVAILABILITY_OPTIONS}
@@ -1065,7 +1399,7 @@ export default function ProviderValidationScreen() {
                   />
                 </View>
 
-                <View onLayout={(e) => rememberFieldPosition("notes", e.nativeEvent.layout.y)}>
+                <View ref={setFieldAnchor("notes")}>
                   <Label text="OBSERVAÇÕES" />
                   <TextInput
                     value={form.notes}
@@ -1073,6 +1407,7 @@ export default function ProviderValidationScreen() {
                     onFocus={() => focusField("notes")}
                     placeholder="Informações adicionais para a equipe de validação (opcional)"
                     placeholderTextColor={c.softMuted}
+                    inputAccessoryViewID={Platform.OS === "ios" ? KEYBOARD_ACCESSORY_ID : undefined}
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
@@ -1102,8 +1437,11 @@ export default function ProviderValidationScreen() {
                   label="RG OU DOCUMENTO DE IDENTIDADE"
                   required
                   uri={form.docRg}
+                  displayName={getDocumentMeta("docRg").displayName}
+                  mimeType={getDocumentMeta("docRg").mimeType}
                   onPickGallery={() => pickFromGallery("docRg")}
-                  hint="Frente e verso · JPG ou PNG"
+                  onPickDocument={() => pickDocument("docRg")}
+                  hint="Frente e verso · JPG, PNG ou PDF"
                   error={errors.docRg}
                 />
 
@@ -1111,7 +1449,10 @@ export default function ProviderValidationScreen() {
                   label="COMPROVANTE DE RESIDÊNCIA"
                   required
                   uri={form.docResidence}
+                  displayName={getDocumentMeta("docResidence").displayName}
+                  mimeType={getDocumentMeta("docResidence").mimeType}
                   onPickGallery={() => pickFromGallery("docResidence")}
+                  onPickDocument={() => pickDocument("docResidence")}
                   hint="Emitido há no máx. 90 dias"
                   error={errors.docResidence}
                 />
@@ -1120,7 +1461,10 @@ export default function ProviderValidationScreen() {
                   label="CNH — CARTEIRA NACIONAL DE HABILITAÇÃO"
                   required
                   uri={form.docCnh}
+                  displayName={getDocumentMeta("docCnh").displayName}
+                  mimeType={getDocumentMeta("docCnh").mimeType}
                   onPickGallery={() => pickFromGallery("docCnh")}
+                  onPickDocument={() => pickDocument("docCnh")}
                   hint="Dentro da validade — frente e verso"
                   error={errors.docCnh}
                 />
@@ -1128,7 +1472,10 @@ export default function ProviderValidationScreen() {
                 <DocPickerRow
                   label="CRLV — DOCUMENTO DO VEÍCULO"
                   uri={form.docCrlv}
+                  displayName={getDocumentMeta("docCrlv").displayName}
+                  mimeType={getDocumentMeta("docCrlv").mimeType}
                   onPickGallery={() => pickFromGallery("docCrlv")}
+                  onPickDocument={() => pickDocument("docCrlv")}
                   hint="Opcional · Documento do veículo atual"
                   error={errors.docCrlv}
                 />
@@ -1143,6 +1490,8 @@ export default function ProviderValidationScreen() {
                   label="SELFIE COM ROSTO VISÍVEL"
                   required
                   uri={form.docSelfie}
+                  displayName={getDocumentMeta("docSelfie").displayName}
+                  mimeType={getDocumentMeta("docSelfie").mimeType}
                   onPickGallery={() => pickFromGallery("docSelfie")}
                   onPickCamera={pickSelfieFromCamera}
                   hint="Rosto centralizado, bem iluminado"
@@ -1194,6 +1543,7 @@ export default function ProviderValidationScreen() {
               </View>
             )}
 
+            </View>
           </KeyboardAwareScrollViewCompat>
         </Animated.View>
 
@@ -1204,11 +1554,38 @@ export default function ProviderValidationScreen() {
             style={[st.submitBtn, { backgroundColor: c.blue, opacity: submitting ? 0.7 : 1 }, shadows.md]}
           >
             <Text style={st.submitBtnTxt}>
-              {submitting ? "Enviando..." : step < 5 ? "Continuar" : "Enviar validação"}
+              {step < 5 ? "Continuar" : "Enviar validação"}
             </Text>
             <Ionicons name={step < 5 ? "arrow-forward" : "checkmark-circle"} size={16} color="#fff" />
           </Pressable>
         </View>
+
+        {Platform.OS === "android" && keyboardVisible ? (
+          <Pressable
+            onPress={() => Keyboard.dismiss()}
+            style={[
+              st.keyboardDismissButton,
+              {
+                bottom: Math.max(keyboardInset - 44, 12),
+                backgroundColor: c.text,
+              },
+              shadows.md,
+            ]}
+          >
+            <Ionicons name="chevron-down" size={16} color={c.background} />
+            <Text style={[st.keyboardDismissText, { color: c.background }]}>Fechar teclado</Text>
+          </Pressable>
+        ) : null}
+
+        {Platform.OS === "ios" ? (
+          <InputAccessoryView nativeID={KEYBOARD_ACCESSORY_ID}>
+            <View style={[st.keyboardAccessory, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Pressable onPress={() => Keyboard.dismiss()} style={st.keyboardAccessoryButton}>
+                <Text style={[st.keyboardAccessoryText, { color: c.blue }]}>Fechar teclado</Text>
+              </Pressable>
+            </View>
+          </InputAccessoryView>
+        ) : null}
 
         {submitting ? (
           <View style={st.loadingOverlay}>
@@ -1266,5 +1643,34 @@ const st = StyleSheet.create({
     fontFamily: fonts.sans.regular,
     lineHeight: 19,
     textAlign: "center",
+  },
+  keyboardDismissButton: {
+    position: "absolute",
+    right: 20,
+    height: 40,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  keyboardDismissText: {
+    fontSize: 12,
+    fontFamily: fonts.sans.bold,
+  },
+  keyboardAccessory: {
+    borderTopWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: "flex-end",
+  },
+  keyboardAccessoryButton: {
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  keyboardAccessoryText: {
+    fontSize: 13,
+    fontFamily: fonts.sans.bold,
   },
 });

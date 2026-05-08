@@ -42,6 +42,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
   } = usePermissions();
   const { pushToken, isRegisteringPushToken, pushRegistrationError, refreshPushToken } = useNotification();
   const [showDangerZone, setShowDangerZone] = useState(false);
+  const [settingsAccordion, setSettingsAccordion] = useState<"notifications" | null>("notifications");
 
   if (label === "Métodos de Pagamento") {
     return (
@@ -253,6 +254,30 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
       await setNotificationPreference(key, nextValue);
     };
 
+    const renderTogglePill = (enabled: boolean, activeColor: string) => (
+      <View
+        style={[
+          subStyles.togglePill,
+          {
+            backgroundColor: enabled ? `${activeColor}18` : c.card,
+            borderColor: enabled ? `${activeColor}44` : c.border,
+          },
+        ]}
+      >
+        <View style={[subStyles.toggleTrack, { backgroundColor: enabled ? activeColor : "#D4D0CB" }]}>
+          <View style={[subStyles.toggleThumb, { left: enabled ? 16 : 2 }]} />
+        </View>
+        <Text
+          style={[
+            subStyles.toggleLabel,
+            { color: enabled ? activeColor : c.softMuted },
+          ]}
+        >
+          {enabled ? "Ligado" : "Desligado"}
+        </Text>
+      </View>
+    );
+
     const notificationRows: Array<{
       key: keyof typeof notificationPreferences;
       icon: React.ComponentProps<typeof Ionicons>["name"];
@@ -295,96 +320,158 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
       <View style={subStyles.container}>
         <Text style={[subStyles.sectionLabel, { color: c.softMuted }]}>Push</Text>
 
-        <Pressable
-          onPress={() => {
-            if (!notifications.granted && notifications.canAsk) {
-              requestNotifications();
-            } else {
-              openSettings();
-            }
-          }}
-          style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}
-        >
-          <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
-            <Ionicons name="notifications" size={18} color={notifications.granted ? c.success : c.sub} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[subStyles.rowLabel, { color: c.text }]}>Permissão do aparelho</Text>
-            <Text style={[subStyles.rowSub, { color: notifications.granted ? c.success : notifications.canAsk ? c.softMuted : "#F97316" }]}>
-              {deviceNotificationLabel}
-            </Text>
-            {pushRegistrationError ? (
-              <Text style={[subStyles.inlineHint, { color: "#F97316" }]}>{pushRegistrationError}</Text>
-            ) : null}
-          </View>
-          {notifications.granted ? (
-            <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
-              <Text style={[subStyles.badgeText, { color: c.success }]}>Sistema</Text>
+        <View style={[subStyles.accordionCard, { backgroundColor: c.background, borderColor: c.border }]}>
+          <Pressable
+            onPress={() => {
+              setSettingsAccordion((current) =>
+                current === "notifications" ? null : "notifications",
+              );
+            }}
+            style={subStyles.accordionHeader}
+          >
+            <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+              <Ionicons
+                name="notifications"
+                size={18}
+                color={notifications.granted ? c.success : c.sub}
+              />
             </View>
-          ) : (
-            <Ionicons name={notifications.canAsk ? "chevron-forward" : "open-outline"} size={16} color={notifications.canAsk ? c.softMuted : "#F97316"} />
-          )}
-        </Pressable>
+            <View style={{ flex: 1 }}>
+              <Text style={[subStyles.rowLabel, { color: c.text }]}>Central de notificações</Text>
+              <Text style={[subStyles.rowSub, { color: c.softMuted }]}>
+                Permissão do aparelho, categorias e redefinição
+              </Text>
+            </View>
+            {renderTogglePill(notifications.granted, c.success)}
+            <Ionicons
+              name={settingsAccordion === "notifications" ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={c.softMuted}
+            />
+          </Pressable>
 
-        <Pressable
-          onPress={() => {
-            if (!notifications.granted) {
-              if (notifications.canAsk) {
-                requestNotifications();
-              } else {
-                openSettings();
-              }
-              return;
-            }
-            refreshPushToken();
-          }}
-          style={[subStyles.compactRow, { borderColor: c.border }]}
-        >
-          <Ionicons name="phone-portrait" size={16} color={c.sub} />
-          <Text style={[subStyles.compactRowText, { color: c.text }]}>
-            {notifications.granted
-              ? isRegisteringPushToken
-                ? "Atualizando dispositivo"
-                : "Atualizar dispositivo"
-              : "Ativar push no aparelho"}
-          </Text>
-        </Pressable>
+          {settingsAccordion === "notifications" ? (
+            <View style={subStyles.accordionBody}>
+              <Pressable
+                onPress={() => {
+                  if (notifications.granted) {
+                    openSettings();
+                    return;
+                  }
+                  if (notifications.canAsk) {
+                    requestNotifications();
+                  } else {
+                    openSettings();
+                  }
+                }}
+                style={[subStyles.row, { backgroundColor: c.card, borderColor: c.border }]}
+              >
+                <View style={[subStyles.iconBox, { backgroundColor: c.background }]}>
+                  <Ionicons
+                    name="phone-portrait"
+                    size={18}
+                    color={notifications.granted ? c.success : c.sub}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[subStyles.rowLabel, { color: c.text }]}>Permissão do aparelho</Text>
+                  <Text
+                    style={[
+                      subStyles.rowSub,
+                      {
+                        color: notifications.granted
+                          ? c.success
+                          : notifications.canAsk
+                            ? c.softMuted
+                            : "#F97316",
+                      },
+                    ]}
+                  >
+                    {deviceNotificationLabel}
+                  </Text>
+                  {pushRegistrationError ? (
+                    <Text style={[subStyles.inlineHint, { color: "#F97316" }]}>
+                      {pushRegistrationError}
+                    </Text>
+                  ) : null}
+                </View>
+                {notifications.granted ? (
+                  <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
+                    <Text style={[subStyles.badgeText, { color: c.success }]}>Sistema</Text>
+                  </View>
+                ) : (
+                  <Ionicons
+                    name={notifications.canAsk ? "chevron-forward" : "open-outline"}
+                    size={16}
+                    color={notifications.canAsk ? c.softMuted : "#F97316"}
+                  />
+                )}
+              </Pressable>
 
-        {notificationRows.map((item) => {
-          const enabled = notificationPreferences[item.key];
-          return (
-            <Pressable
-              key={item.key}
-              onPress={() => {
-                handleNotificationCategoryToggle(item.key, !enabled);
-              }}
-              style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}
-            >
-              <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
-                <Ionicons name={item.icon} size={18} color={enabled ? c.primaryDeep : c.sub} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[subStyles.rowLabel, { color: c.text }]}>{item.label}</Text>
-                <Text style={[subStyles.rowSub, { color: enabled ? c.sub : c.softMuted }]}>{item.sub}</Text>
-              </View>
-              <View style={[subStyles.miniSwitch, { backgroundColor: enabled ? c.success : "#D4D0CB" }]}>
-                <View style={[subStyles.miniDot, { left: enabled ? 14 : 2 }]} />
-              </View>
-            </Pressable>
-          );
-        })}
+              <Pressable
+                onPress={() => {
+                  if (!notifications.granted) {
+                    if (notifications.canAsk) {
+                      requestNotifications();
+                    } else {
+                      openSettings();
+                    }
+                    return;
+                  }
+                  refreshPushToken();
+                }}
+                style={[subStyles.compactRow, { borderColor: c.border }]}
+              >
+                <Ionicons name="sync" size={16} color={c.sub} />
+                <Text style={[subStyles.compactRowText, { color: c.text }]}>
+                  {notifications.granted
+                    ? isRegisteringPushToken
+                      ? "Sincronizando dispositivo"
+                      : pushToken
+                        ? "Dispositivo sincronizado"
+                        : "Sincronizar dispositivo"
+                    : "Ativar push no aparelho"}
+                </Text>
+              </Pressable>
 
-        <Pressable
-          onPress={() => {
-            resetPermissionSettings();
-          }}
-          style={[subStyles.compactRow, { borderColor: c.border }]}
-        >
-          <Ionicons name="refresh" size={16} color={c.sub} />
-          <Text style={[subStyles.compactRowText, { color: c.text }]}>
-            Redefinir permissões do app
-          </Text>
-        </Pressable>
+              {notificationRows.map((item) => {
+                const enabled = notificationPreferences[item.key];
+                return (
+                  <Pressable
+                    key={item.key}
+                    onPress={() => {
+                      handleNotificationCategoryToggle(item.key, !enabled);
+                    }}
+                    style={[subStyles.row, { backgroundColor: c.card, borderColor: c.border }]}
+                  >
+                    <View style={[subStyles.iconBox, { backgroundColor: c.background }]}>
+                      <Ionicons name={item.icon} size={18} color={enabled ? c.primaryDeep : c.sub} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[subStyles.rowLabel, { color: c.text }]}>{item.label}</Text>
+                      <Text style={[subStyles.rowSub, { color: enabled ? c.sub : c.softMuted }]}>
+                        {item.sub}
+                      </Text>
+                    </View>
+                    {renderTogglePill(enabled, c.success)}
+                  </Pressable>
+                );
+              })}
+
+              <Pressable
+                onPress={() => {
+                  resetPermissionSettings();
+                }}
+                style={[subStyles.compactRow, { borderColor: c.border }]}
+              >
+                <Ionicons name="refresh" size={16} color={c.sub} />
+                <Text style={[subStyles.compactRowText, { color: c.text }]}>
+                  Redefinir permissões do app
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
 
         <Text style={[subStyles.sectionLabel, { color: c.softMuted }]}>Privacidade</Text>
 
@@ -410,9 +497,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
           {(!backgroundLocation.canAsk && !backgroundLocation.granted && !backgroundTrackingEnabled) ? (
             <Ionicons name="open-outline" size={16} color="#F97316" />
           ) : (
-            <View style={[subStyles.miniSwitch, { backgroundColor: backgroundTrackingEnabled ? c.success : "#D4D0CB" }]}>
-              <View style={[subStyles.miniDot, { left: backgroundTrackingEnabled ? 14 : 2 }]} />
-            </View>
+            renderTogglePill(backgroundTrackingEnabled, c.blue)
           )}
         </Pressable>
 
@@ -433,9 +518,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
               {themeMode === "dark" ? "Ativado" : "Desativado"}
             </Text>
           </View>
-          <View style={[subStyles.miniSwitch, { backgroundColor: themeMode === "dark" ? c.success : "#D4D0CB" }]}>
-            <View style={[subStyles.miniDot, { left: themeMode === "dark" ? 14 : 2 }]} />
-          </View>
+          {renderTogglePill(themeMode === "dark", c.primaryDeep)}
         </Pressable>
 
         <View style={[subStyles.rowBlock, { backgroundColor: c.background, borderColor: c.border }]}>
@@ -767,6 +850,22 @@ const subStyles = StyleSheet.create({
     borderRadius: 8,
   },
   badgeText: { fontSize: 11, fontFamily: fonts.sans.bold },
+  accordionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  accordionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+  },
+  accordionBody: {
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
   compactRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -837,6 +936,33 @@ const subStyles = StyleSheet.create({
     marginBottom: 2,
   },
   ratingBig: { fontSize: 36, fontFamily: fonts.sans.bold },
-  miniSwitch: { width: 36, height: 20, borderRadius: 10, position: "relative" },
-  miniDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: "#fff", position: "absolute", top: 3 },
+  togglePill: {
+    minWidth: 98,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "space-between",
+  },
+  toggleTrack: {
+    width: 32,
+    height: 18,
+    borderRadius: 9,
+    position: "relative",
+  },
+  toggleThumb: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#fff",
+    position: "absolute",
+    top: 2,
+  },
+  toggleLabel: {
+    fontSize: 11,
+    fontFamily: fonts.sans.bold,
+  },
 });

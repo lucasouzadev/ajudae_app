@@ -41,7 +41,6 @@ export default function AccountPendingScreen() {
     try {
       await confirmSignupOtp(code, currentPending.email);
       setSheetOpen(false);
-      router.replace("/");
     } finally {
       setLoading(false);
     }

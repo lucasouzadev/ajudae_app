@@ -18,9 +18,7 @@ import { useAuthSafe } from "./AuthContext";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
-  if (Constants.appOwnership !== "expo") {
-    Notifications = require("expo-notifications");
-  }
+  Notifications = require("expo-notifications");
 } catch (e) {
 }
 
@@ -137,6 +135,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   const [ready, setReady] = useState(false);
 
   const appState = useRef(AppState.currentState);
+  const lastSyncedProfileState = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     const results = await Promise.allSettled([
@@ -256,7 +255,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
 
     boot();
     return () => { mounted = false; };
-  }, [isAuthenticated, user?.id, user?.updated_at]);
+  }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextState) => {
@@ -280,22 +279,34 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!ready || !isAuthenticated || !user) return;
 
+    const nextPayload = {
+      geolocation_requested: location.granted || backgroundLocation.granted,
+      camera_requested: camera.granted || mediaLibrary.granted,
+      notifications_requested: notifications.granted,
+      lgpd_accepted: lgpdAccepted,
+      theme_mode: themeMode,
+      app_language: appLanguage,
+      background_tracking_enabled: backgroundTrackingEnabled,
+      notification_preferences: notificationPreferences,
+    };
+    const serialized = JSON.stringify(nextPayload);
+    if (lastSyncedProfileState.current === serialized) {
+      return;
+    }
+    lastSyncedProfileState.current = serialized;
+
     supabase
       .from("profiles")
       .update({
-        geolocation_requested: location.granted || backgroundLocation.granted,
-        camera_requested: camera.granted || mediaLibrary.granted,
-        notifications_requested: notifications.granted,
-        lgpd_accepted: lgpdAccepted,
-        theme_mode: themeMode,
-        app_language: appLanguage,
-        background_tracking_enabled: backgroundTrackingEnabled,
-        notification_preferences: notificationPreferences,
+        ...nextPayload,
         last_consent_update: new Date().toISOString(),
       })
       .eq("id", user.id)
       .then(({ error }) => {
-        if (error) console.warn("[PermissionsContext] DB sync error:", error.message);
+        if (error) {
+          lastSyncedProfileState.current = null;
+          console.warn("[PermissionsContext] DB sync error:", error.message);
+        }
       });
   }, [
     ready,
@@ -328,6 +339,15 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   const requestBackgroundLocation = async (): Promise<boolean> => {
     try {
       let foregroundGranted = location.granted;
+      if (!foregroundGranted) {
+        const currentForeground = await Location.getForegroundPermissionsAsync();
+        const currentPerm = toOsPerm(
+          currentForeground.status,
+          currentForeground.canAskAgain,
+        );
+        setLocation(currentPerm);
+        foregroundGranted = currentPerm.granted;
+      }
       if (!foregroundGranted) {
         foregroundGranted = await requestLocation();
       }
@@ -385,6 +405,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
           allowAlert: true,
           allowBadge: true,
           allowSound: true,
+          provideAppNotificationSettings: true,
         },
       });
       const perm = toNotificationPerm(result);
