@@ -68,8 +68,7 @@ export default function InboxScreen() {
     return () => clearTimeout(t);
   }, []);
 
-  if (!user) return null;
-  const initials = (user.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
+  const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const accent = role === "cliente" ? c.primary : c.blue;
   const accentEnd = role === "cliente" ? c.primaryDeep : "#60A5FA";
   const counterRoleLabel = role === "cliente" ? "prestadores" : "clientes";
@@ -87,7 +86,9 @@ export default function InboxScreen() {
       setHighlightId(match.id);
       setTimeout(() => scrollRef.current?.scrollTo({ y: conversations.indexOf(match) * 90, animated: true }), 300);
     }
-  }, [openName]);
+  }, [conversations, openName]);
+
+  if (!user) return null;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>

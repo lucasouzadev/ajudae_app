@@ -27,12 +27,30 @@ const DOC_FIELDS: { key: keyof DocRecord; label: string }[] = [
   { key: "doc_selfie_url", label: "Selfie" },
 ];
 
+function getFileExtension(path: string) {
+  const clean = path.split("?")[0].toLowerCase();
+  return clean.includes(".") ? clean.slice(clean.lastIndexOf(".") + 1) : "";
+}
+
+function isPdfPath(path: string) {
+  return getFileExtension(path) === "pdf";
+}
+
+function isImagePath(path: string) {
+  return ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif"].includes(getFileExtension(path));
+}
+
+function fileNameFromPath(path: string) {
+  return path.split("/").pop() || "arquivo";
+}
+
 export function Documents() {
   const [showDetail, setShowDetail] = useState(false);
   const [docs, setDocs] = useState<DocRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<DocRecord | null>(null);
   const [signedUrls, setSignedUrls] = useState<SignedUrls>({});
+  const [failedPreviews, setFailedPreviews] = useState<Record<string, boolean>>({});
   const [signingUrls, setSigningUrls] = useState(false);
   const [actioning, setActioning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -83,6 +101,7 @@ export function Documents() {
     setShowDetail(true);
     setSelected(doc);
     setSignedUrls({});
+    setFailedPreviews({});
     setActionError(null);
     setSigningUrls(true);
 
@@ -216,25 +235,66 @@ export function Documents() {
               <div className="grid grid-cols-2 gap-4">
                 {DOC_FIELDS.map(({ key, label }) => {
                   const signedUrl = signedUrls[key as string];
+                  const rawPath = selected[key] as string;
+                  const previewFailed = failedPreviews[key as string];
+                  const isPdf = isPdfPath(rawPath);
+                  const isImage = isImagePath(rawPath);
                   return (
                     <div key={key as string} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                       <div className="border-b border-slate-100 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-500">
                         {label}
                       </div>
                       {signedUrl ? (
-                        <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="block">
-                          <img
-                            src={signedUrl}
-                            alt={label}
-                            className="h-48 w-full object-cover transition hover:opacity-90"
-                            onError={(e) => {
-                              const target = e.currentTarget;
-                              target.style.display = "none";
-                              target.parentElement!.innerHTML =
-                                '<div class="flex h-48 items-center justify-center text-sm text-slate-400">Erro ao carregar</div>';
-                            }}
-                          />
-                        </a>
+                        <div className="flex min-h-48 flex-col">
+                          {!previewFailed && isImage ? (
+                            <a href={signedUrl} target="_blank" rel="noopener noreferrer" className="block">
+                              <img
+                                src={signedUrl}
+                                alt={label}
+                                className="h-48 w-full object-cover transition hover:opacity-90"
+                                onError={() =>
+                                  setFailedPreviews((prev) => ({ ...prev, [key as string]: true }))
+                                }
+                              />
+                            </a>
+                          ) : !previewFailed && isPdf ? (
+                            <object
+                              data={signedUrl}
+                              type="application/pdf"
+                              className="h-48 w-full bg-slate-50"
+                              onError={() =>
+                                setFailedPreviews((prev) => ({ ...prev, [key as string]: true }))
+                              }
+                            >
+                              <div />
+                            </object>
+                          ) : (
+                            <div className="flex h-48 flex-col items-center justify-center gap-2 bg-slate-50 px-4 text-center">
+                              <span className="text-2xl">{isPdf ? "📄" : "🖼️"}</span>
+                              <p className="text-sm text-slate-500">
+                                Pré-visualização indisponível
+                              </p>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-medium text-slate-700">
+                                {fileNameFromPath(rawPath)}
+                              </p>
+                              <p className="text-[11px] text-slate-400">
+                                {isPdf ? "PDF" : isImage ? "Imagem" : "Arquivo"}
+                              </p>
+                            </div>
+                            <a
+                              href={signedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                            >
+                              Abrir
+                            </a>
+                          </div>
+                        </div>
                       ) : (
                         <div className="flex h-48 items-center justify-center text-sm text-slate-400">
                           {(selected[key] as string) ? "Erro ao gerar link seguro" : "Não enviado"}

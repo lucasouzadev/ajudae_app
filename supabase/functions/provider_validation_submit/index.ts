@@ -73,40 +73,181 @@ async function sendEmail(to: string, subject: string, html: string) {
   return { sent: true, skipped: false }
 }
 
-function buildSummaryHtml(input: z.infer<typeof ValidationSchema>, email: string) {
-  const lines = [
-    ['Nome completo', input.full_name],
-    ['E-mail', email],
-    ['CPF', input.cpf],
-    ['Telefone', input.phone],
-    ['Data de nascimento', input.birth_date],
-    ['Tipo de serviço', input.service_type],
-    ['Categoria', input.service_category],
-    ['Veículo', `${input.vehicle_model} (${input.vehicle_year})`],
-    ['Placa', input.vehicle_plate],
-    ['Tipo de veículo', input.vehicle_type],
-    ['Contato', `${input.contact_method} · ${input.contact_availability}`],
-    ['RG', input.doc_rg_url],
-    ['Comprovante', input.doc_residence_url],
-    ['CNH', input.doc_cnh_url],
-    ['CRLV', input.doc_crlv_url || 'Não enviado'],
-    ['Selfie', input.doc_selfie_url],
-    ['Observações', input.validation_notes || 'Sem observações'],
-  ]
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
-  const items = lines
-    .map(([label, value]) => `<tr><td style="padding:8px 12px;border:1px solid #E8E3D8;"><strong>${label}</strong></td><td style="padding:8px 12px;border:1px solid #E8E3D8;">${value}</td></tr>`)
+function fileNameFromPath(path: string) {
+  return path.split('/').pop() || path
+}
+
+function labelServiceType(value: string) {
+  const map: Record<string, string> = {
+    frete: 'Frete',
+    mudanca: 'Mudança',
+    entrega: 'Entrega',
+  }
+  return map[value] ?? value
+}
+
+function labelVehicleType(value: string) {
+  const map: Record<string, string> = {
+    car: 'Carro utilitário / pickup pequena',
+    utility: 'Pickup média',
+    van: 'Furgão / Van de carga',
+    truck_small: 'Van grande / Caminhão pequeno',
+    truck_large: 'Caminhão',
+  }
+  return map[value] ?? value
+}
+
+function labelContactMethod(value: string) {
+  const map: Record<string, string> = {
+    ligacao: 'Ligação',
+    whatsapp: 'WhatsApp',
+  }
+  return map[value] ?? value
+}
+
+function labelAvailability(value: string) {
+  const map: Record<string, string> = {
+    manha: 'Manhã (8h–12h)',
+    tarde: 'Tarde (13h–18h)',
+    noite: 'Noite (18h–21h)',
+    qualquer: 'Qualquer horário',
+  }
+  return map[value] ?? value
+}
+
+function buildSection(title: string, rows: Array<[string, string]>) {
+  const items = rows
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #EEE7DC;width:34%;font-size:12px;font-weight:700;color:#6B6259;vertical-align:top;">
+            ${escapeHtml(label)}
+          </td>
+          <td style="padding:10px 12px;border-bottom:1px solid #EEE7DC;font-size:13px;color:#1A1714;vertical-align:top;">
+            ${escapeHtml(value)}
+          </td>
+        </tr>
+      `,
+    )
     .join('')
 
   return `
-    <div style="font-family:Arial,sans-serif;color:#1A1714;">
-      <h2>Ajudaê - Validação de conta do prestador</h2>
-      <p>Recebemos envio de validação abaixo.</p>
-      <table style="border-collapse:collapse;width:100%;max-width:760px;">
+    <div style="margin:0 0 18px;border:1px solid #E8E3D8;border-radius:18px;overflow:hidden;background:#FFFFFF;">
+      <div style="padding:12px 16px;background:#F8F5EC;border-bottom:1px solid #E8E3D8;font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#6B6259;">
+        ${escapeHtml(title)}
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
         <tbody>${items}</tbody>
       </table>
     </div>
   `
+}
+
+function buildEmailFrame(title: string, eyebrow: string, intro: string, sections: string, footer: string) {
+  return `
+    <div style="margin:0;padding:24px;background:#F3F1EC;font-family:Arial,sans-serif;color:#1A1714;">
+      <div style="max-width:760px;margin:0 auto;background:#FFFFFF;border:1px solid #E8E3D8;border-radius:24px;overflow:hidden;">
+        <div style="padding:24px 24px 20px;background:linear-gradient(135deg,#FFCC00 0%,#F4B400 100%);">
+          <div style="display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.28);font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#1A1714;">
+            ${escapeHtml(eyebrow)}
+          </div>
+          <h1 style="margin:14px 0 8px;font-size:28px;line-height:1.15;color:#1A1714;">${escapeHtml(title)}</h1>
+          <p style="margin:0;font-size:14px;line-height:1.55;color:#3B3129;">${escapeHtml(intro)}</p>
+        </div>
+        <div style="padding:24px;">
+          ${sections}
+          <div style="margin-top:20px;padding:16px 18px;border-radius:18px;background:#F8F5EC;border:1px solid #E8E3D8;font-size:12px;line-height:1.6;color:#6B6259;">
+            ${escapeHtml(footer)}
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+function buildOpsEmailHtml(input: z.infer<typeof ValidationSchema>, email: string) {
+  const sections = [
+    buildSection('Dados pessoais', [
+      ['Nome completo', input.full_name],
+      ['E-mail', email || 'Não informado'],
+      ['CPF', input.cpf],
+      ['Telefone', input.phone],
+      ['Data de nascimento', input.birth_date],
+    ]),
+    buildSection('Serviço e veículo', [
+      ['Tipo de serviço', labelServiceType(input.service_type)],
+      ['Categoria', input.service_category],
+      ['Tipo de veículo', labelVehicleType(input.vehicle_type)],
+      ['Modelo', input.vehicle_model],
+      ['Ano', String(input.vehicle_year)],
+      ['Placa', input.vehicle_plate],
+    ]),
+    buildSection('Contato e disponibilidade', [
+      ['Método preferido', labelContactMethod(input.contact_method)],
+      ['Faixa de contato', labelAvailability(input.contact_availability)],
+      ['Observações', input.validation_notes || 'Sem observações'],
+    ]),
+    buildSection('Documentos enviados', [
+      ['RG / Identidade', fileNameFromPath(input.doc_rg_url)],
+      ['Comprovante de residência', fileNameFromPath(input.doc_residence_url)],
+      ['CNH', fileNameFromPath(input.doc_cnh_url)],
+      ['CRLV', input.doc_crlv_url ? fileNameFromPath(input.doc_crlv_url) : 'Não enviado'],
+      ['Selfie', fileNameFromPath(input.doc_selfie_url)],
+    ]),
+  ].join('')
+
+  return buildEmailFrame(
+    'Nova validação de prestador',
+    'Ajudaê CRM',
+    'Recebemos um novo envio de validação e os dados abaixo já estão disponíveis para conferência operacional.',
+    sections,
+    'Os documentos visuais devem ser analisados pelo painel interno. Use o CRM para revisar, aprovar ou reprovar com segurança.',
+  )
+}
+
+function buildProviderEmailHtml(input: z.infer<typeof ValidationSchema>, email: string) {
+  const sections = [
+    buildSection('Resumo do cadastro', [
+      ['Nome completo', input.full_name],
+      ['E-mail', email || 'Não informado'],
+      ['CPF', input.cpf],
+      ['Telefone', input.phone],
+      ['Tipo de serviço', labelServiceType(input.service_type)],
+      ['Categoria', input.service_category],
+      ['Veículo', `${input.vehicle_model} · ${input.vehicle_year}`],
+      ['Placa', input.vehicle_plate],
+    ]),
+    buildSection('Documentação recebida', [
+      ['RG / Identidade', 'Recebido'],
+      ['Comprovante de residência', 'Recebido'],
+      ['CNH', 'Recebido'],
+      ['CRLV', input.doc_crlv_url ? 'Recebido' : 'Não enviado'],
+      ['Selfie', 'Recebida'],
+      ['Observações enviadas', input.validation_notes ? 'Incluídas no envio' : 'Sem observações'],
+    ]),
+    buildSection('Próximas etapas', [
+      ['Status atual', 'Em análise'],
+      ['Prazo estimado', 'Até 24 horas'],
+      ['Retorno', 'Avisaremos por e-mail assim que a análise terminar'],
+    ]),
+  ].join('')
+
+  return buildEmailFrame(
+    'Recebemos sua validação',
+    'Ajudaê',
+    'Seu envio foi registrado com sucesso. Agora nossa equipe vai revisar os dados e os documentos do cadastro.',
+    sections,
+    'Guarde este e-mail como comprovante do envio. Se precisar atualizar algum dado antes da aprovação, faça um novo envio pelo aplicativo.',
+  )
 }
 
 Deno.serve(async (req: Request) => {
@@ -204,21 +345,22 @@ Deno.serve(async (req: Request) => {
     return json(500, { error: 'Erro ao enviar validação' })
   }
 
-  const summaryHtml = buildSummaryHtml(input, user.email ?? '')
   const providerEmail = user.email ?? ''
+  const providerEmailHtml = buildProviderEmailHtml(input, providerEmail)
+  const opsEmailHtml = buildOpsEmailHtml(input, providerEmail)
 
   const [providerMail, opsMail] = await Promise.all([
     providerEmail
       ? sendEmail(
           providerEmail,
           'Ajudaê - Recebemos sua validação de conta',
-          summaryHtml,
+          providerEmailHtml,
         )
       : Promise.resolve({ sent: false, skipped: true }),
     sendEmail(
       'contato@ajudaeh.com.br',
       'Ajudaê - Nova validação de prestador',
-      summaryHtml,
+      opsEmailHtml,
     ),
   ])
 

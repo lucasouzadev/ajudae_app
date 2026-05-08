@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as Haptics from "expo-haptics";
-import { Modal, View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { Animated, Modal, View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import colors, { fonts, shadows } from "@/constants/colors";
@@ -32,17 +32,68 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
   const c = colors.light;
   const { role } = useAuth();
   const isClient = role === "cliente";
-  if (!provider) return null;
-  const accentText = provider.color === "#FFCC00" ? "#8B6F00" : provider.color;
+  const [mounted, setMounted] = useState(open && !!provider);
+  const [presentedProvider, setPresentedProvider] = useState<Provider | null>(provider);
+  const translateY = useRef(new Animated.Value(36)).current;
+  const scale = useRef(new Animated.Value(0.96)).current;
+  const fade = useRef(new Animated.Value(0)).current;
 
+  useEffect(() => {
+    if (open && provider) {
+      setPresentedProvider(provider);
+      setMounted(true);
+      translateY.stopAnimation();
+      scale.stopAnimation();
+      fade.stopAnimation();
+      translateY.setValue(36);
+      scale.setValue(0.96);
+      fade.setValue(0);
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.spring(translateY, { toValue: 0, tension: 68, friction: 12, useNativeDriver: true }),
+          Animated.spring(scale, { toValue: 1, tension: 68, friction: 12, useNativeDriver: true }),
+          Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
+        ]).start();
+      });
+      return;
+    }
+
+    if (!mounted) return;
+
+    translateY.stopAnimation();
+    scale.stopAnimation();
+    fade.stopAnimation();
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: 28, duration: 180, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 0.97, duration: 180, useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 0, duration: 160, useNativeDriver: true }),
+    ]).start(() => {
+      setMounted(false);
+      setPresentedProvider(null);
+    });
+  }, [open, provider, mounted, translateY, scale, fade]);
+
+  if (!mounted || !presentedProvider) return null;
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.backdrop} onPress={onClose} />
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <Animated.View style={[styles.backdrop, { opacity: fade }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
       <View style={styles.centerWrap} pointerEvents="box-none">
-        <View style={[styles.card, { backgroundColor: c.card }, shadows.xl]}>
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              backgroundColor: c.card,
+              opacity: fade,
+              transform: [{ translateY }, { scale }],
+            },
+            shadows.xl,
+          ]}
+        >
           {/* Hero */}
           <LinearGradient
-            colors={[`${provider.color}14`, c.card]}
+            colors={[`${presentedProvider.color}14`, c.card]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={styles.hero}
@@ -54,27 +105,27 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
             <View style={styles.heroBody}>
               <View>
                 <LinearGradient
-                  colors={[provider.color, `${provider.color}AA`]}
+                  colors={[presentedProvider.color, `${presentedProvider.color}AA`]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[styles.avatar, { borderColor: c.card }, shadows.md]}
                 >
-                  <Text style={styles.avatarText}>{provider.ini}</Text>
+                  <Text style={styles.avatarText}>{presentedProvider.ini}</Text>
                 </LinearGradient>
                 <View style={[styles.verifyBadge, { borderColor: c.card, backgroundColor: c.success }]}>
                   <Ionicons name="checkmark" size={11} color="#fff" />
                 </View>
               </View>
-              <Text style={[styles.name, { color: c.text }]}>{provider.name}</Text>
+              <Text style={[styles.name, { color: c.text }]}>{presentedProvider.name}</Text>
               <View style={styles.metaRow}>
-                <View style={[styles.catChip, { backgroundColor: `${provider.color}18` }]}>
-                  <CatIcon cat={provider.cat} size={11} color={provider.color} />
-                  <Text style={[styles.catText, { color: provider.color }]}>{provider.cat}</Text>
+                <View style={[styles.catChip, { backgroundColor: `${presentedProvider.color}18` }]}>
+                  <CatIcon cat={presentedProvider.cat} size={11} color={presentedProvider.color} />
+                  <Text style={[styles.catText, { color: presentedProvider.color }]}>{presentedProvider.cat}</Text>
                 </View>
                 <Ionicons name="star" size={13} color={c.warning} />
-                <Text style={[styles.ratingText, { color: c.warning }]}>{provider.rating}</Text>
+                <Text style={[styles.ratingText, { color: c.warning }]}>{presentedProvider.rating}</Text>
                 <Text style={{ color: c.softMuted, fontSize: 11 }}>·</Text>
-                <Text style={[styles.jobsText, { color: c.sub }]}>{provider.jobs} serviços</Text>
+                <Text style={[styles.jobsText, { color: c.sub }]}>{presentedProvider.jobs} serviços</Text>
               </View>
             </View>
           </LinearGradient>
@@ -84,14 +135,14 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
             <View style={styles.gridRow}>
               <View style={[styles.gridCell, { backgroundColor: c.background, borderColor: c.border }]}>
                 <Text style={[styles.cellLabel, { color: c.softMuted }]}>MODELO</Text>
-                <Text style={[styles.cellTitle, { color: c.text }]}>{provider.vehicle}</Text>
-                <Text style={[styles.cellSub, { color: c.sub }]}>{provider.model}</Text>
+                <Text style={[styles.cellTitle, { color: c.text }]}>{presentedProvider.vehicle}</Text>
+                <Text style={[styles.cellSub, { color: c.sub }]}>{presentedProvider.model}</Text>
               </View>
               <View style={[styles.gridCell, { backgroundColor: c.background, borderColor: c.border }]}>
                 <Text style={[styles.cellLabel, { color: c.softMuted }]}>SERVIÇO</Text>
-                <Text style={[styles.cellTitle, { color: c.text }]}>{provider.cat}</Text>
+                <Text style={[styles.cellTitle, { color: c.text }]}>{presentedProvider.cat}</Text>
                 <Text style={[styles.cellSub, { color: c.sub }]}>
-                  a partir de <Text style={{ color: provider.color, fontFamily: fonts.serif.extra }}>{provider.price}</Text>
+                  a partir de <Text style={{ color: presentedProvider.color, fontFamily: fonts.serif.extra }}>{presentedProvider.price}</Text>
                 </Text>
               </View>
             </View>
@@ -103,10 +154,10 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
                 <View key={i} style={{ marginBottom: i < REPUTATION.length - 1 ? 10 : 0 }}>
                   <View style={styles.reputHead}>
                     <Text style={[styles.reputLabel, { color: c.text }]}>{r.label}</Text>
-                    <Text style={[styles.reputPct, { color: provider.color }]}>{Math.round(r.v * 100)}%</Text>
+                    <Text style={[styles.reputPct, { color: presentedProvider.color }]}>{Math.round(r.v * 100)}%</Text>
                   </View>
                   <View style={[styles.reputBar, { backgroundColor: c.border }]}>
-                    <View style={[styles.reputFill, { width: `${r.v * 100}%`, backgroundColor: provider.color }]} />
+                    <View style={[styles.reputFill, { width: `${r.v * 100}%`, backgroundColor: presentedProvider.color }]} />
                   </View>
                 </View>
               ))}
@@ -115,15 +166,15 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
             {/* Stats */}
             <View style={styles.statsRow}>
               <View style={[styles.statCell, { backgroundColor: c.background, borderColor: c.border }]}>
-                <Text style={[styles.statValue, { color: c.text }]}>{provider.responseTime}</Text>
+                <Text style={[styles.statValue, { color: c.text }]}>{presentedProvider.responseTime}</Text>
                 <Text style={[styles.statLabel, { color: c.softMuted }]}>Resposta</Text>
               </View>
               <View style={[styles.statCell, { backgroundColor: c.background, borderColor: c.border }]}>
-                <Text style={[styles.statValue, { color: c.text }]}>{provider.completionRate}</Text>
+                <Text style={[styles.statValue, { color: c.text }]}>{presentedProvider.completionRate}</Text>
                 <Text style={[styles.statLabel, { color: c.softMuted }]}>Conclusão</Text>
               </View>
               <View style={[styles.statCell, { backgroundColor: c.background, borderColor: c.border }]}>
-                <Text style={[styles.statValue, { color: c.text }]}>{provider.km} km</Text>
+                <Text style={[styles.statValue, { color: c.text }]}>{presentedProvider.km} km</Text>
                 <Text style={[styles.statLabel, { color: c.softMuted }]}>Distância</Text>
               </View>
             </View>
@@ -135,16 +186,16 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
               variant="outline"
               title="Mais Detalhes"
               size="md"
-              color={provider.color}
-              onPress={() => onProfile(provider)}
+              color={presentedProvider.color}
+              onPress={() => onProfile(presentedProvider)}
               style={{ flex: 1 }}
             />
             {isClient ? (
               <PrimaryButton
                 title="Solicitar"
                 size="md"
-                color={provider.color}
-                onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); onRequest(provider); }}
+                color={presentedProvider.color}
+                onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); onRequest(presentedProvider); }}
                 icon="arrow-forward"
                 style={{ flex: 1.4 }}
               />
@@ -156,7 +207,7 @@ export function ProviderModal({ open, provider, onClose, onRequest, onProfile }:
               </View>
             )}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

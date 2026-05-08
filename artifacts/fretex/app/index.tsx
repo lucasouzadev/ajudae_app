@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated, Easing, PanResponder, Dimensions, RefreshControl, Modal, TextInput, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Animated, Easing, PanResponder, Dimensions, RefreshControl, Modal, TextInput, Alert, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -1545,17 +1545,14 @@ function ClienteHome() {
     return result;
   }, [providers]);
 
-  // Anima o sheet para EMPTY_H quando não há prestadores, COLLAPSED_H quando chegam
   useEffect(() => {
-    if (loadingProviders) return;
     const target = providers.length === 0 ? EMPTY_H : COLLAPSED_H;
-    Animated.timing(sheetHeightAnim, {
-      toValue: target,
-      duration: 350,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [providers.length, loadingProviders]);
+    sheetHeightAnim.stopAnimation();
+    sheetHeightAnim.setValue(target);
+    if (providers.length === 0) {
+      setActive(null);
+    }
+  }, [providers.length, sheetHeightAnim]);
 
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
 
@@ -1704,7 +1701,7 @@ function ClienteHome() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}
         >
-          {(FILTERS as string[]).map((f) => (
+          {FILTERS.map((f) => (
             <Chip
               key={f}
               label={f}
@@ -2569,7 +2566,7 @@ const styles = StyleSheet.create({
   filtersWrap: { position: "absolute", left: 0, right: 0, zIndex: 30, maxHeight: 40 },
   providerMiniCard: {
     width: 150,
-    height: MINI_CARD_H,
+    height: 82,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1.5,
@@ -2770,47 +2767,51 @@ function ProvidersSheet({
   heightAnim: Animated.Value;
 }) {
   const c = colors.light;
-  const isEmpty = !loading && providers.length === 0;
-  const minH = isEmpty ? EMPTY_H : COLLAPSED_H;
+  const hasProviders = providers.length > 0;
+  const searching = loading || !hasProviders;
+  const minH = hasProviders ? COLLAPSED_H : EMPTY_H;
   const startH = useRef(minH);
   const [expanded, setExpanded] = useState(false);
+  const canExpandRef = useRef(hasProviders);
 
-  // Quando providers aparecem/somem, reseta o estado de expandido
   useEffect(() => {
-    if (expanded) setExpanded(false);
-  }, [isEmpty]);
+    canExpandRef.current = hasProviders;
+    startH.current = minH;
+    if (!hasProviders && expanded) {
+      setExpanded(false);
+    }
+  }, [expanded, hasProviders, minH]);
 
   const snap = (target: number) => {
-    Animated.timing(heightAnim, {
-      toValue: target,
-      duration: 320,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
+    heightAnim.stopAnimation();
+    heightAnim.setValue(target);
     startH.current = target;
-    setExpanded(target === EXPANDED_H);
-    Haptics.impactAsync(target === EXPANDED_H ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const nextExpanded = canExpandRef.current && target === EXPANDED_H;
+    setExpanded(nextExpanded);
+    Haptics.impactAsync(nextExpanded ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   };
 
   const responder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+      onMoveShouldSetPanResponder: (_, g) => canExpandRef.current && Math.abs(g.dy) > 6 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderGrant: () => {
-        // @ts-expect-error access internal
+        if (!canExpandRef.current) return;
         startH.current = (heightAnim as any)._value ?? startH.current;
         heightAnim.stopAnimation();
       },
       onPanResponderMove: (_, g) => {
-        // @ts-expect-error access internal
-        const currentMin = isEmpty ? EMPTY_H : COLLAPSED_H;
+        if (!canExpandRef.current) return;
+        const currentMin = canExpandRef.current ? COLLAPSED_H : EMPTY_H;
         const next = Math.max(currentMin, Math.min(EXPANDED_H, startH.current - g.dy));
         heightAnim.setValue(next);
       },
       onPanResponderRelease: (_, g) => {
-        // @ts-expect-error access internal
-        const currentMin = isEmpty ? EMPTY_H : COLLAPSED_H;
+        if (!canExpandRef.current) {
+          snap(EMPTY_H);
+          return;
+        }
+        const currentMin = canExpandRef.current ? COLLAPSED_H : EMPTY_H;
         const mid = (currentMin + EXPANDED_H) / 2;
-        // @ts-expect-error access internal
         const value = (heightAnim as any)._value ?? startH.current;
         const target = g.vy < -0.5 ? EXPANDED_H : g.vy > 0.5 ? currentMin : value > mid ? EXPANDED_H : currentMin;
         snap(target);
@@ -2818,7 +2819,10 @@ function ProvidersSheet({
     }),
   ).current;
 
-  const toggle = () => snap(expanded ? minH : EXPANDED_H);
+  const toggle = () => {
+    if (!hasProviders) return;
+    snap(expanded ? minH : EXPANDED_H);
+  };
 
   return (
     <Animated.View
@@ -2834,17 +2838,15 @@ function ProvidersSheet({
         <View style={sheetStyles.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={[sheetStyles.headerTitle, { color: c.text }]}>
-              {loading ? "Buscando prestadores…" : expanded ? "Prestadores na sua área" : "Perto de você"}
+              {searching ? "Buscando prestadores…" : expanded ? "Prestadores na sua área" : "Perto de você"}
             </Text>
             <Text style={[sheetStyles.headerSub, { color: c.softMuted }]}>
-              {loading
-                ? "Aguarde um momento"
-                : providers.length === 0
-                ? "Nenhum disponível agora · atualize em instantes"
+              {searching
+                ? "Procurando na sua região"
                 : `${providers.length} disponíveis · ${expanded ? "deslize para baixo" : "puxe para ver lista"}`}
             </Text>
           </View>
-          {!loading && (
+          {hasProviders && (
             <Pressable onPress={toggle} style={[sheetStyles.toggleBtn, { backgroundColor: c.background, borderColor: c.borderLight }]}>
               <Ionicons name={expanded ? "chevron-down" : "chevron-up"} size={16} color={c.text} />
             </Pressable>
@@ -2854,159 +2856,114 @@ function ProvidersSheet({
 
       {/* Body — carrossel e lista em posição absoluta dentro do sheet, sem overflow */}
       <View style={{ flex: 1, position: "relative" }}>
-
-      {/* Loading skeleton */}
-      {loading && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 18, gap: 10 }}
-        >
-          {[0, 1, 2].map((i) => (
-            <View
-              key={i}
-              style={[
-                styles.providerMiniCard,
-                { backgroundColor: c.borderLight, borderColor: c.borderLight, width: 130, height: MINI_CARD_H },
-              ]}
-            >
-              <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: c.border, marginBottom: 8 }} />
-              <View style={{ width: 80, height: 10, borderRadius: 5, backgroundColor: c.border, marginBottom: 6 }} />
-              <View style={{ width: 56, height: 8, borderRadius: 4, backgroundColor: c.border }} />
-            </View>
-          ))}
-        </ScrollView>
-      )}
-
-      <Animated.View
-        pointerEvents={expanded ? "none" : "auto"}
-        style={{
-          position: "absolute",
-          left: 0, right: 0, top: 0,
-          height: MINI_CARD_H + 22,
-          opacity: loading ? 0 : heightAnim.interpolate({
-            inputRange: [COLLAPSED_H, COLLAPSED_H + 50],
-            outputRange: [1, 0],
-            extrapolate: "clamp",
-          }),
-        }}
-      >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 18, gap: 10 }}
-        >
-          {providers.map((p) => (
-            <Pressable
-              key={p.id}
-              onPress={() => onSelect(p)}
-              style={[
-                styles.providerMiniCard,
-                {
-                  backgroundColor: c.background,
-                  borderColor: active?.id === p.id ? p.color : c.borderLight,
-                },
-              ]}
-            >
-              <View style={styles.providerMiniHead}>
-                <View style={[styles.providerMiniIcon, { backgroundColor: `${p.color}18` }]}>
-                  {p.cat === "Mudança" ? (
-                    <Ionicons name="home" size={12} color={p.color} />
-                  ) : p.cat === "Frete" ? (
-                    <MaterialCommunityIcons name="truck" size={13} color={p.color} />
-                  ) : (
-                    <Ionicons name="cube" size={12} color={p.color} />
-                  )}
-                </View>
-                <Text style={[styles.providerMiniPrice, { color: p.color }]}>{p.price}</Text>
-              </View>
-              <View>
-                <Text style={[styles.providerMiniName, { color: c.text }]} numberOfLines={1}>{p.name}</Text>
-                <Text style={[styles.providerMiniMeta, { color: c.softMuted }]}>★ {p.rating} · {p.vehicle}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </Animated.View>
-
-      <Animated.View
-        pointerEvents={expanded ? "auto" : "none"}
-        style={{
-          position: "absolute",
-          top: 0, left: 0, right: 0, bottom: 0,
-          opacity: heightAnim.interpolate({
-            inputRange: [COLLAPSED_H + 50, COLLAPSED_H + 120],
-            outputRange: [0, 1],
-            extrapolate: "clamp",
-          }),
-        }}
-      >
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {providers.map((p) => (
-            <Pressable
-              key={p.id}
-              onPress={() => onOpenProfile(p)}
-              style={[
-                sheetStyles.listRow,
-                {
-                  backgroundColor: c.background,
-                  borderColor: active?.id === p.id ? p.color : c.borderLight,
-                  borderWidth: active?.id === p.id ? 2 : 1,
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={[p.color, `${p.color}AA`]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={sheetStyles.listAvatar}
-              >
-                <Text style={sheetStyles.listIni}>{p.ini}</Text>
-              </LinearGradient>
-              <View style={{ flex: 1 }}>
-                <View style={sheetStyles.listHeadRow}>
-                  <Text style={[sheetStyles.listName, { color: c.text }]} numberOfLines={1}>{p.name}</Text>
-                  {p.isOnline ? (
-                    <View style={[sheetStyles.onlineDot, { backgroundColor: c.success }]} />
-                  ) : null}
-                </View>
-                <View style={sheetStyles.listMeta}>
-                  <View style={[sheetStyles.catTag, { backgroundColor: `${p.color}18` }]}>
-                    {p.cat === "Mudança" ? (
-                      <Ionicons name="home" size={9} color={p.color} />
-                    ) : p.cat === "Frete" ? (
-                      <MaterialCommunityIcons name="truck" size={10} color={p.color} />
-                    ) : (
-                      <Ionicons name="cube" size={9} color={p.color} />
-                    )}
-                    <Text style={[sheetStyles.catTxt, { color: p.color }]}>{p.cat}</Text>
-                  </View>
-                  <Ionicons name="star" size={10} color={c.warning} />
-                  <Text style={[sheetStyles.metaTxt, { color: c.warning }]}>{p.rating}</Text>
-                  <Text style={[sheetStyles.metaTxt, { color: c.softMuted }]}>·</Text>
-                  <Text style={[sheetStyles.metaTxt, { color: c.sub }]}>{p.km} km</Text>
-                  <Text style={[sheetStyles.metaTxt, { color: c.softMuted }]}>·</Text>
-                  <Text style={[sheetStyles.metaTxt, { color: c.sub }]}>{p.area}</Text>
-                </View>
-              </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={[sheetStyles.listPrice, { color: p.color }]}>{p.price}</Text>
-                <Text style={[sheetStyles.listPriceSub, { color: c.softMuted }]}>desde</Text>
-              </View>
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={onSeeAll}
-            style={[sheetStyles.seeAll, { backgroundColor: c.background, borderColor: c.borderLight }]}
+        {searching ? (
+          <View style={sheetStyles.searchingBody}>
+            <ActivityIndicator size="small" color={c.primary} />
+          </View>
+        ) : expanded ? (
+          <ScrollView
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={[sheetStyles.seeAllTxt, { color: c.text }]}>Ver tudo no Marketplace</Text>
-            <Ionicons name="arrow-forward" size={14} color={c.text} />
-          </Pressable>
-        </ScrollView>
-      </Animated.View>
+            {providers.map((p) => (
+              <Pressable
+                key={p.id}
+                onPress={() => onOpenProfile(p)}
+                style={[
+                  sheetStyles.listRow,
+                  {
+                    backgroundColor: c.background,
+                    borderColor: active?.id === p.id ? p.color : c.borderLight,
+                    borderWidth: active?.id === p.id ? 2 : 1,
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[p.color, `${p.color}AA`]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={sheetStyles.listAvatar}
+                >
+                  <Text style={sheetStyles.listIni}>{p.ini}</Text>
+                </LinearGradient>
+                <View style={{ flex: 1 }}>
+                  <View style={sheetStyles.listHeadRow}>
+                    <Text style={[sheetStyles.listName, { color: c.text }]} numberOfLines={1}>{p.name}</Text>
+                    {p.isOnline ? (
+                      <View style={[sheetStyles.onlineDot, { backgroundColor: c.success }]} />
+                    ) : null}
+                  </View>
+                  <View style={sheetStyles.listMeta}>
+                    <View style={[sheetStyles.catTag, { backgroundColor: `${p.color}18` }]}>
+                      {p.cat === "Mudança" ? (
+                        <Ionicons name="home" size={9} color={p.color} />
+                      ) : p.cat === "Frete" ? (
+                        <MaterialCommunityIcons name="truck" size={10} color={p.color} />
+                      ) : (
+                        <Ionicons name="cube" size={9} color={p.color} />
+                      )}
+                      <Text style={[sheetStyles.catTxt, { color: p.color }]}>{p.cat}</Text>
+                    </View>
+                    <Ionicons name="star" size={10} color={c.warning} />
+                    <Text style={[sheetStyles.metaTxt, { color: c.warning }]}>{p.rating}</Text>
+                    <Text style={[sheetStyles.metaTxt, { color: c.softMuted }]}>·</Text>
+                    <Text style={[sheetStyles.metaTxt, { color: c.sub }]}>{p.km} km</Text>
+                    <Text style={[sheetStyles.metaTxt, { color: c.softMuted }]}>·</Text>
+                    <Text style={[sheetStyles.metaTxt, { color: c.sub }]}>{p.area}</Text>
+                  </View>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={[sheetStyles.listPrice, { color: p.color }]}>{p.price}</Text>
+                  <Text style={[sheetStyles.listPriceSub, { color: c.softMuted }]}>desde</Text>
+                </View>
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={onSeeAll}
+              style={[sheetStyles.seeAll, { backgroundColor: c.background, borderColor: c.borderLight }]}
+            >
+              <Text style={[sheetStyles.seeAllTxt, { color: c.text }]}>Ver tudo no Marketplace</Text>
+              <Ionicons name="arrow-forward" size={14} color={c.text} />
+            </Pressable>
+          </ScrollView>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 18, gap: 10 }}
+          >
+            {providers.map((p) => (
+              <Pressable
+                key={p.id}
+                onPress={() => onSelect(p)}
+                style={[
+                  styles.providerMiniCard,
+                  {
+                    backgroundColor: c.background,
+                    borderColor: active?.id === p.id ? p.color : c.borderLight,
+                  },
+                ]}
+              >
+                <View style={styles.providerMiniHead}>
+                  <View style={[styles.providerMiniIcon, { backgroundColor: `${p.color}18` }]}>
+                    {p.cat === "Mudança" ? (
+                      <Ionicons name="home" size={12} color={p.color} />
+                    ) : p.cat === "Frete" ? (
+                      <MaterialCommunityIcons name="truck" size={13} color={p.color} />
+                    ) : (
+                      <Ionicons name="cube" size={12} color={p.color} />
+                    )}
+                  </View>
+                  <Text style={[styles.providerMiniPrice, { color: p.color }]}>{p.price}</Text>
+                </View>
+                <View>
+                  <Text style={[styles.providerMiniName, { color: c.text }]} numberOfLines={1}>{p.name}</Text>
+                  <Text style={[styles.providerMiniMeta, { color: c.softMuted }]}>★ {p.rating} · {p.vehicle}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
       </View>
     </Animated.View>
   );
@@ -3029,6 +2986,7 @@ const sheetStyles = StyleSheet.create({
   headerTitle: { fontSize: 14, fontFamily: fonts.sans.bold },
   headerSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
   toggleBtn: { width: 32, height: 32, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  searchingBody: { flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: 18 },
 
   listRow: {
     flexDirection: "row",

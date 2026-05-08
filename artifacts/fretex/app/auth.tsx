@@ -689,7 +689,7 @@ export default function AuthScreen() {
           maxLength={72}
           returnKeyType="done"
           onSubmitEditing={handleLogin}
-          style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.senha ? ERROR_COLOR : c.border, color: c.text, paddingRight: 48 }]}
+          style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.senha ? ERROR_COLOR : c.border, color: c.text, paddingRight: 92 }]}
         />
         <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8} style={s.eyeBtn}>
           <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color={c.softMuted} />
@@ -872,7 +872,7 @@ export default function AuthScreen() {
           maxLength={72}
           returnKeyType="done"
           onSubmitEditing={handleSignup}
-          style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.senha ? ERROR_COLOR : c.border, color: c.text, paddingRight: 48 }]}
+          style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.senha ? ERROR_COLOR : c.border, color: c.text, paddingRight: 92 }]}
         />
         <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8} style={s.eyeBtn}>
           <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color={c.softMuted} />
@@ -1061,7 +1061,7 @@ export default function AuthScreen() {
             secureTextEntry={!showForgotPass}
             maxLength={72}
             returnKeyType="next"
-            style={[s.input, { backgroundColor: c.card, borderColor: forgotFieldErrors.password ? ERROR_COLOR : c.border, color: c.text, paddingRight: 48 }]}
+            style={[s.input, { backgroundColor: c.card, borderColor: forgotFieldErrors.password ? ERROR_COLOR : c.border, color: c.text, paddingRight: 92 }]}
           />
           <Pressable onPress={() => setShowForgotPass((v) => !v)} hitSlop={8} style={s.eyeBtn}>
             <Ionicons name={showForgotPass ? "eye-off-outline" : "eye-outline"} size={18} color={c.softMuted} />
@@ -1081,7 +1081,7 @@ export default function AuthScreen() {
             maxLength={72}
             returnKeyType="done"
             onSubmitEditing={handleSetNewPassword}
-            style={[s.input, { backgroundColor: c.card, borderColor: forgotFieldErrors.confirm ? ERROR_COLOR : c.border, color: c.text, paddingRight: 48 }]}
+            style={[s.input, { backgroundColor: c.card, borderColor: forgotFieldErrors.confirm ? ERROR_COLOR : c.border, color: c.text, paddingRight: 92 }]}
           />
           <Pressable onPress={() => setShowForgotConfirm((v) => !v)} hitSlop={8} style={s.eyeBtn}>
             <Ionicons name={showForgotConfirm ? "eye-off-outline" : "eye-outline"} size={18} color={c.softMuted} />
@@ -1221,7 +1221,7 @@ const s = StyleSheet.create({
   },
   eyeBtn: {
     position: "absolute",
-    right: 14,
+    right: 46,
     top: 0,
     bottom: 0,
     justifyContent: "center",

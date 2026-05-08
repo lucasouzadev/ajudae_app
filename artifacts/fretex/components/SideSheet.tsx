@@ -60,20 +60,36 @@ export function SideSheet({ open, onClose }: SideSheetProps) {
   const translateX = useRef(new Animated.Value(-SHEET_WIDTH - 20)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(open);
 
   useEffect(() => {
     if (open) {
-      Animated.parallel([
-        Animated.timing(translateX, { toValue: 0, duration: 380, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
-        Animated.timing(fade, { toValue: 1, duration: 320, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(translateX, { toValue: -SHEET_WIDTH - 20, duration: 280, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
-        Animated.timing(fade, { toValue: 0, duration: 240, useNativeDriver: true }),
-      ]).start();
+      setMounted(true);
+      translateX.stopAnimation();
+      fade.stopAnimation();
+      translateX.setValue(-SHEET_WIDTH - 20);
+      fade.setValue(0);
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.timing(translateX, { toValue: 0, duration: 380, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
+          Animated.timing(fade, { toValue: 1, duration: 320, useNativeDriver: true }),
+        ]).start();
+      });
+      return;
     }
-  }, [open, translateX, fade]);
+
+    if (!mounted) return;
+
+    translateX.stopAnimation();
+    fade.stopAnimation();
+    Animated.parallel([
+      Animated.timing(translateX, { toValue: -SHEET_WIDTH - 20, duration: 280, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 0, duration: 240, useNativeDriver: true }),
+    ]).start(() => {
+      setMounted(false);
+      setExpanded(null);
+    });
+  }, [open, mounted, translateX, fade]);
 
   const accent = role === "cliente" ? c.primary : c.blue;
   const accentEnd = role === "cliente" ? c.primaryDeep : "#60A5FA";
@@ -81,8 +97,10 @@ export function SideSheet({ open, onClose }: SideSheetProps) {
   const help = HELP[role];
   const faqs = MOCK_FAQS[role];
 
+  if (!mounted) return null;
+
   return (
-    <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View style={[styles.backdrop, { opacity: fade }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>

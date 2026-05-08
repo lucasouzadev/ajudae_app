@@ -61,22 +61,43 @@ export function AuthOtpSheet({
   const [error, setError] = useState("");
   const [resendMessage, setResendMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mounted, setMounted] = useState(visible);
 
   useEffect(() => {
-    if (!visible) {
-      setCode("");
-      setError("");
-      setResendMessage("");
+    if (visible) {
+      setMounted(true);
+      slideAnim.stopAnimation();
+      backdropAnim.stopAnimation();
       slideAnim.setValue(480);
       backdropAnim.setValue(0);
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 14, useNativeDriver: true }),
+          Animated.timing(backdropAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+        ]).start();
+      });
       return;
     }
 
+    if (!mounted) {
+      setCode("");
+      setError("");
+      setResendMessage("");
+      return;
+    }
+
+    slideAnim.stopAnimation();
+    backdropAnim.stopAnimation();
     Animated.parallel([
-      Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 14, useNativeDriver: true }),
-      Animated.timing(backdropAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
-    ]).start();
-  }, [backdropAnim, slideAnim, visible]);
+      Animated.timing(slideAnim, { toValue: 480, duration: 220, useNativeDriver: true }),
+      Animated.timing(backdropAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => {
+      setMounted(false);
+      setCode("");
+      setError("");
+      setResendMessage("");
+    });
+  }, [backdropAnim, mounted, slideAnim, visible]);
 
   async function handleConfirm() {
     const normalized = code.replace(/\D/g, "").slice(0, 6);
@@ -117,8 +138,10 @@ export function AuthOtpSheet({
 
   const disabled = loading || busy;
 
+  if (!mounted) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
       <View style={StyleSheet.absoluteFill}>
         <Animated.View
           style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay, opacity: backdropAnim }]}

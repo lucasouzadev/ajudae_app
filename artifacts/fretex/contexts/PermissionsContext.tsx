@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import React, {
@@ -11,12 +12,15 @@ import React, {
 } from "react";
 import { AppState, Linking } from "react-native";
 
+import colors from "@/constants/colors";
 import { supabase } from "@/lib/supabase";
 import { useAuthSafe } from "./AuthContext";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
-  Notifications = require("expo-notifications");
+  if (Constants.appOwnership !== "expo") {
+    Notifications = require("expo-notifications");
+  }
 } catch (e) {
   // expo-notifications not available in dev
 }
@@ -31,20 +35,45 @@ export interface OsPermission {
 
 export interface PermissionsState {
   location: OsPermission;
+  backgroundLocation: OsPermission;
   camera: OsPermission;
   mediaLibrary: OsPermission;
   notifications: OsPermission;
   lgpdAccepted: boolean;
+  backgroundTrackingEnabled: boolean;
+  themeMode: ThemeMode;
+  appLanguage: AppLanguage;
+  notificationPreferences: NotificationPreferences;
   /** true once the initial OS read is done */
   ready: boolean;
 }
 
+export type ThemeMode = "light" | "dark";
+export type AppLanguage = "pt-BR" | "en-US" | "es-ES";
+export type NotificationPreferenceKey =
+  | "orders"
+  | "messages"
+  | "payments"
+  | "account"
+  | "marketing";
+
+export type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
+
 export interface PermissionsContextType extends PermissionsState {
   requestLocation: () => Promise<boolean>;
+  requestBackgroundLocation: () => Promise<boolean>;
   requestCamera: () => Promise<boolean>;
   requestMediaLibrary: () => Promise<boolean>;
   requestNotifications: () => Promise<boolean>;
   acceptLGPD: () => Promise<void>;
+  setBackgroundTrackingEnabled: (enabled: boolean) => Promise<boolean>;
+  setThemeMode: (mode: ThemeMode) => Promise<void>;
+  toggleThemeMode: () => Promise<void>;
+  setAppLanguage: (language: AppLanguage) => Promise<void>;
+  setNotificationPreference: (
+    key: NotificationPreferenceKey,
+    enabled: boolean,
+  ) => Promise<void>;
   openSettings: () => void;
   refresh: () => Promise<void>;
 }
@@ -52,6 +81,19 @@ export interface PermissionsContextType extends PermissionsState {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 const LGPD_KEY = "@ajudae_lgpd_accepted";
+const THEME_MODE_KEY = "@ajudae_theme_mode";
+const APP_LANGUAGE_KEY = "@ajudae_app_language";
+const BG_TRACKING_KEY = "@ajudae_background_tracking_enabled";
+const NOTIFICATION_PREFS_KEY = "@ajudae_notification_preferences";
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  orders: true,
+  messages: true,
+  payments: true,
+  account: true,
+  marketing: false,
+};
+const LIGHT_PALETTE = { ...colors.light };
+const DARK_PALETTE = { ...colors.dark };
 
 function toOsPerm(status: string, canAskAgain: boolean): OsPermission {
   return { granted: status === "granted", canAsk: canAskAgain };
@@ -74,6 +116,10 @@ function toNotificationPerm(result: {
   };
 }
 
+function applyTheme(mode: ThemeMode) {
+  Object.assign(colors.light, mode === "dark" ? DARK_PALETTE : LIGHT_PALETTE);
+}
+
 // ─── Context ───────────────────────────────────────────────────────────────────
 
 const PermissionsContext = createContext<PermissionsContextType | null>(null);
@@ -85,10 +131,16 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   const { user, isAuthenticated } = useAuthSafe();
 
   const [location, setLocation] = useState<OsPermission>(UNKNOWN);
+  const [backgroundLocation, setBackgroundLocation] = useState<OsPermission>(UNKNOWN);
   const [camera, setCamera] = useState<OsPermission>(UNKNOWN);
   const [mediaLibrary, setMediaLibrary] = useState<OsPermission>(UNKNOWN);
   const [notifications, setNotifications] = useState<OsPermission>(UNKNOWN);
   const [lgpdAccepted, setLgpdAccepted] = useState(false);
+  const [backgroundTrackingEnabled, setBackgroundTrackingEnabledState] = useState(false);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>("light");
+  const [appLanguage, setAppLanguageState] = useState<AppLanguage>("pt-BR");
+  const [notificationPreferences, setNotificationPreferencesState] =
+    useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
   const [ready, setReady] = useState(false);
 
   const appState = useRef(AppState.currentState);
@@ -97,14 +149,19 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   const refresh = useCallback(async () => {
     const results = await Promise.allSettled([
       Location.getForegroundPermissionsAsync(),
+      Location.getBackgroundPermissionsAsync(),
       ImagePicker.getCameraPermissionsAsync(),
       ImagePicker.getMediaLibraryPermissionsAsync(),
       Notifications ? Notifications.getPermissionsAsync() : Promise.resolve({ status: "denied", canAskAgain: false }),
     ]);
-    const [locResult, camResult, libResult, notifResult] = results;
+    const [locResult, bgLocResult, camResult, libResult, notifResult] = results;
 
     if (locResult.status === "fulfilled") {
       setLocation(toOsPerm(locResult.value.status, locResult.value.canAskAgain));
+    }
+
+    if (bgLocResult.status === "fulfilled") {
+      setBackgroundLocation(toOsPerm(bgLocResult.value.status, bgLocResult.value.canAskAgain));
     }
 
     if (camResult.status === "fulfilled") {
@@ -131,6 +188,32 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
 
       // LGPD: DB is source of truth when authenticated; AsyncStorage is fallback
       let accepted = false;
+      const [storedTheme, storedLanguage, storedBgTracking, storedNotificationPrefs] =
+        await Promise.all([
+          AsyncStorage.getItem(THEME_MODE_KEY),
+          AsyncStorage.getItem(APP_LANGUAGE_KEY),
+          AsyncStorage.getItem(BG_TRACKING_KEY),
+          AsyncStorage.getItem(NOTIFICATION_PREFS_KEY),
+        ]);
+
+      const resolvedTheme: ThemeMode = storedTheme === "dark" ? "dark" : "light";
+      const resolvedLanguage: AppLanguage =
+        storedLanguage === "en-US" || storedLanguage === "es-ES" || storedLanguage === "pt-BR"
+          ? storedLanguage
+          : "pt-BR";
+      const resolvedBgTracking = storedBgTracking === "1";
+      let resolvedNotificationPrefs = DEFAULT_NOTIFICATION_PREFERENCES;
+      if (storedNotificationPrefs) {
+        try {
+          resolvedNotificationPrefs = {
+            ...DEFAULT_NOTIFICATION_PREFERENCES,
+            ...(JSON.parse(storedNotificationPrefs) as Partial<NotificationPreferences>),
+          };
+        } catch {
+          resolvedNotificationPrefs = DEFAULT_NOTIFICATION_PREFERENCES;
+        }
+      }
+
       if (isAuthenticated && user) {
         accepted = user.lgpd_accepted ?? false;
         if (!accepted) {
@@ -144,6 +227,11 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       }
 
       if (mounted) {
+        applyTheme(resolvedTheme);
+        setThemeModeState(resolvedTheme);
+        setAppLanguageState(resolvedLanguage);
+        setBackgroundTrackingEnabledState(resolvedBgTracking);
+        setNotificationPreferencesState(resolvedNotificationPrefs);
         setLgpdAccepted(accepted);
         setReady(true);
       }
@@ -167,6 +255,12 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     return () => sub.remove();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!ready || backgroundLocation.granted || !backgroundTrackingEnabled) return;
+    AsyncStorage.setItem(BG_TRACKING_KEY, "0").catch(() => {});
+    setBackgroundTrackingEnabledState(false);
+  }, [ready, backgroundLocation.granted, backgroundTrackingEnabled]);
+
   // ── Sync permission states to Supabase whenever they change ─────────────────
   useEffect(() => {
     if (!ready || !isAuthenticated || !user) return;
@@ -174,7 +268,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     supabase
       .from("profiles")
       .update({
-        geolocation_requested: location.granted,
+        geolocation_requested: location.granted || backgroundLocation.granted,
         camera_requested: camera.granted || mediaLibrary.granted,
         notifications_requested: notifications.granted,
         lgpd_accepted: lgpdAccepted,
@@ -189,6 +283,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     isAuthenticated,
     user?.id,
     location.granted,
+    backgroundLocation.granted,
     camera.granted,
     mediaLibrary.granted,
     notifications.granted,
@@ -205,6 +300,26 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       return perm.granted;
     } catch (error) {
       console.warn("[PermissionsContext] requestLocation failed:", (error as Error).message);
+      return false;
+    }
+  };
+
+  const requestBackgroundLocation = async (): Promise<boolean> => {
+    try {
+      let foregroundGranted = location.granted;
+      if (!foregroundGranted) {
+        foregroundGranted = await requestLocation();
+      }
+      if (!foregroundGranted) {
+        return false;
+      }
+
+      const result = await Location.requestBackgroundPermissionsAsync();
+      const perm = toOsPerm(result.status, result.canAskAgain);
+      setBackgroundLocation(perm);
+      return perm.granted;
+    } catch (error) {
+      console.warn("[PermissionsContext] requestBackgroundLocation failed:", (error as Error).message);
       return false;
     }
   };
@@ -274,22 +389,78 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  const setBackgroundTrackingEnabled = async (enabled: boolean): Promise<boolean> => {
+    if (!enabled) {
+      await AsyncStorage.setItem(BG_TRACKING_KEY, "0");
+      setBackgroundTrackingEnabledState(false);
+      return true;
+    }
+
+    const granted = backgroundLocation.granted || (await requestBackgroundLocation());
+    if (!granted) {
+      if (!backgroundLocation.canAsk) {
+        openSettings();
+      }
+      return false;
+    }
+
+    await AsyncStorage.setItem(BG_TRACKING_KEY, "1");
+    setBackgroundTrackingEnabledState(true);
+    return true;
+  };
+
+  const setThemeMode = async (mode: ThemeMode): Promise<void> => {
+    applyTheme(mode);
+    setThemeModeState(mode);
+    await AsyncStorage.setItem(THEME_MODE_KEY, mode);
+  };
+
+  const toggleThemeMode = async (): Promise<void> => {
+    const next = themeMode === "dark" ? "light" : "dark";
+    await setThemeMode(next);
+  };
+
+  const setAppLanguage = async (language: AppLanguage): Promise<void> => {
+    setAppLanguageState(language);
+    await AsyncStorage.setItem(APP_LANGUAGE_KEY, language);
+  };
+
+  const setNotificationPreference = async (
+    key: NotificationPreferenceKey,
+    enabled: boolean,
+  ): Promise<void> => {
+    const next = { ...notificationPreferences, [key]: enabled };
+    setNotificationPreferencesState(next);
+    await AsyncStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(next));
+  };
+
   const openSettings = () => Linking.openSettings();
 
   return (
     <PermissionsContext.Provider
       value={{
         location,
+        backgroundLocation,
         camera,
         mediaLibrary,
         notifications,
         lgpdAccepted,
+        backgroundTrackingEnabled,
+        themeMode,
+        appLanguage,
+        notificationPreferences,
         ready,
         requestLocation,
+        requestBackgroundLocation,
         requestCamera,
         requestMediaLibrary,
         requestNotifications,
         acceptLGPD,
+        setBackgroundTrackingEnabled,
+        setThemeMode,
+        toggleThemeMode,
+        setAppLanguage,
+        setNotificationPreference,
         openSettings,
         refresh,
       }}

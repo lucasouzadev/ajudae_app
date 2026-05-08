@@ -30,7 +30,7 @@ import { supabase } from "@/lib/supabase";
 import colors, { fonts, shadows } from "@/constants/colors";
 
 const ERROR_COLOR = "#DC2626";
-const EMAIL_RECOVERY = "recovery";
+const EMAIL_RECOVERY = "PASSWORD_RECOVERY";
 
 type StrengthLevel = { score: number; label: string; color: string };
 function passwordStrength(p: string): StrengthLevel {
@@ -225,12 +225,12 @@ export default function ResetPasswordScreen() {
               secureTextEntry={!showPass}
               maxLength={72}
               returnKeyType="next"
-              style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.password ? ERROR_COLOR : c.border, color: c.text, paddingRight: 48 }]}
+              style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.password ? ERROR_COLOR : c.border, color: c.text, paddingRight: 92 }]}
             />
             <Pressable
               onPress={() => setShowPass((v) => !v)}
               hitSlop={8}
-              style={{ position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" }}
+              style={{ position: "absolute", right: 46, top: 0, bottom: 0, justifyContent: "center" }}
             >
               <Ionicons name={showPass ? "eye-off-outline" : "eye-outline"} size={18} color={c.softMuted} />
             </Pressable>
@@ -255,12 +255,12 @@ export default function ResetPasswordScreen() {
               maxLength={72}
               returnKeyType="done"
               onSubmitEditing={handleUpdate}
-              style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.confirm ? ERROR_COLOR : c.border, color: c.text, paddingRight: 48 }]}
+              style={[s.input, { backgroundColor: c.card, borderColor: fieldErrors.confirm ? ERROR_COLOR : c.border, color: c.text, paddingRight: 92 }]}
             />
             <Pressable
               onPress={() => setShowConfirm((v) => !v)}
               hitSlop={8}
-              style={{ position: "absolute", right: 14, top: 0, bottom: 0, justifyContent: "center" }}
+              style={{ position: "absolute", right: 46, top: 0, bottom: 0, justifyContent: "center" }}
             >
               <Ionicons name={showConfirm ? "eye-off-outline" : "eye-outline"} size={18} color={c.softMuted} />
             </Pressable>

@@ -189,11 +189,11 @@ function Label({ text, required }: { text: string; required?: boolean }) {
 
 function StyledInput({
   value, onChangeText, placeholder, keyboardType, maxLength, autoCapitalize,
-  error, success, hint,
+  error, success, hint, onFocus,
 }: {
   value: string; onChangeText: (t: string) => void; placeholder?: string;
   keyboardType?: any; maxLength?: number; autoCapitalize?: any;
-  error?: string; success?: boolean; hint?: string;
+  error?: string; success?: boolean; hint?: string; onFocus?: () => void;
 }) {
   const c = colors.light;
   const borderColor = error ? ERROR_COLOR : success ? c.success : c.border;
@@ -208,6 +208,7 @@ function StyledInput({
         maxLength={maxLength}
         autoCapitalize={autoCapitalize ?? "none"}
         autoCorrect={false}
+        onFocus={onFocus}
         style={{
           height: 52, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 16,
           fontSize: 14, fontFamily: fonts.sans.medium,
@@ -454,6 +455,8 @@ export default function ProviderValidationScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const scrollRef = useRef<ScrollView>(null);
+  const fieldPositions = useRef<Record<string, number>>({});
 
   const initialForm = useMemo<FormState>(() => ({
     fullName: user?.name || "",
@@ -496,10 +499,25 @@ export default function ProviderValidationScreen() {
     setErrors((p) => ({ ...p, [field]: "" }));
   }
 
+  function rememberFieldPosition(field: string, y: number) {
+    fieldPositions.current[field] = y;
+  }
+
+  function focusField(field: string) {
+    const y = fieldPositions.current[field];
+    if (typeof y !== "number") return;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(y - 110, 0), animated: true });
+    });
+  }
+
   const transition = (next: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     Animated.timing(fadeAnim, { toValue: 0, duration: 140, useNativeDriver: true }).start(() => {
       setStep(next);
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      });
       Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
     });
   };
@@ -591,7 +609,7 @@ export default function ProviderValidationScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       cameraType: ImagePicker.CameraType.front,
       allowsEditing: true,
       aspect: [1, 1],
@@ -733,6 +751,7 @@ export default function ProviderValidationScreen() {
 
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 90 }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -750,20 +769,23 @@ export default function ProviderValidationScreen() {
                   <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.blue }}>CONTA</Text>
                 </View>
 
-                <Label text="NOME COMPLETO" required />
-                <StyledInput
-                  value={form.fullName}
-                  onChangeText={(t) => setField("fullName", sanitize(t))}
-                  placeholder="Nome e sobrenome"
-                  autoCapitalize="words"
-                  maxLength={100}
-                  error={errors.fullName}
-                  success={!errors.fullName && form.fullName.trim().split(/\s+/).filter((w) => w.length >= 2).length >= 2}
-                  hint="Como aparece nos seus documentos"
-                />
+                <View onLayout={(e) => rememberFieldPosition("fullName", e.nativeEvent.layout.y)}>
+                  <Label text="NOME COMPLETO" required />
+                  <StyledInput
+                    value={form.fullName}
+                    onChangeText={(t) => setField("fullName", sanitize(t))}
+                    placeholder="Nome e sobrenome"
+                    autoCapitalize="words"
+                    maxLength={100}
+                    error={errors.fullName}
+                    success={!errors.fullName && form.fullName.trim().split(/\s+/).filter((w) => w.length >= 2).length >= 2}
+                    hint="Como aparece nos seus documentos"
+                    onFocus={() => focusField("fullName")}
+                  />
+                </View>
 
                 <View style={{ flexDirection: "row", gap: 12 }}>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1 }} onLayout={(e) => rememberFieldPosition("cpf", e.nativeEvent.layout.y)}>
                     <Label text="CPF" required />
                     <StyledInput
                       value={form.cpf}
@@ -773,9 +795,10 @@ export default function ProviderValidationScreen() {
                       maxLength={14}
                       error={errors.cpf}
                       success={!errors.cpf && validateCPF(form.cpf)}
+                      onFocus={() => focusField("cpf")}
                     />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1 }} onLayout={(e) => rememberFieldPosition("birthDate", e.nativeEvent.layout.y)}>
                     <Label text="NASCIMENTO" required />
                     <StyledInput
                       value={form.birthDate}
@@ -786,21 +809,25 @@ export default function ProviderValidationScreen() {
                       error={errors.birthDate}
                       success={!errors.birthDate && validateDate(form.birthDate)}
                       hint="Mínimo 18 anos"
+                      onFocus={() => focusField("birthDate")}
                     />
                   </View>
                 </View>
 
-                <Label text="TELEFONE / WHATSAPP" required />
-                <StyledInput
-                  value={form.phone}
-                  onChangeText={(t) => setField("phone", maskPhone(t))}
-                  placeholder="(00) 00000-0000"
-                  keyboardType="phone-pad"
-                  maxLength={15}
-                  error={errors.phone}
-                  success={!errors.phone && form.phone.replace(/\D/g, "").length >= 10}
-                  hint="Com DDD — usado para contato de verificação"
-                />
+                <View onLayout={(e) => rememberFieldPosition("phone", e.nativeEvent.layout.y)}>
+                  <Label text="TELEFONE / WHATSAPP" required />
+                  <StyledInput
+                    value={form.phone}
+                    onChangeText={(t) => setField("phone", maskPhone(t))}
+                    placeholder="(00) 00000-0000"
+                    keyboardType="phone-pad"
+                    maxLength={15}
+                    error={errors.phone}
+                    success={!errors.phone && form.phone.replace(/\D/g, "").length >= 10}
+                    hint="Com DDD — usado para contato de verificação"
+                    onFocus={() => focusField("phone")}
+                  />
+                </View>
               </View>
             )}
 
@@ -841,7 +868,7 @@ export default function ProviderValidationScreen() {
                 />
 
                 <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
-                  <View style={{ flex: 2 }}>
+                  <View style={{ flex: 2 }} onLayout={(e) => rememberFieldPosition("vehicleModel", e.nativeEvent.layout.y)}>
                     <Label text="MODELO" required />
                     <StyledInput
                       value={form.vehicleModel}
@@ -851,9 +878,10 @@ export default function ProviderValidationScreen() {
                       maxLength={60}
                       error={errors.vehicleModel}
                       success={!errors.vehicleModel && form.vehicleModel.trim().length > 0}
+                      onFocus={() => focusField("vehicleModel")}
                     />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1 }} onLayout={(e) => rememberFieldPosition("vehicleYear", e.nativeEvent.layout.y)}>
                     <Label text="ANO" required />
                     <StyledInput
                       value={form.vehicleYear}
@@ -863,21 +891,25 @@ export default function ProviderValidationScreen() {
                       maxLength={4}
                       error={errors.vehicleYear}
                       success={!errors.vehicleYear && form.vehicleYear.length === 4 && parseInt(form.vehicleYear) >= 1990}
+                      onFocus={() => focusField("vehicleYear")}
                     />
                   </View>
                 </View>
 
-                <Label text="PLACA" required />
-                <StyledInput
-                  value={form.vehiclePlate}
-                  onChangeText={(t) => setField("vehiclePlate", maskPlate(t))}
-                  placeholder="ABC-1234"
-                  autoCapitalize="characters"
-                  maxLength={8}
-                  error={errors.vehiclePlate}
-                  success={!errors.vehiclePlate && validatePlate(form.vehiclePlate)}
-                  hint="Formato antigo (ABC-1234) ou Mercosul (ABC1D23)"
-                />
+                <View onLayout={(e) => rememberFieldPosition("vehiclePlate", e.nativeEvent.layout.y)}>
+                  <Label text="PLACA" required />
+                  <StyledInput
+                    value={form.vehiclePlate}
+                    onChangeText={(t) => setField("vehiclePlate", maskPlate(t))}
+                    placeholder="ABC-1234"
+                    autoCapitalize="characters"
+                    maxLength={8}
+                    error={errors.vehiclePlate}
+                    success={!errors.vehiclePlate && validatePlate(form.vehiclePlate)}
+                    hint="Formato antigo (ABC-1234) ou Mercosul (ABC1D23)"
+                    onFocus={() => focusField("vehiclePlate")}
+                  />
+                </View>
               </View>
             )}
 
@@ -903,21 +935,24 @@ export default function ProviderValidationScreen() {
                   error={errors.contactAvailability}
                 />
 
-                <Label text="OBSERVAÇÕES" />
-                <TextInput
-                  value={form.notes}
-                  onChangeText={(t) => setField("notes", sanitize(t))}
-                  placeholder="Informações adicionais para a equipe de validação (opcional)"
-                  placeholderTextColor={c.softMuted}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                  style={{
-                    minHeight: 110, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 14,
-                    fontSize: 14, fontFamily: fonts.sans.medium,
-                    backgroundColor: c.card, borderColor: c.border, color: c.text,
-                  }}
-                />
+                <View onLayout={(e) => rememberFieldPosition("notes", e.nativeEvent.layout.y)}>
+                  <Label text="OBSERVAÇÕES" />
+                  <TextInput
+                    value={form.notes}
+                    onChangeText={(t) => setField("notes", sanitize(t))}
+                    onFocus={() => focusField("notes")}
+                    placeholder="Informações adicionais para a equipe de validação (opcional)"
+                    placeholderTextColor={c.softMuted}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                    style={{
+                      minHeight: 110, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 14,
+                      fontSize: 14, fontFamily: fonts.sans.medium,
+                      backgroundColor: c.card, borderColor: c.border, color: c.text,
+                    }}
+                  />
+                </View>
               </View>
             )}
 

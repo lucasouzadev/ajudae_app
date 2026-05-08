@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useNotification } from "@/contexts/NotificationContext";
 
 interface ProfileOverlayProps {
   open: boolean;
@@ -24,6 +25,23 @@ const ITEMS_BASE = [
 ];
 
 function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Object.assign> }) {
+  const {
+    notifications,
+    backgroundLocation,
+    backgroundTrackingEnabled,
+    themeMode,
+    appLanguage,
+    notificationPreferences,
+    requestNotifications,
+    setBackgroundTrackingEnabled,
+    toggleThemeMode,
+    setAppLanguage,
+    setNotificationPreference,
+    openSettings,
+  } = usePermissions();
+  const { pushToken, isRegisteringPushToken, pushRegistrationError, refreshPushToken } = useNotification();
+  const [showDangerZone, setShowDangerZone] = useState(false);
+
   if (label === "Métodos de Pagamento") {
     return (
       <View style={subStyles.container}>
@@ -153,7 +171,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
       <View style={subStyles.container}>
         <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
           <View style={[subStyles.iconBox, { backgroundColor: `${c.success}18` }]}>
-            <Ionicons name="checkmark-shield" size={18} color={c.success} />
+            <Ionicons name="shield-checkmark" size={18} color={c.success} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[subStyles.rowLabel, { color: c.text }]}>PIN de segurança</Text>
@@ -204,94 +222,290 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
   }
 
   if (label === "Configurações") {
-    const { notifications, location, requestNotifications, requestLocation, openSettings } = usePermissions();
+    const languageOptions = [
+      { value: "pt-BR" as const, label: "PT" },
+      { value: "en-US" as const, label: "EN" },
+      { value: "es-ES" as const, label: "ES" },
+    ];
 
-    // Build a row descriptor for each OS permission toggle
-    type PermRow = {
+    const languageLabel =
+      appLanguage === "en-US"
+        ? "English"
+        : appLanguage === "es-ES"
+          ? "Español"
+          : "Português (Brasil)";
+
+    const deviceNotificationLabel = notifications.granted
+      ? isRegisteringPushToken
+        ? "Sincronizando dispositivo"
+        : pushToken
+          ? "Dispositivo conectado"
+          : "Permissão ativa"
+      : notifications.canAsk
+        ? "Toque para ativar"
+        : "Abrir ajustes do aparelho";
+
+    const handleNotificationCategoryToggle = async (
+      key: keyof typeof notificationPreferences,
+      nextValue: boolean,
+    ) => {
+      if (nextValue && !notifications.granted) {
+        if (!notifications.canAsk) {
+          openSettings();
+          return;
+        }
+        const granted = await requestNotifications();
+        if (!granted) {
+          return;
+        }
+      }
+      await setNotificationPreference(key, nextValue);
+    };
+
+    const notificationRows: Array<{
+      key: keyof typeof notificationPreferences;
       icon: React.ComponentProps<typeof Ionicons>["name"];
       label: string;
       sub: string;
-      granted: boolean;
-      canAsk: boolean;
-      onRequest: () => void;
-    };
-
-    const permRows: PermRow[] = [
+    }> = [
       {
-        icon: "notifications",
+        key: "orders" as const,
+        icon: "cube",
         label: "Notificações de pedidos",
-        sub: notifications.granted ? "Ativas" : notifications.canAsk ? "Toque para ativar" : "Abrir Configurações",
-        granted: notifications.granted,
-        canAsk: notifications.canAsk,
-        onRequest: notifications.canAsk ? requestNotifications : openSettings,
+        sub: "Novos pedidos, aceite, rota e conclusão",
       },
       {
-        icon: "location",
-        label: "Localização em segundo plano",
-        sub: location.granted ? "Ativa" : location.canAsk ? "Toque para ativar" : "Abrir Configurações",
-        granted: location.granted,
-        canAsk: location.canAsk,
-        onRequest: location.canAsk ? requestLocation : openSettings,
+        key: "messages" as const,
+        icon: "chatbubble-ellipses",
+        label: "Mensagens e chat",
+        sub: "Conversas com clientes e prestadores",
       },
-    ];
-
-    const staticRows = [
-      { icon: "moon" as const, label: "Modo escuro", sub: "Seguir tema do sistema", on: false },
-      { icon: "language" as const, label: "Idioma", sub: "Português (Brasil)", on: null as boolean | null },
+      {
+        key: "payments" as const,
+        icon: "card",
+        label: "Pagamentos e saques",
+        sub: "Autorizações, cobranças e repasses",
+      },
+      {
+        key: "account" as const,
+        icon: "shield-checkmark",
+        label: "Conta e segurança",
+        sub: "Verificações, PIN e alertas importantes",
+      },
+      {
+        key: "marketing" as const,
+        icon: "megaphone",
+        label: "Novidades e ofertas",
+        sub: "Campanhas, promoções e avisos comerciais",
+      },
     ];
 
     return (
       <View style={subStyles.container}>
-        {/* Permission-backed toggles */}
-        {permRows.map((item, i) => (
-          <Pressable key={i} onPress={() => item.onRequest()} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
-            <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
-              <Ionicons name={item.icon} size={18} color={item.granted ? c.success : c.sub} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[subStyles.rowLabel, { color: c.text }]}>{item.label}</Text>
-              <Text style={[subStyles.rowSub, { color: item.granted ? c.success : item.canAsk ? c.softMuted : "#F97316" }]}>
-                {item.sub}
-              </Text>
-            </View>
-            {!item.canAsk && !item.granted ? (
-              <Ionicons name="open-outline" size={16} color="#F97316" />
-            ) : (
-              <View style={[subStyles.miniSwitch, { backgroundColor: item.granted ? c.success : "#D4D0CB" }]}>
-                <View style={[subStyles.miniDot, { left: item.granted ? 14 : 2 }]} />
-              </View>
-            )}
-          </Pressable>
-        ))}
+        <Text style={[subStyles.sectionLabel, { color: c.softMuted }]}>Push</Text>
 
-        {/* Static preference rows */}
-        {staticRows.map((item, i) => (
-          <View key={i} style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
-            <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
-              <Ionicons name={item.icon} size={18} color={c.sub} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[subStyles.rowLabel, { color: c.text }]}>{item.label}</Text>
-              <Text style={[subStyles.rowSub, { color: c.softMuted }]}>{item.sub}</Text>
-            </View>
-            {item.on !== null ? (
-              <View style={[subStyles.miniSwitch, { backgroundColor: item.on ? c.success : "#D4D0CB" }]}>
-                <View style={[subStyles.miniDot, { left: item.on ? 14 : 2 }]} />
-              </View>
-            ) : (
-              <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
-            )}
-          </View>
-        ))}
-        <View style={[subStyles.row, { backgroundColor: "#FEF2F218", borderColor: "#E5373718" }]}>
-          <View style={[subStyles.iconBox, { backgroundColor: "#E5373718" }]}>
-            <Ionicons name="trash" size={18} color="#E53737" />
+        <Pressable
+          onPress={() => {
+            if (notifications.granted) return;
+            if (notifications.canAsk) {
+              requestNotifications();
+            } else {
+              openSettings();
+            }
+          }}
+          style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}
+        >
+          <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+            <Ionicons name="notifications" size={18} color={notifications.granted ? c.success : c.sub} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[subStyles.rowLabel, { color: "#E53737" }]}>Excluir conta</Text>
-            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Ação irreversível</Text>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Permissão do aparelho</Text>
+            <Text style={[subStyles.rowSub, { color: notifications.granted ? c.success : notifications.canAsk ? c.softMuted : "#F97316" }]}>
+              {deviceNotificationLabel}
+            </Text>
+            {pushRegistrationError ? (
+              <Text style={[subStyles.inlineHint, { color: "#F97316" }]}>{pushRegistrationError}</Text>
+            ) : null}
+          </View>
+          {notifications.granted ? (
+            <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
+              <Text style={[subStyles.badgeText, { color: c.success }]}>Ativo</Text>
+            </View>
+          ) : (
+            <Ionicons name={notifications.canAsk ? "chevron-forward" : "open-outline"} size={16} color={notifications.canAsk ? c.softMuted : "#F97316"} />
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => {
+            if (!notifications.granted) {
+              if (notifications.canAsk) {
+                requestNotifications();
+              } else {
+                openSettings();
+              }
+              return;
+            }
+            refreshPushToken();
+          }}
+          style={[subStyles.compactRow, { borderColor: c.border }]}
+        >
+          <Ionicons name="phone-portrait" size={16} color={c.sub} />
+          <Text style={[subStyles.compactRowText, { color: c.text }]}>
+            {notifications.granted
+              ? isRegisteringPushToken
+                ? "Atualizando dispositivo"
+                : "Atualizar dispositivo"
+              : "Ativar push no aparelho"}
+          </Text>
+        </Pressable>
+
+        {notificationRows.map((item) => {
+          const enabled = notificationPreferences[item.key];
+          return (
+            <Pressable
+              key={item.key}
+              onPress={() => {
+                handleNotificationCategoryToggle(item.key, !enabled);
+              }}
+              style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}
+            >
+              <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+                <Ionicons name={item.icon} size={18} color={enabled ? c.primaryDeep : c.sub} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[subStyles.rowLabel, { color: c.text }]}>{item.label}</Text>
+                <Text style={[subStyles.rowSub, { color: enabled ? c.sub : c.softMuted }]}>{item.sub}</Text>
+              </View>
+              <View style={[subStyles.miniSwitch, { backgroundColor: enabled ? c.success : "#D4D0CB" }]}>
+                <View style={[subStyles.miniDot, { left: enabled ? 14 : 2 }]} />
+              </View>
+            </Pressable>
+          );
+        })}
+
+        <Text style={[subStyles.sectionLabel, { color: c.softMuted }]}>Privacidade</Text>
+
+        <Pressable
+          onPress={() => {
+            setBackgroundTrackingEnabled(!backgroundTrackingEnabled);
+          }}
+          style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}
+        >
+          <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+            <Ionicons name="navigate" size={18} color={backgroundTrackingEnabled ? c.blue : c.sub} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Localização em segundo plano</Text>
+            <Text style={[subStyles.rowSub, { color: backgroundTrackingEnabled ? c.blue : backgroundLocation.canAsk ? c.softMuted : "#F97316" }]}>
+              {backgroundTrackingEnabled
+                ? "Ativa para rastreamento fora da tela"
+                : backgroundLocation.canAsk || backgroundLocation.granted
+                  ? "Desligada"
+                  : "Abrir ajustes do aparelho"}
+            </Text>
+          </View>
+          {(!backgroundLocation.canAsk && !backgroundLocation.granted && !backgroundTrackingEnabled) ? (
+            <Ionicons name="open-outline" size={16} color="#F97316" />
+          ) : (
+            <View style={[subStyles.miniSwitch, { backgroundColor: backgroundTrackingEnabled ? c.success : "#D4D0CB" }]}>
+              <View style={[subStyles.miniDot, { left: backgroundTrackingEnabled ? 14 : 2 }]} />
+            </View>
+          )}
+        </Pressable>
+
+        <Text style={[subStyles.sectionLabel, { color: c.softMuted }]}>Aparência</Text>
+
+        <Pressable
+          onPress={() => {
+            toggleThemeMode();
+          }}
+          style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}
+        >
+          <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+            <Ionicons name={themeMode === "dark" ? "moon" : "sunny"} size={18} color={themeMode === "dark" ? c.warning : c.primaryDeep} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Modo Escuro</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>
+              {themeMode === "dark" ? "Ativado" : "Desativado"}
+            </Text>
+          </View>
+          <View style={[subStyles.miniSwitch, { backgroundColor: themeMode === "dark" ? c.success : "#D4D0CB" }]}>
+            <View style={[subStyles.miniDot, { left: themeMode === "dark" ? 14 : 2 }]} />
+          </View>
+        </Pressable>
+
+        <View style={[subStyles.rowBlock, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={subStyles.rowBlockHeader}>
+            <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+              <Ionicons name="language" size={18} color={c.sub} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[subStyles.rowLabel, { color: c.text }]}>Idioma</Text>
+              <Text style={[subStyles.rowSub, { color: c.softMuted }]}>{languageLabel}</Text>
+            </View>
+          </View>
+          <View style={subStyles.optionRow}>
+            {languageOptions.map((item) => {
+              const active = item.value === appLanguage;
+              return (
+                <Pressable
+                  key={item.value}
+                  onPress={() => {
+                    setAppLanguage(item.value);
+                  }}
+                  style={[
+                    subStyles.languageChip,
+                    {
+                      backgroundColor: active ? c.text : c.card,
+                      borderColor: active ? c.text : c.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      subStyles.languageChipText,
+                      { color: active ? c.background : c.text },
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
+
+        <Text style={[subStyles.sectionLabel, { color: c.softMuted }]}>Conta</Text>
+
+        <Pressable
+          onPress={() => setShowDangerZone((value) => !value)}
+          style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}
+        >
+          <View style={[subStyles.iconBox, { backgroundColor: c.card }]}>
+            <Ionicons name="lock-closed" size={18} color={c.sub} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Privacidade e dados</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Ações sensíveis da conta</Text>
+          </View>
+          <Ionicons name={showDangerZone ? "chevron-up" : "chevron-down"} size={16} color={c.softMuted} />
+        </Pressable>
+
+        {showDangerZone ? (
+          <View style={[subStyles.dangerZone, { borderColor: "#E5373718", backgroundColor: "#FEF2F218" }]}>
+            <View style={[subStyles.row, { backgroundColor: "transparent", borderColor: "transparent", paddingHorizontal: 0, paddingVertical: 0 }]}>
+              <View style={[subStyles.iconBox, { backgroundColor: "#E5373718" }]}>
+                <Ionicons name="trash" size={18} color="#E53737" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[subStyles.rowLabel, { color: "#E53737" }]}>Excluir conta</Text>
+                <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Ação irreversível</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -313,27 +527,44 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
   const translateY = useRef(new Animated.Value(-1000)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(open);
 
   useEffect(() => {
     if (open) {
-      Animated.parallel([
-        Animated.timing(translateY, { toValue: 0, duration: 440, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
-        Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }),
-      ]).start();
-    } else {
-      setActiveMenu(null);
-      Animated.parallel([
-        Animated.timing(translateY, { toValue: -1000, duration: 320, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
-        Animated.timing(fade, { toValue: 0, duration: 260, useNativeDriver: true }),
-      ]).start();
+      setMounted(true);
+      translateY.stopAnimation();
+      fade.stopAnimation();
+      translateY.setValue(-1000);
+      fade.setValue(0);
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.timing(translateY, { toValue: 0, duration: 440, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
+          Animated.timing(fade, { toValue: 1, duration: 380, useNativeDriver: true }),
+        ]).start();
+      });
+      return;
     }
-  }, [open, translateY, fade]);
+
+    if (!mounted) return;
+
+    translateY.stopAnimation();
+    fade.stopAnimation();
+    Animated.parallel([
+      Animated.timing(translateY, { toValue: -1000, duration: 320, easing: Easing.bezier(0.32, 0.72, 0, 1), useNativeDriver: true }),
+      Animated.timing(fade, { toValue: 0, duration: 260, useNativeDriver: true }),
+    ]).start(() => {
+      setActiveMenu(null);
+      setMounted(false);
+    });
+  }, [open, mounted, translateY, fade]);
 
   const accent = role === "cliente" ? c.primary : c.blue;
   const roleLabel = role === "cliente" ? "Cliente" : "Prestador";
 
+  if (!mounted) return null;
+
   return (
-    <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View style={[styles.backdrop, { opacity: fade }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
@@ -502,6 +733,14 @@ const styles = StyleSheet.create({
 
 const subStyles = StyleSheet.create({
   container: { gap: 10 },
+  sectionLabel: {
+    fontSize: 11,
+    fontFamily: fonts.sans.bold,
+    letterSpacing: 0.4,
+    marginTop: 6,
+    marginBottom: 2,
+    textTransform: "uppercase",
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -519,12 +758,52 @@ const subStyles = StyleSheet.create({
   },
   rowLabel: { fontSize: 13, fontFamily: fonts.sans.semibold },
   rowSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  inlineHint: { fontSize: 10, fontFamily: fonts.sans.medium, marginTop: 6 },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
   },
   badgeText: { fontSize: 11, fontFamily: fonts.sans.bold },
+  compactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  compactRowText: { fontSize: 12, fontFamily: fonts.sans.semibold },
+  rowBlock: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+  },
+  rowBlockHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  optionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  languageChip: {
+    flex: 1,
+    height: 38,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  languageChipText: { fontSize: 12, fontFamily: fonts.sans.bold },
+  dangerZone: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+  },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",

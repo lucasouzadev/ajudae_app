@@ -30,16 +30,26 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 
 const ONBOARDING_KEY = "@ajudae_perm_onboarding_shown";
 
-type Step = "lgpd" | "location" | "notifications" | "done";
+type Step = "lgpd" | "notifications" | "location" | "background-location" | "done";
 
 export function PermissionGate() {
   const { isAuthenticated } = useAuth();
-  const { lgpdAccepted, location, notifications, ready, acceptLGPD, requestLocation, requestNotifications } = usePermissions();
+  const {
+    lgpdAccepted,
+    location,
+    backgroundLocation,
+    notifications,
+    ready,
+    acceptLGPD,
+    requestLocation,
+    requestBackgroundLocation,
+    requestNotifications,
+    setBackgroundTrackingEnabled,
+  } = usePermissions();
   const insets = useSafeAreaInsets();
   const c = colors.light;
 
   const [step, setStep] = useState<Step | null>(null);
-  const [onboardingShown, setOnboardingShown] = useState<boolean | null>(null);
 
   // ── Decide which step to show ──────────────────────────────────────────────
   useEffect(() => {
@@ -47,18 +57,17 @@ export function PermissionGate() {
 
     AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
       const shown = val === "1";
-      setOnboardingShown(shown);
 
       if (!lgpdAccepted) {
         setStep("lgpd");
       } else if (!shown) {
-        // First time after LGPD accepted — walk through permission steps
-        if (!location.granted && location.canAsk) {
-          setStep("location");
-        } else if (!notifications.granted && notifications.canAsk) {
+        if (!notifications.granted && notifications.canAsk) {
           setStep("notifications");
+        } else if (!location.granted && location.canAsk) {
+          setStep("location");
+        } else if (!backgroundLocation.granted && backgroundLocation.canAsk) {
+          setStep("background-location");
         } else {
-          // Nothing to ask — mark onboarding done
           AsyncStorage.setItem(ONBOARDING_KEY, "1");
           setStep("done");
         }
@@ -66,19 +75,29 @@ export function PermissionGate() {
         setStep("done");
       }
     });
-  }, [isAuthenticated, ready, lgpdAccepted]);
+  }, [isAuthenticated, ready, lgpdAccepted, notifications.granted, notifications.canAsk, location.granted, location.canAsk, backgroundLocation.granted, backgroundLocation.canAsk]);
 
-  // Advance from location step
-  const afterLocation = () => {
-    if (!notifications.granted && notifications.canAsk) {
-      setStep("notifications");
+  const afterNotifications = () => {
+    if (!location.granted && location.canAsk) {
+      setStep("location");
+    } else if (!backgroundLocation.granted && backgroundLocation.canAsk) {
+      setStep("background-location");
     } else {
       AsyncStorage.setItem(ONBOARDING_KEY, "1");
       setStep("done");
     }
   };
 
-  const afterNotifications = () => {
+  const afterLocation = () => {
+    if (!backgroundLocation.granted && backgroundLocation.canAsk) {
+      setStep("background-location");
+    } else {
+      AsyncStorage.setItem(ONBOARDING_KEY, "1");
+      setStep("done");
+    }
+  };
+
+  const afterBackgroundLocation = () => {
     AsyncStorage.setItem(ONBOARDING_KEY, "1");
     setStep("done");
   };
@@ -105,14 +124,39 @@ export function PermissionGate() {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               await acceptLGPD();
               // Proceed to permission requests
-              if (!location.granted && location.canAsk) {
-                setStep("location");
-              } else if (!notifications.granted && notifications.canAsk) {
+              if (!notifications.granted && notifications.canAsk) {
                 setStep("notifications");
+              } else if (!location.granted && location.canAsk) {
+                setStep("location");
+              } else if (!backgroundLocation.granted && backgroundLocation.canAsk) {
+                setStep("background-location");
               } else {
                 AsyncStorage.setItem(ONBOARDING_KEY, "1");
                 setStep("done");
               }
+            }}
+          />
+        )}
+
+        {step === "notifications" && (
+          <PermissionScreen
+            icon="notifications"
+            iconColor="#6366F1"
+            title="Notificações"
+            description={
+              "Ative as notificações para acompanhar pedidos, mensagens, pagamentos e alertas importantes da conta.\n\nDepois você consegue ajustar cada categoria nas Configurações."
+            }
+            allowLabel="Permitir notificações"
+            c={c}
+            insets={insets}
+            onAllow={async () => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await requestNotifications();
+              afterNotifications();
+            }}
+            onSkip={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              afterNotifications();
             }}
           />
         )}
@@ -140,25 +184,28 @@ export function PermissionGate() {
           />
         )}
 
-        {step === "notifications" && (
+        {step === "background-location" && (
           <PermissionScreen
-            icon="notifications"
-            iconColor="#6366F1"
-            title="Notificações"
+            icon="navigate"
+            iconColor="#0EA5E9"
+            title="Localização em segundo plano"
             description={
-              "Notificações de serviço mantêm você informado sobre o status do pedido, confirmações de PIN e atualizações de pagamento.\n\nVocê pode desativar a qualquer momento nas Configurações."
+              "Ative para continuar atualizando a sua rota e a do prestador mesmo quando o app estiver minimizado.\n\nVocê também pode desligar isso dentro das Configurações."
             }
-            allowLabel="Permitir notificações"
+            allowLabel="Ativar em segundo plano"
             c={c}
             insets={insets}
             onAllow={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              await requestNotifications();
-              afterNotifications();
+              const granted = await requestBackgroundLocation();
+              if (granted) {
+                await setBackgroundTrackingEnabled(true);
+              }
+              afterBackgroundLocation();
             }}
             onSkip={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              afterNotifications();
+              afterBackgroundLocation();
             }}
           />
         )}
