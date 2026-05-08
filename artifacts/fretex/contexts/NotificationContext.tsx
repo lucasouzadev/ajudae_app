@@ -19,6 +19,8 @@ if (Notifications) {
   try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
@@ -73,7 +75,10 @@ interface NotificationPayload {
 export interface NotificationContextType {
   hasPermission: boolean;
   pushToken: string | null;
+  isRegisteringPushToken: boolean;
+  pushRegistrationError: string | null;
   requestPermission: () => Promise<boolean>;
+  refreshPushToken: () => Promise<string | null>;
   send: (event: NotificationEvent, vars?: Vars) => Promise<void>;
 }
 
@@ -249,6 +254,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const { active } = useService();
   const { notifications, requestNotifications } = usePermissions();
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [isRegisteringPushToken, setIsRegisteringPushToken] = useState(false);
+  const [pushRegistrationError, setPushRegistrationError] = useState<string | null>(null);
 
   // Track previous service state to detect changes
   const prevStatus = useRef<ServiceStatus | null>(null);
@@ -259,16 +266,39 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => { roleRef.current = role; }, [role]);
 
+  const registerPushToken = async (force = false): Promise<string | null> => {
+    if (!Notifications || !notifications.granted) return null;
+    if (!force && pushToken) return pushToken;
+
+    const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
+    const easConfig = Constants.easConfig as { projectId?: string } | null | undefined;
+    const projectId = extra?.eas?.projectId ?? easConfig?.projectId;
+    if (!projectId) {
+      setPushRegistrationError("Projeto EAS sem projectId");
+      return null;
+    }
+
+    setIsRegisteringPushToken(true);
+    setPushRegistrationError(null);
+
+    try {
+      const token = await Notifications.getExpoPushTokenAsync({ projectId });
+      setPushToken(token.data);
+      return token.data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha ao gerar push token";
+      setPushRegistrationError(message);
+      setPushToken("local-only");
+      return "local-only";
+    } finally {
+      setIsRegisteringPushToken(false);
+    }
+  };
+
   // ── Request push token once notification permission is granted ────────────
   useEffect(() => {
     if (!Notifications || !notifications.granted || pushToken) return;
-    const projectId =
-      (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.eas?.projectId as
-        | string
-        | undefined;
-    Notifications.getExpoPushTokenAsync({ projectId })
-      .then((t) => setPushToken(t.data))
-      .catch(() => setPushToken("local-only")); // simulator fallback
+    registerPushToken().catch(() => {});
   }, [notifications.granted]);
 
   // ── Reactive service state watcher ────────────────────────────────────────
@@ -364,13 +394,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // ─────────────────────────────────────────────────────────────────────────────
 
   const requestPermission = requestNotifications;
+  const refreshPushToken = async (): Promise<string | null> => registerPushToken(true);
 
   const send = async (event: NotificationEvent, vars?: Vars): Promise<void> => {
     await fire(event, vars);
   };
 
   return (
-    <NotificationContext.Provider value={{ hasPermission: notifications.granted, pushToken, requestPermission, send }}>
+    <NotificationContext.Provider
+      value={{
+        hasPermission: notifications.granted,
+        pushToken,
+        isRegisteringPushToken,
+        pushRegistrationError,
+        requestPermission,
+        refreshPushToken,
+        send,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );

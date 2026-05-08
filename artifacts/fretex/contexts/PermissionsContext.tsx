@@ -57,6 +57,23 @@ function toOsPerm(status: string, canAskAgain: boolean): OsPermission {
   return { granted: status === "granted", canAsk: canAskAgain };
 }
 
+function toNotificationPerm(result: {
+  status: string;
+  canAskAgain: boolean;
+  ios?: { status?: number | null } | null;
+}): OsPermission {
+  const iosStatus = result.ios?.status;
+  const grantedOnIos =
+    iosStatus === Notifications?.IosAuthorizationStatus.AUTHORIZED ||
+    iosStatus === Notifications?.IosAuthorizationStatus.PROVISIONAL ||
+    iosStatus === Notifications?.IosAuthorizationStatus.EPHEMERAL;
+
+  return {
+    granted: result.status === "granted" || grantedOnIos,
+    canAsk: result.canAskAgain,
+  };
+}
+
 // ─── Context ───────────────────────────────────────────────────────────────────
 
 const PermissionsContext = createContext<PermissionsContextType | null>(null);
@@ -78,17 +95,31 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
 
   // ── Read all OS permission states ───────────────────────────────────────────
   const refresh = useCallback(async () => {
-    const results = await Promise.all([
+    const results = await Promise.allSettled([
       Location.getForegroundPermissionsAsync(),
       ImagePicker.getCameraPermissionsAsync(),
       ImagePicker.getMediaLibraryPermissionsAsync(),
       Notifications ? Notifications.getPermissionsAsync() : Promise.resolve({ status: "denied", canAskAgain: false }),
     ]);
     const [locResult, camResult, libResult, notifResult] = results;
-    setLocation(toOsPerm(locResult.status, locResult.canAskAgain));
-    setCamera(toOsPerm(camResult.status, camResult.canAskAgain));
-    setMediaLibrary(toOsPerm(libResult.status, libResult.canAskAgain));
-    setNotifications(toOsPerm(notifResult.status, notifResult.canAskAgain));
+
+    if (locResult.status === "fulfilled") {
+      setLocation(toOsPerm(locResult.value.status, locResult.value.canAskAgain));
+    }
+
+    if (camResult.status === "fulfilled") {
+      setCamera(toOsPerm(camResult.value.status, camResult.value.canAskAgain));
+    }
+
+    if (libResult.status === "fulfilled") {
+      setMediaLibrary(toOsPerm(libResult.value.status, libResult.value.canAskAgain));
+    }
+
+    if (notifResult.status === "fulfilled") {
+      setNotifications(toNotificationPerm(notifResult.value));
+    } else {
+      setNotifications(DENIED);
+    }
   }, []);
 
   // ── Bootstrap: read OS states + resolve LGPD from DB / AsyncStorage ─────────
@@ -167,33 +198,66 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   // ── Request functions ────────────────────────────────────────────────────────
 
   const requestLocation = async (): Promise<boolean> => {
-    const result = await Location.requestForegroundPermissionsAsync();
-    const perm = toOsPerm(result.status, result.canAskAgain);
-    setLocation(perm);
-    return perm.granted;
+    try {
+      const result = await Location.requestForegroundPermissionsAsync();
+      const perm = toOsPerm(result.status, result.canAskAgain);
+      setLocation(perm);
+      return perm.granted;
+    } catch (error) {
+      console.warn("[PermissionsContext] requestLocation failed:", (error as Error).message);
+      return false;
+    }
   };
 
   const requestCamera = async (): Promise<boolean> => {
-    const result = await ImagePicker.requestCameraPermissionsAsync();
-    const perm = toOsPerm(result.status, result.canAskAgain);
-    setCamera(perm);
-    return perm.granted;
+    try {
+      const result = await ImagePicker.requestCameraPermissionsAsync();
+      const perm = toOsPerm(result.status, result.canAskAgain);
+      setCamera(perm);
+      return perm.granted;
+    } catch (error) {
+      console.warn("[PermissionsContext] requestCamera failed:", (error as Error).message);
+      return false;
+    }
   };
 
   const requestMediaLibrary = async (): Promise<boolean> => {
-    const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    const perm = toOsPerm(result.status, result.canAskAgain);
-    setMediaLibrary(perm);
-    return perm.granted;
+    try {
+      const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const perm = toOsPerm(result.status, result.canAskAgain);
+      setMediaLibrary(perm);
+      return perm.granted;
+    } catch (error) {
+      console.warn("[PermissionsContext] requestMediaLibrary failed:", (error as Error).message);
+      return false;
+    }
   };
 
   const requestNotifications = async (): Promise<boolean> => {
     if (!Notifications) return false; // notifications not available in dev
-    await setupAndroidNotificationChannels();
-    const result = await Notifications.requestPermissionsAsync();
-    const perm = toOsPerm(result.status, result.canAskAgain);
-    setNotifications(perm);
-    return perm.granted;
+    try {
+      await setupAndroidNotificationChannels();
+      const current = await Notifications.getPermissionsAsync();
+      if (toNotificationPerm(current).granted || !current.canAskAgain) {
+        const perm = toNotificationPerm(current);
+        setNotifications(perm);
+        return perm.granted;
+      }
+
+      const result = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+        },
+      });
+      const perm = toNotificationPerm(result);
+      setNotifications(perm);
+      return perm.granted;
+    } catch (error) {
+      console.warn("[PermissionsContext] requestNotifications failed:", (error as Error).message);
+      return false;
+    }
   };
 
   const acceptLGPD = async (): Promise<void> => {

@@ -85,11 +85,9 @@ export function PermissionGate() {
 
   if (!step || step === "done") return null;
 
-  const visible = step !== "done";
-
   return (
     <Modal
-      visible={visible}
+      visible
       transparent={false}
       animationType="slide"
       statusBarTranslucent

@@ -9,6 +9,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native
 import * as Location from "expo-location";
 import { ProviderPin } from "./ProviderPin";
 import type { Category } from "@/constants/mockData";
+import { usePermissions } from "@/contexts/PermissionsContext";
 
 const isGoogle = process.env.EXPO_PUBLIC_MAP_PROVIDER === "google";
 const MAP_PROVIDER = isGoogle ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
@@ -44,14 +45,15 @@ const RIO_DEFAULT = {
 
 export const MapReal = forwardRef<MapRealRef, MapRealProps>(
   ({ pins, activeId, onPinPress }, ref) => {
+    const { location, requestLocation } = usePermissions();
     const mapRef = useRef<MapView>(null);
     const [region, setRegion] = useState(RIO_DEFAULT);
     const regionRef = useRef(RIO_DEFAULT);
 
     useImperativeHandle(ref, () => ({
       recenter: async () => {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
+        const granted = location.granted || await requestLocation();
+        if (!granted) return;
         const loc = await Location.getCurrentPositionAsync({});
         const newRegion = {
           latitude: loc.coords.latitude,
@@ -79,7 +81,7 @@ export const MapReal = forwardRef<MapRealRef, MapRealProps>(
         provider={MAP_PROVIDER}
         style={StyleSheet.absoluteFill}
         initialRegion={region}
-        showsUserLocation
+        showsUserLocation={location.granted}
         showsMyLocationButton={false}
         showsCompass={false}
         toolbarEnabled={false}

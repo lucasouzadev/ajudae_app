@@ -18,6 +18,7 @@ const QUICK = [
   { icon: "card" as const, label: "Cobrança", color: "#16A34A", lib: "ion" as const },
   { icon: "lock-closed" as const, label: "Segurança", color: "#2563EB" },
   { icon: "chatbubbles" as const, label: "Chat com agente", color: "#9333EA" },
+  { icon: "notifications" as const, label: "Teste push", color: "#7C3AED" },
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string; label: string }> = {
@@ -87,6 +88,7 @@ export default function SupportScreen() {
                 else if (q.label === "Chat com agente") router.push({ pathname: "/chat", params: { id: "support", name: "Suporte Ajudaê", ini: "SA", color: "#FF5500", type: "support" } } as any);
                 else if (q.label === "Cobrança") router.push({ pathname: "/chat", params: { id: "financial", name: "Suporte Financeiro", ini: "SF", color: "#16A34A", type: "financial" } } as any);
                 else if (q.label === "Segurança") router.push("/ticket");
+                else if (q.label === "Teste push") router.push("/push-test" as never);
               }}
               style={[styles.quickCell, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
             >
