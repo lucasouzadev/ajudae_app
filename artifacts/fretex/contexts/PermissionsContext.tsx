@@ -22,14 +22,10 @@ try {
     Notifications = require("expo-notifications");
   }
 } catch (e) {
-  // expo-notifications not available in dev
 }
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface OsPermission {
   granted: boolean;
-  /** false when permanently denied — must open OS Settings to change */
   canAsk: boolean;
 }
 
@@ -44,7 +40,6 @@ export interface PermissionsState {
   themeMode: ThemeMode;
   appLanguage: AppLanguage;
   notificationPreferences: NotificationPreferences;
-  /** true once the initial OS read is done */
   ready: boolean;
 }
 
@@ -74,17 +69,17 @@ export interface PermissionsContextType extends PermissionsState {
     key: NotificationPreferenceKey,
     enabled: boolean,
   ) => Promise<void>;
+  resetPermissionSettings: () => Promise<void>;
   openSettings: () => void;
   refresh: () => Promise<void>;
 }
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 const LGPD_KEY = "@ajudae_lgpd_accepted";
 const THEME_MODE_KEY = "@ajudae_theme_mode";
 const APP_LANGUAGE_KEY = "@ajudae_app_language";
 const BG_TRACKING_KEY = "@ajudae_background_tracking_enabled";
 const NOTIFICATION_PREFS_KEY = "@ajudae_notification_preferences";
+const PERMISSION_ONBOARDING_KEY = "@ajudae_perm_onboarding_shown";
 const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   orders: true,
   messages: true,
@@ -120,8 +115,6 @@ function applyTheme(mode: ThemeMode) {
   Object.assign(colors.light, mode === "dark" ? DARK_PALETTE : LIGHT_PALETTE);
 }
 
-// ─── Context ───────────────────────────────────────────────────────────────────
-
 const PermissionsContext = createContext<PermissionsContextType | null>(null);
 
 const DENIED: OsPermission = { granted: false, canAsk: false };
@@ -145,7 +138,6 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
 
   const appState = useRef(AppState.currentState);
 
-  // ── Read all OS permission states ───────────────────────────────────────────
   const refresh = useCallback(async () => {
     const results = await Promise.allSettled([
       Location.getForegroundPermissionsAsync(),
@@ -179,14 +171,12 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  // ── Bootstrap: read OS states + resolve LGPD from DB / AsyncStorage ─────────
   useEffect(() => {
     let mounted = true;
 
     async function boot() {
       await refresh();
 
-      // LGPD: DB is source of truth when authenticated; AsyncStorage is fallback
       let accepted = false;
       const [storedTheme, storedLanguage, storedBgTracking, storedNotificationPrefs] =
         await Promise.all([
@@ -214,12 +204,39 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
         }
       }
 
+      let nextThemeMode: ThemeMode = resolvedTheme;
+      let nextLanguage: AppLanguage = resolvedLanguage;
+      let nextBackgroundTracking = resolvedBgTracking;
+      let nextNotificationPrefs = resolvedNotificationPrefs;
+
       if (isAuthenticated && user) {
         accepted = user.lgpd_accepted ?? false;
         if (!accepted) {
-          // also check local cache (e.g. accepted before profile loaded)
           const cached = await AsyncStorage.getItem(LGPD_KEY);
           if (cached === "1") accepted = true;
+        }
+
+        if (user.theme_mode === "dark" || user.theme_mode === "light") {
+          nextThemeMode = user.theme_mode;
+        }
+
+        if (
+          user.app_language === "pt-BR" ||
+          user.app_language === "en-US" ||
+          user.app_language === "es-ES"
+        ) {
+          nextLanguage = user.app_language;
+        }
+
+        if (typeof user.background_tracking_enabled === "boolean") {
+          nextBackgroundTracking = user.background_tracking_enabled;
+        }
+
+        if (user.notification_preferences) {
+          nextNotificationPrefs = {
+            ...DEFAULT_NOTIFICATION_PREFERENCES,
+            ...user.notification_preferences,
+          };
         }
       } else {
         const cached = await AsyncStorage.getItem(LGPD_KEY);
@@ -227,11 +244,11 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       }
 
       if (mounted) {
-        applyTheme(resolvedTheme);
-        setThemeModeState(resolvedTheme);
-        setAppLanguageState(resolvedLanguage);
-        setBackgroundTrackingEnabledState(resolvedBgTracking);
-        setNotificationPreferencesState(resolvedNotificationPrefs);
+        applyTheme(nextThemeMode);
+        setThemeModeState(nextThemeMode);
+        setAppLanguageState(nextLanguage);
+        setBackgroundTrackingEnabledState(nextBackgroundTracking);
+        setNotificationPreferencesState(nextNotificationPrefs);
         setLgpdAccepted(accepted);
         setReady(true);
       }
@@ -239,9 +256,8 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
 
     boot();
     return () => { mounted = false; };
-  }, [isAuthenticated, user?.id]); // re-run when auth state changes
+  }, [isAuthenticated, user?.id, user?.updated_at]);
 
-  // ── Re-read OS states when app returns to foreground ────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextState) => {
       if (
@@ -261,7 +277,6 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     setBackgroundTrackingEnabledState(false);
   }, [ready, backgroundLocation.granted, backgroundTrackingEnabled]);
 
-  // ── Sync permission states to Supabase whenever they change ─────────────────
   useEffect(() => {
     if (!ready || !isAuthenticated || !user) return;
 
@@ -272,6 +287,10 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
         camera_requested: camera.granted || mediaLibrary.granted,
         notifications_requested: notifications.granted,
         lgpd_accepted: lgpdAccepted,
+        theme_mode: themeMode,
+        app_language: appLanguage,
+        background_tracking_enabled: backgroundTrackingEnabled,
+        notification_preferences: notificationPreferences,
         last_consent_update: new Date().toISOString(),
       })
       .eq("id", user.id)
@@ -288,9 +307,11 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     mediaLibrary.granted,
     notifications.granted,
     lgpdAccepted,
+    themeMode,
+    appLanguage,
+    backgroundTrackingEnabled,
+    notificationPreferences,
   ]);
-
-  // ── Request functions ────────────────────────────────────────────────────────
 
   const requestLocation = async (): Promise<boolean> => {
     try {
@@ -349,7 +370,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   };
 
   const requestNotifications = async (): Promise<boolean> => {
-    if (!Notifications) return false; // notifications not available in dev
+    if (!Notifications) return false;
     try {
       await setupAndroidNotificationChannels();
       const current = await Notifications.getPermissionsAsync();
@@ -429,9 +450,33 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     key: NotificationPreferenceKey,
     enabled: boolean,
   ): Promise<void> => {
+    if (enabled && !notifications.granted) {
+      if (notifications.canAsk) {
+        const granted = await requestNotifications();
+        if (!granted) {
+          return;
+        }
+      } else {
+        openSettings();
+        return;
+      }
+    }
+
     const next = { ...notificationPreferences, [key]: enabled };
     setNotificationPreferencesState(next);
     await AsyncStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(next));
+  };
+
+  const resetPermissionSettings = async (): Promise<void> => {
+    await AsyncStorage.multiRemove([
+      BG_TRACKING_KEY,
+      NOTIFICATION_PREFS_KEY,
+      PERMISSION_ONBOARDING_KEY,
+    ]);
+
+    setBackgroundTrackingEnabledState(false);
+    setNotificationPreferencesState(DEFAULT_NOTIFICATION_PREFERENCES);
+    await refresh();
   };
 
   const openSettings = () => Linking.openSettings();
@@ -461,6 +506,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
         toggleThemeMode,
         setAppLanguage,
         setNotificationPreference,
+        resetPermissionSettings,
         openSettings,
         refresh,
       }}
@@ -476,10 +522,8 @@ export function usePermissions() {
   return ctx;
 }
 
-// ─── Android channel setup (shared with NotificationContext) ─────────────────
-
 async function setupAndroidNotificationChannels() {
-  if (!Notifications) return; // notifications not available in dev
+  if (!Notifications) return;
   const { Platform } = await import("react-native");
   if (Platform.OS !== "android") return;
   await Promise.all([

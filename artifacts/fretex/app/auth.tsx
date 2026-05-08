@@ -83,6 +83,7 @@ function passwordStrength(p: string): StrengthLevel {
 
 function mapAuthError(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes("já está vinculado") || msg.includes("CPF já utilizado")) return msg;
   if (msg.includes("Invalid login credentials"))  return "E-mail ou senha incorretos.";
   if (msg.includes("Email not confirmed"))         return "Confirme seu e-mail antes de entrar.";
   if (msg.includes("already registered") || msg.includes("already been registered"))

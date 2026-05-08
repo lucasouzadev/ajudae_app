@@ -1,5 +1,6 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Image,
@@ -21,8 +22,8 @@ import * as Haptics from "expo-haptics";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
-/* ─── Types ────────────────────────────────────────────────────────────────── */
 type ServiceType = "frete" | "mudanca" | "entrega";
 type ContactMethod = "ligacao" | "whatsapp";
 type VehicleType = "car" | "utility" | "van" | "truck_small" | "truck_large";
@@ -49,7 +50,6 @@ interface FormState {
   docSelfie: string;
 }
 
-/* ─── Constants ────────────────────────────────────────────────────────────── */
 const SERVICE_TYPES = [
   { value: "frete" as ServiceType, icon: "🚚", label: "Frete", desc: "Transporte leve a médio" },
   { value: "mudanca" as ServiceType, icon: "📦", label: "Mudança", desc: "Residencial ou comercial" },
@@ -92,7 +92,6 @@ const CONTACT_METHODS = [
   { value: "ligacao" as ContactMethod, icon: "call", label: "Ligação telefônica" },
 ];
 
-/* ─── Masks & validators ───────────────────────────────────────────────────── */
 function sanitize(raw: string) {
   return raw.replace(/<[^>]*>/g, "").replace(/[<>"'`\\]/g, "").trimStart();
 }
@@ -153,7 +152,31 @@ function validatePlate(raw: string): boolean {
   return /^[A-Z]{3}\d{4}$/.test(v) || /^[A-Z]{3}\d[A-Z]\d{2}$/.test(v);
 }
 
-/* ─── Sub-components ───────────────────────────────────────────────────────── */
+function hasSubmittedProviderData(provider: {
+  onboarding_status?: string | null;
+  submitted_at?: string | null;
+  doc_rg_url?: string | null;
+  doc_residence_url?: string | null;
+  doc_cnh_url?: string | null;
+  doc_selfie_url?: string | null;
+} | null) {
+  if (!provider) {
+    return false;
+  }
+
+  if (provider.onboarding_status === "submitted") {
+    return true;
+  }
+
+  return Boolean(
+    provider.submitted_at ||
+      provider.doc_rg_url ||
+      provider.doc_residence_url ||
+      provider.doc_cnh_url ||
+      provider.doc_selfie_url,
+  );
+}
+
 const ERROR_COLOR = "#DC2626";
 
 function FieldError({ msg }: { msg?: string }) {
@@ -365,7 +388,6 @@ function DocPickerRow({
       </Pressable>
       {error && <FieldError msg={error} />}
 
-      {/* Source picker modal for selfie */}
       <Modal visible={showSourcePicker} transparent animationType="fade" onRequestClose={() => setShowSourcePicker(false)}>
         <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }} onPress={() => setShowSourcePicker(false)}>
           <View style={{ backgroundColor: c.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 }}>
@@ -440,12 +462,7 @@ function StepProgress({ step, total }: { step: number; total: number }) {
   );
 }
 
-/* ─── Step labels ──────────────────────────────────────────────────────────── */
 const STEP_LABELS = ["Dados pessoais", "Serviço e veículo", "Contato", "Documentos", "Revisão"];
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   Main screen
-   ══════════════════════════════════════════════════════════════════════════════ */
 export default function ProviderValidationScreen() {
   const c = colors.light;
   const insets = useSafeAreaInsets();
@@ -480,6 +497,16 @@ export default function ProviderValidationScreen() {
   }), [user]);
 
   const [form, setForm] = useState<FormState>(initialForm);
+  const providerStatus = user?.provider?.onboarding_status ?? "incomplete";
+  const providerRejected = providerStatus === "rejected";
+  const providerReviewOnly =
+    Boolean(user?.provider?.verified) ||
+    providerStatus === "approved" ||
+    (hasSubmittedProviderData(user?.provider ?? null) && providerStatus !== "rejected");
+
+  useEffect(() => {
+    setForm(initialForm);
+  }, [initialForm]);
 
   if (!user || role !== "prestador") {
     return (
@@ -522,7 +549,6 @@ export default function ProviderValidationScreen() {
     });
   };
 
-  /* ── Step validators ── */
   function validateStep1(): boolean {
     const e: Record<string, string> = {};
     if (!form.fullName.trim() || form.fullName.trim().split(/\s+/).filter((w) => w.length >= 2).length < 2)
@@ -585,7 +611,6 @@ export default function ProviderValidationScreen() {
     else router.back();
   }
 
-  /* ── Image pickers ── */
   async function pickFromGallery(field: keyof Pick<FormState, "docRg" | "docResidence" | "docCnh" | "docCrlv" | "docSelfie">) {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (perm.status !== "granted") {
@@ -620,7 +645,6 @@ export default function ProviderValidationScreen() {
     }
   }
 
-  /* ── Submit ── */
   async function uploadDocument(name: string, value: string) {
     if (!/^(file|content|ph):/i.test(value)) return value;
     let response: Response;
@@ -641,9 +665,8 @@ export default function ProviderValidationScreen() {
   }
 
   async function handleSubmit() {
-    if (submitting) return;
+    if (submitting || providerReviewOnly) return;
     setSubmitting(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     try {
       const [docRg, docResidence, docCnh, docCrlv, docSelfie] = await Promise.all([
         uploadDocument("rg", form.docRg),
@@ -678,6 +701,7 @@ export default function ProviderValidationScreen() {
 
       if (error) throw error;
       await refreshUser();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Alert.alert("Validação enviada", "Recebemos seus documentos. Você será notificado por e-mail em até 24h.");
       router.replace("/");
     } catch (err) {
@@ -688,7 +712,6 @@ export default function ProviderValidationScreen() {
     }
   }
 
-  /* ── Review helper ── */
   const reviewSections = [
     {
       icon: "👤", title: "Dados pessoais",
@@ -729,10 +752,86 @@ export default function ProviderValidationScreen() {
     },
   ];
 
+  const reviewStatusTitle =
+    providerStatus === "approved" || providerUser.provider?.verified
+      ? "Conta verificada"
+      : "Validação em análise";
+  const reviewStatusText =
+    providerStatus === "approved" || providerUser.provider?.verified
+      ? "Sua conta está liberada. Este painel mostra a última validação enviada."
+      : "Recebemos sua validação e ela está aguardando análise da equipe.";
+
+  if (providerReviewOnly) {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.background, paddingTop: insets.top + 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 24, marginBottom: 16 }}>
+          <Pressable onPress={() => router.replace("/")} style={[st.backBtn, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Ionicons name="chevron-back" size={18} color={c.text} />
+          </Pressable>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.8 }}>VALIDAÇÃO DE PRESTADOR</Text>
+            <Text style={{ fontSize: 13, fontFamily: fonts.sans.medium, color: c.sub }}>Visualização do envio</Text>
+          </View>
+          <View style={[st.pill, { backgroundColor: `${c.blue}14`, borderColor: `${c.blue}44` }]}>
+            <Ionicons
+              name={providerStatus === "approved" || providerUser.provider?.verified ? "checkmark-circle-outline" : "time-outline"}
+              size={11}
+              color={c.blue}
+            />
+            <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.blue }}>
+              {providerStatus === "approved" || providerUser.provider?.verified ? "Aprovada" : "Enviada"}
+            </Text>
+          </View>
+        </View>
+
+        <KeyboardAwareScrollViewCompat
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 32 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[st.infoBox, { backgroundColor: `${c.blue}12`, borderColor: `${c.blue}30`, marginTop: 4, marginBottom: 16 }]}>
+            <Ionicons
+              name={providerStatus === "approved" || providerUser.provider?.verified ? "shield-checkmark" : "time-outline"}
+              size={16}
+              color={c.blue}
+            />
+            <Text style={{ flex: 1, fontSize: 12, fontFamily: fonts.sans.regular, color: c.text, lineHeight: 18 }}>
+              <Text style={{ fontFamily: fonts.sans.bold }}>{reviewStatusTitle}. </Text>
+              {reviewStatusText}
+            </Text>
+          </View>
+
+          {reviewSections.map((section) => (
+            <View key={section.title} style={[st.reviewCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text, marginBottom: 10 }}>
+                {section.icon} {section.title}
+              </Text>
+              {section.rows.map(([label, value]) => (
+                <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.borderLight }}>
+                  <Text style={{ fontSize: 12, fontFamily: fonts.sans.regular, color: c.softMuted }}>{label}</Text>
+                  <Text style={{ fontSize: 12, fontFamily: fonts.sans.medium, color: c.text, maxWidth: "60%", textAlign: "right" }}>
+                    {value || "—"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+
+          <Pressable
+            onPress={() => router.replace("/")}
+            style={[st.submitBtn, { backgroundColor: c.blue, marginTop: 12 }, shadows.md]}
+          >
+            <Text style={st.submitBtnTxt}>Voltar para a home</Text>
+            <Ionicons name="home-outline" size={16} color="#fff" />
+          </Pressable>
+        </KeyboardAwareScrollViewCompat>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.background }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={{ flex: 1, paddingTop: insets.top + 8 }}>
-        {/* Header */}
         <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 24, marginBottom: 16 }}>
           <Pressable onPress={goBack} style={[st.backBtn, { backgroundColor: c.card, borderColor: c.border }]}>
             <Ionicons name="chevron-back" size={18} color={c.text} />
@@ -750,14 +849,23 @@ export default function ProviderValidationScreen() {
         <StepProgress step={step} total={5} />
 
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-          <ScrollView
+          <KeyboardAwareScrollViewCompat
             ref={scrollRef}
+            bottomOffset={insets.bottom + 110}
             contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 90 }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {providerRejected && providerUser.provider?.rejection_reason ? (
+              <View style={[st.infoBox, { backgroundColor: "#FEF2F2", borderColor: "#FECACA", marginBottom: 14 }]}>
+                <Ionicons name="alert-circle-outline" size={16} color={ERROR_COLOR} />
+                <Text style={{ flex: 1, fontSize: 12, fontFamily: fonts.sans.regular, color: c.text, lineHeight: 18 }}>
+                  <Text style={{ fontFamily: fonts.sans.bold, color: ERROR_COLOR }}>Validação anterior recusada. </Text>
+                  {providerUser.provider.rejection_reason}
+                </Text>
+              </View>
+            ) : null}
 
-            {/* ── STEP 1: Dados pessoais ── */}
             {step === 1 && (
               <View>
                 <Text style={[st.title, { color: c.text }]}>Dados pessoais</Text>
@@ -831,41 +939,54 @@ export default function ProviderValidationScreen() {
               </View>
             )}
 
-            {/* ── STEP 2: Serviço e veículo ── */}
             {step === 2 && (
               <View>
                 <Text style={[st.title, { color: c.text }]}>Serviço e veículo</Text>
                 <Text style={[st.sub, { color: c.sub }]}>Defina o tipo de serviço que você oferece e os dados do seu veículo.</Text>
 
-                <Label text="TIPO DE SERVIÇO" required />
-                <ServiceTypeCard
-                  options={SERVICE_TYPES}
-                  value={form.serviceType}
-                  onSelect={(v) => { setField("serviceType", v as ServiceType); setField("serviceCategory", ""); }}
-                  error={errors.serviceType}
-                />
+                <View onLayout={(e) => rememberFieldPosition("serviceType", e.nativeEvent.layout.y)}>
+                  <Label text="TIPO DE SERVIÇO" required />
+                  <ServiceTypeCard
+                    options={SERVICE_TYPES}
+                    value={form.serviceType}
+                    onSelect={(v) => {
+                      focusField("serviceType");
+                      setField("serviceType", v as ServiceType);
+                      setField("serviceCategory", "");
+                    }}
+                    error={errors.serviceType}
+                  />
+                </View>
 
                 {form.serviceType && (
-                  <>
+                  <View onLayout={(e) => rememberFieldPosition("serviceCategory", e.nativeEvent.layout.y)}>
                     <Label text="CATEGORIA" required />
                     <RadioRow
                       options={SERVICE_CATEGORIES[form.serviceType as ServiceType] || []}
                       value={form.serviceCategory}
-                      onSelect={(v) => setField("serviceCategory", v)}
+                      onSelect={(v) => {
+                        focusField("serviceCategory");
+                        setField("serviceCategory", v);
+                      }}
                       error={errors.serviceCategory}
                     />
-                  </>
+                  </View>
                 )}
 
                 <View style={[st.divider, { borderColor: c.border }]} />
 
-                <Label text="TIPO DE VEÍCULO" required />
-                <RadioRow
-                  options={VEHICLE_TYPES.map((v) => ({ ...v, icon: undefined, label: `${v.icon} ${v.label}` }))}
-                  value={form.vehicleType}
-                  onSelect={(v) => setField("vehicleType", v as VehicleType)}
-                  error={errors.vehicleType}
-                />
+                <View onLayout={(e) => rememberFieldPosition("vehicleType", e.nativeEvent.layout.y)}>
+                  <Label text="TIPO DE VEÍCULO" required />
+                  <RadioRow
+                    options={VEHICLE_TYPES.map((v) => ({ ...v, icon: undefined, label: `${v.icon} ${v.label}` }))}
+                    value={form.vehicleType}
+                    onSelect={(v) => {
+                      focusField("vehicleType");
+                      setField("vehicleType", v as VehicleType);
+                    }}
+                    error={errors.vehicleType}
+                  />
+                </View>
 
                 <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
                   <View style={{ flex: 2 }} onLayout={(e) => rememberFieldPosition("vehicleModel", e.nativeEvent.layout.y)}>
@@ -913,27 +1034,36 @@ export default function ProviderValidationScreen() {
               </View>
             )}
 
-            {/* ── STEP 3: Contato ── */}
             {step === 3 && (
               <View>
                 <Text style={[st.title, { color: c.text }]}>Contato e disponibilidade</Text>
                 <Text style={[st.sub, { color: c.sub }]}>Como prefere ser contatado pela nossa equipe antes da aprovação?</Text>
 
-                <Label text="MÉTODO PREFERIDO" required />
-                <RadioRow
-                  options={CONTACT_METHODS.map((m) => ({ ...m, icon: m.icon }))}
-                  value={form.contactMethod}
-                  onSelect={(v) => setField("contactMethod", v as ContactMethod)}
-                  error={errors.contactMethod}
-                />
+                <View onLayout={(e) => rememberFieldPosition("contactMethod", e.nativeEvent.layout.y)}>
+                  <Label text="MÉTODO PREFERIDO" required />
+                  <RadioRow
+                    options={CONTACT_METHODS.map((m) => ({ ...m, icon: m.icon }))}
+                    value={form.contactMethod}
+                    onSelect={(v) => {
+                      focusField("contactMethod");
+                      setField("contactMethod", v as ContactMethod);
+                    }}
+                    error={errors.contactMethod}
+                  />
+                </View>
 
-                <Label text="DISPONIBILIDADE PARA CONTATO" required />
-                <RadioRow
-                  options={AVAILABILITY_OPTIONS}
-                  value={form.contactAvailability}
-                  onSelect={(v) => setField("contactAvailability", v as Availability)}
-                  error={errors.contactAvailability}
-                />
+                <View onLayout={(e) => rememberFieldPosition("contactAvailability", e.nativeEvent.layout.y)}>
+                  <Label text="DISPONIBILIDADE PARA CONTATO" required />
+                  <RadioRow
+                    options={AVAILABILITY_OPTIONS}
+                    value={form.contactAvailability}
+                    onSelect={(v) => {
+                      focusField("contactAvailability");
+                      setField("contactAvailability", v as Availability);
+                    }}
+                    error={errors.contactAvailability}
+                  />
+                </View>
 
                 <View onLayout={(e) => rememberFieldPosition("notes", e.nativeEvent.layout.y)}>
                   <Label text="OBSERVAÇÕES" />
@@ -956,7 +1086,6 @@ export default function ProviderValidationScreen() {
               </View>
             )}
 
-            {/* ── STEP 4: Documentos ── */}
             {step === 4 && (
               <View>
                 <Text style={[st.title, { color: c.text }]}>Documentos</Text>
@@ -1035,7 +1164,6 @@ export default function ProviderValidationScreen() {
               </View>
             )}
 
-            {/* ── STEP 5: Revisão ── */}
             {step === 5 && (
               <View>
                 <Text style={[st.title, { color: c.text }]}>Revise e envie</Text>
@@ -1066,10 +1194,9 @@ export default function ProviderValidationScreen() {
               </View>
             )}
 
-          </ScrollView>
+          </KeyboardAwareScrollViewCompat>
         </Animated.View>
 
-        {/* Bottom bar */}
         <View style={[st.bottomBar, { paddingBottom: insets.bottom + 12, backgroundColor: c.background, borderColor: c.border }]}>
           <Pressable
             onPress={step < 5 ? goNext : handleSubmit}
@@ -1082,6 +1209,18 @@ export default function ProviderValidationScreen() {
             <Ionicons name={step < 5 ? "arrow-forward" : "checkmark-circle"} size={16} color="#fff" />
           </Pressable>
         </View>
+
+        {submitting ? (
+          <View style={st.loadingOverlay}>
+            <View style={[st.loadingCard, { backgroundColor: c.card, borderColor: c.border }, shadows.xl]}>
+              <ActivityIndicator size="large" color={c.blue} />
+              <Text style={[st.loadingTitle, { color: c.text }]}>Enviando validação</Text>
+              <Text style={[st.loadingText, { color: c.sub }]}>
+                Estamos salvando seus dados e processando os documentos enviados.
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -1099,4 +1238,33 @@ const st = StyleSheet.create({
   bottomBar: { borderTopWidth: 1, paddingTop: 12, paddingHorizontal: 24 },
   submitBtn: { height: 54, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   submitBtnTxt: { fontSize: 15, fontFamily: fonts.sans.extra, color: "#fff" },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(17, 24, 39, 0.38)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  loadingCard: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    alignItems: "center",
+  },
+  loadingTitle: {
+    marginTop: 18,
+    fontSize: 18,
+    fontFamily: fonts.sans.bold,
+    textAlign: "center",
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 13,
+    fontFamily: fonts.sans.regular,
+    lineHeight: 19,
+    textAlign: "center",
+  },
 });

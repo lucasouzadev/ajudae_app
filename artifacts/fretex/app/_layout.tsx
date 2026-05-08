@@ -34,15 +34,12 @@ import { PermissionGate } from "@/components/PermissionGate";
 import { StatusBar } from "expo-status-bar";
 import colors from "@/constants/colors";
 
-// expo-notifications requires native modules — not available in Expo Go without a dev build.
-// Using conditional require so _layout.tsx loads normally in all environments.
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
   if (Constants.appOwnership !== "expo") {
     Notifications = require("expo-notifications");
   }
 } catch {
-  // Native module ExpoPushTokenManager not available — notification tap-to-navigate disabled
 }
 
 SplashScreen.preventAutoHideAsync();
@@ -50,18 +47,18 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function AuthGate() {
-  const { isAuthenticated, isLoading, user, role, accountStatus } = useAuth();
+  const { isAuthenticated, isLoading, role, accountStatus } = useAuth();
   const { active } = useService();
   const { themeMode } = usePermissions();
   const segments = useSegments();
   const pathname = usePathname();
   const router = useRouter();
   const c = colors.light;
+  const rootSegment = String(segments[0] ?? "");
+  const currentSegment = String(segments[segments.length - 1] ?? "");
 
   const terminalStatuses = ["completed", "cancelled", "disputed"];
 
-  // Navigate to the screen embedded in notification data when user taps a notification
-  // Guard: Notifications is null when native modules are not available (Expo Go / dev)
   useEffect(() => {
     if (!Notifications) return;
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -75,8 +72,6 @@ function AuthGate() {
 
   useEffect(() => {
     if (isLoading) return;
-
-    const rootSegment = String(segments[0] ?? "");
     const inAuthGroup = rootSegment === "auth";
     const inPending = rootSegment === "account-pending";
 
@@ -87,7 +82,7 @@ function AuthGate() {
     } else if (isAuthenticated && (inAuthGroup || inPending) && pathname !== "/") {
       router.replace("/" as never);
     }
-  }, [accountStatus, isAuthenticated, isLoading, pathname, segments, user]);
+  }, [accountStatus, isAuthenticated, isLoading, pathname, rootSegment]);
 
   useEffect(() => {
     if (!isAuthenticated || isLoading) return;
@@ -97,15 +92,13 @@ function AuthGate() {
     const allowedProvider = ["job", "start-pin", "job-otp", "ticket", "inbox"];
     const allowed = role === "prestador" ? allowedProvider : allowedClient;
 
-    const currentSegment = segments[segments.length - 1];
-
     if (!allowed.includes(currentSegment)) {
       const target = role === "prestador" ? "/job" : "/track";
       if (pathname !== target) {
         router.replace(target as never);
       }
     }
-  }, [active, isAuthenticated, isLoading, pathname, role, segments]);
+  }, [active, currentSegment, isAuthenticated, isLoading, pathname, role]);
 
   return (
     <>
@@ -119,7 +112,6 @@ function AuthGate() {
         <Stack.Screen name="marketplace" options={{ headerShown: false }} />
         <Stack.Screen name="inbox" options={{ headerShown: false }} />
         <Stack.Screen name="support" options={{ headerShown: false }} />
-        <Stack.Screen name="push-test" options={{ headerShown: false }} />
         <Stack.Screen name="provider/[id]" options={{ presentation: "card", animation: "slide_from_right" }} />
         <Stack.Screen name="payment" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
         <Stack.Screen name="request" options={{ presentation: "modal", animation: "slide_from_bottom" }} />

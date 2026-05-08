@@ -17,6 +17,25 @@ const RequestSchema = z.object({
   email: z.string().trim().toLowerCase().email('E-mail inválido'),
 })
 
+function hasProviderSubmission(provider: {
+  onboarding_status?: string | null
+  submitted_at?: string | null
+  doc_rg_url?: string | null
+  doc_residence_url?: string | null
+  doc_cnh_url?: string | null
+  doc_selfie_url?: string | null
+} | null) {
+  if (!provider) return false
+  if (provider.onboarding_status === 'submitted') return true
+  return Boolean(
+    provider.submitted_at ||
+      provider.doc_rg_url ||
+      provider.doc_residence_url ||
+      provider.doc_cnh_url ||
+      provider.doc_selfie_url,
+  )
+}
+
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
     status,
@@ -83,13 +102,18 @@ Deno.serve(async (req: Request) => {
         active: boolean
         onboarding_status: string
         kyc_status: string
+        submitted_at?: string | null
+        doc_rg_url?: string | null
+        doc_residence_url?: string | null
+        doc_cnh_url?: string | null
+        doc_selfie_url?: string | null
       }
     | null = null
 
   if (role === 'provider') {
     const { data: providerRow } = await supabase
       .from('providers')
-      .select('verified, active, onboarding_status, kyc_status')
+      .select('verified, active, onboarding_status, kyc_status, submitted_at, doc_rg_url, doc_residence_url, doc_cnh_url, doc_selfie_url')
       .eq('id', authUser.id)
       .maybeSingle()
 
@@ -101,9 +125,9 @@ Deno.serve(async (req: Request) => {
   if (!emailConfirmed) {
     status = 'pending_email_confirmation'
   } else if (role === 'provider') {
-    if (provider?.verified) {
+    if (provider?.verified || provider?.active || provider?.onboarding_status === 'approved') {
       status = 'provider_verified'
-    } else if (provider?.onboarding_status === 'submitted') {
+    } else if (hasProviderSubmission(provider) && provider?.onboarding_status !== 'rejected') {
       status = 'provider_pending_review'
     } else {
       status = 'provider_needs_validation'

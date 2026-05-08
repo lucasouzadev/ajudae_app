@@ -250,6 +250,17 @@ function buildProviderEmailHtml(input: z.infer<typeof ValidationSchema>, email: 
   )
 }
 
+function hasLockedSubmission(provider: {
+  onboarding_status?: string | null
+  submitted_at?: string | null
+}) {
+  if (provider.onboarding_status === 'approved' || provider.onboarding_status === 'submitted') {
+    return true
+  }
+
+  return Boolean(provider.submitted_at && provider.onboarding_status !== 'rejected')
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -284,6 +295,26 @@ Deno.serve(async (req: Request) => {
     return json(403, { error: 'Apenas prestadores podem validar conta' })
   }
 
+  const { data: existingProvider, error: providerLookupError } = await supabase
+    .from('providers')
+    .select('id, onboarding_status, submitted_at')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (providerLookupError || !existingProvider) {
+    console.error('[provider_validation_submit] provider lookup:', providerLookupError?.message ?? 'not found')
+    return json(404, { error: 'Perfil de prestador não encontrado' })
+  }
+
+  if (hasLockedSubmission(existingProvider)) {
+    return json(409, {
+      error:
+        existingProvider.onboarding_status === 'approved'
+          ? 'Sua conta já foi aprovada. Não é possível reenviar esta validação.'
+          : 'Sua validação já foi enviada e está em análise.',
+    })
+  }
+
   let payload: unknown
   try {
     payload = await req.json()
@@ -308,6 +339,9 @@ Deno.serve(async (req: Request) => {
     .eq('id', user.id)
 
   if (profileError) {
+    if ((profileError as { code?: string }).code === '23505') {
+      return json(409, { error: 'CPF já utilizado por outra conta' })
+    }
     console.error('[provider_validation_submit] profiles:', profileError.message)
     return json(500, { error: 'Erro ao atualizar perfil' })
   }
@@ -341,6 +375,9 @@ Deno.serve(async (req: Request) => {
     .eq('id', user.id)
 
   if (providerError) {
+    if ((providerError as { code?: string }).code === '23505') {
+      return json(409, { error: 'CPF já utilizado por outra conta' })
+    }
     console.error('[provider_validation_submit] providers:', providerError.message)
     return json(500, { error: 'Erro ao enviar validação' })
   }

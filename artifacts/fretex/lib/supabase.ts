@@ -64,6 +64,18 @@ export interface Profile {
   geolocation_requested: boolean;
   camera_requested: boolean;
   notifications_requested: boolean;
+  theme_mode?: 'light' | 'dark';
+  app_language?: 'pt-BR' | 'en-US' | 'es-ES';
+  background_tracking_enabled?: boolean;
+  notification_preferences?: {
+    orders?: boolean;
+    messages?: boolean;
+    payments?: boolean;
+    account?: boolean;
+    marketing?: boolean;
+  } | null;
+  expo_push_token?: string | null;
+  push_token_updated_at?: string | null;
   last_consent_update?: string;
   created_at: string;
   updated_at: string;

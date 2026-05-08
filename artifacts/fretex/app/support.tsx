@@ -18,7 +18,6 @@ const QUICK = [
   { icon: "card" as const, label: "Cobrança", color: "#16A34A", lib: "ion" as const },
   { icon: "lock-closed" as const, label: "Segurança", color: "#2563EB" },
   { icon: "chatbubbles" as const, label: "Chat com agente", color: "#9333EA" },
-  { icon: "notifications" as const, label: "Teste push", color: "#7C3AED" },
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string; label: string }> = {
@@ -66,7 +65,6 @@ export default function SupportScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
         <LinearGradient
           colors={[accent, accentEnd]}
           start={{ x: 0, y: 0 }}
@@ -78,7 +76,6 @@ export default function SupportScreen() {
           <Text style={styles.heroSub}>Tickets em até 2h úteis · Chat 24/7.</Text>
         </LinearGradient>
 
-        {/* Quick actions */}
         <View style={styles.quickGrid}>
           {QUICK.map((q) => (
             <Pressable
@@ -88,7 +85,6 @@ export default function SupportScreen() {
                 else if (q.label === "Chat com agente") router.push({ pathname: "/chat", params: { id: "support", name: "Suporte Ajudaê", ini: "SA", color: "#FF5500", type: "support" } } as any);
                 else if (q.label === "Cobrança") router.push({ pathname: "/chat", params: { id: "financial", name: "Suporte Financeiro", ini: "SF", color: "#16A34A", type: "financial" } } as any);
                 else if (q.label === "Segurança") router.push("/ticket");
-                else if (q.label === "Teste push") router.push("/push-test" as never);
               }}
               style={[styles.quickCell, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
             >
@@ -100,7 +96,6 @@ export default function SupportScreen() {
           ))}
         </View>
 
-        {/* Tickets */}
         <Text style={[styles.sectionTitle, { color: c.text }]}>Meus Tickets</Text>
         <Text style={[styles.sectionSub, { color: c.softMuted }]}>
           {loading ? "Carregando..." : tickets.length === 0 ? "Você ainda não abriu tickets" : `${tickets.length} aberto(s)`}
@@ -153,7 +148,6 @@ export default function SupportScreen() {
           })
         )}
 
-        {/* FAQs */}
         <Text style={[styles.sectionTitle, { color: c.text, marginTop: 24 }]}>Perguntas Frequentes</Text>
         <Text style={[styles.sectionSub, { color: c.softMuted }]}>Respostas rápidas para dúvidas comuns</Text>
 
@@ -181,7 +175,6 @@ export default function SupportScreen() {
           </View>
         ))}
 
-        {/* Contacts */}
         <Text style={[styles.sectionTitle, { color: c.text, marginTop: 24 }]}>Outros canais</Text>
         <View style={[styles.contactCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <Pressable onPress={() => Linking.openURL("whatsapp://send?phone=5521998765432").catch(() => Linking.openURL("https://wa.me/5521998765432"))} style={[styles.contactRow, { borderBottomColor: c.borderLight }]}>

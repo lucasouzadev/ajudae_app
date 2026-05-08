@@ -5,6 +5,7 @@ import { Platform } from "react-native";
 import { useAuthSafe } from "./AuthContext";
 import { usePermissions, type AppLanguage } from "./PermissionsContext";
 import { useService, type ServiceStatus } from "./ServiceContext";
+import { supabase } from "@/lib/supabase";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
@@ -12,7 +13,6 @@ try {
     Notifications = require("expo-notifications");
   }
 } catch (e) {
-  // expo-notifications not available in Expo Go / dev env without native modules
 }
 
 if (Notifications) {
@@ -74,8 +74,6 @@ export interface NotificationContextType {
   refreshPushToken: () => Promise<string | null>;
   send: (event: NotificationEvent, vars?: Vars) => Promise<void>;
 }
-
-const REMOTE_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
 const EVENT_CATEGORY: Record<NotificationEvent, NotificationCategory> = {
   service_requested: "orders",
@@ -214,7 +212,6 @@ async function fire(event: NotificationEvent, language: AppLanguage, vars?: Vars
       trigger: null,
     });
   } catch {
-    // silently fail
   }
 }
 
@@ -238,7 +235,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const prevEndAttempts = useRef(0);
   const isInitialLoad = useRef(true);
   const roleRef = useRef(role);
-  const autoProbeKeyRef = useRef<string | null>(null);
+  const previousProviderVerified = useRef<boolean>(Boolean(user?.provider?.verified));
 
   useEffect(() => { roleRef.current = role; }, [role]);
 
@@ -280,66 +277,46 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [notifications.granted, pushToken]);
 
   useEffect(() => {
-    if (
-      !isAuthenticated ||
-      !user?.id ||
-      !notifications.granted ||
-      !pushToken ||
-      pushToken === "local-only" ||
-      !notificationPreferences.account
-    ) {
+    if (!isAuthenticated || !user?.id) {
       return;
     }
 
-    const probeKey = `${user.id}:${pushToken}`;
-    if (autoProbeKeyRef.current === probeKey) {
-      return;
-    }
+    const nextToken =
+      notifications.granted && pushToken && pushToken !== "local-only"
+        ? pushToken
+        : null;
 
-    let cancelled = false;
-
-    const sendAutoProbe = async () => {
-      if (cancelled) {
-        autoProbeKeyRef.current = probeKey;
-        return;
-      }
-
-      const body =
-        appLanguage === "en-US"
-          ? "Test push sent successfully after login."
-          : appLanguage === "es-ES"
-            ? "Push de prueba enviada con éxito al iniciar sesión."
-            : "Push de teste enviada no login com sucesso.";
-
-      const response = await fetch(REMOTE_PUSH_URL, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Accept-encoding": "gzip, deflate",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          to: pushToken,
-          title: "Ajudaê",
-          body,
-          data: { screen: "push-test", source: "auto-login-probe" },
-          sound: "default",
-        }),
+    supabase
+      .from("profiles")
+      .update({
+        expo_push_token: nextToken,
+        push_token_updated_at: nextToken ? new Date().toISOString() : null,
+      })
+      .eq("id", user.id)
+      .then(({ error }) => {
+        if (error) {
+          console.warn("[NotificationContext] token sync error:", error.message);
+        }
       });
+  }, [isAuthenticated, notifications.granted, pushToken, user?.id]);
 
-      if (!response.ok) {
-        throw new Error("Falha ao enviar push automática");
-      }
+  useEffect(() => {
+    const currentVerified = Boolean(
+      user?.provider?.verified || user?.provider?.onboarding_status === "approved",
+    );
+    const wasVerified = previousProviderVerified.current;
 
-      autoProbeKeyRef.current = probeKey;
-    };
+    if (
+      currentVerified &&
+      !wasVerified &&
+      role === "prestador" &&
+      canSendEvent("provider_verified")
+    ) {
+      fire("provider_verified", appLanguage).catch(() => {});
+    }
 
-    sendAutoProbe().catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [appLanguage, isAuthenticated, notificationPreferences.account, notifications.granted, pushToken, user?.id]);
+    previousProviderVerified.current = currentVerified;
+  }, [appLanguage, notificationPreferences, role, user?.provider?.onboarding_status, user?.provider?.verified]);
 
   useEffect(() => {
     if (!active) {

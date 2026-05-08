@@ -1947,6 +1947,7 @@ function PrestadorHome() {
   const firstName = (user?.name || "Carlos").split(" ")[0];
   const providerNeedsValidation = user?.accountStatus === "provider_needs_validation";
   const providerPendingReview = user?.accountStatus === "provider_pending_review";
+  const providerRejected = user?.provider?.onboarding_status === "rejected";
 
   const incoming = activeService && activeService.status === "requested" ? activeService : null;
   const inProgress = activeService && ["accepted", "en_route", "in_progress"].includes(activeService.status) ? activeService : null;
@@ -2001,12 +2002,14 @@ function PrestadorHome() {
                 />
               </View>
               <Text style={[styles.providerGateTitle, { color: c.text }]}>
-                {providerPendingReview ? "Validação em análise" : "Conta não verificada"}
+                {providerPendingReview ? "Validação em análise" : providerRejected ? "Validação recusada" : "Conta não verificada"}
               </Text>
               <Text style={[styles.providerGateSub, { color: c.sub }]}>
                 {providerPendingReview
                   ? "Recebemos seus documentos. Sua conta será liberada assim que a análise terminar."
-                  : "Você pode acessar o app e revisar seu perfil, mas ainda precisa validar sua conta para criar e publicar serviços."}
+                  : providerRejected
+                    ? (user?.provider?.rejection_reason || "Revise seus dados e envie uma nova validação para seguir com a conta.")
+                    : "Você pode acessar o app e revisar seu perfil, mas ainda precisa validar sua conta para criar e publicar serviços."}
               </Text>
 
               {providerNeedsValidation ? (
@@ -2014,16 +2017,17 @@ function PrestadorHome() {
                   onPress={() => router.push("/provider-validation" as never)}
                   style={[styles.providerGateButton, { backgroundColor: c.blue }, shadows.md]}
                 >
-                  <Text style={styles.providerGateButtonText}>Validar conta</Text>
+                  <Text style={styles.providerGateButtonText}>{providerRejected ? "Atualizar validação" : "Validar conta"}</Text>
                   <Ionicons name="arrow-forward" size={16} color="#fff" />
                 </Pressable>
               ) : (
-                <View style={[styles.providerGateStatus, { backgroundColor: `${c.primary}18` }]}>
-                  <Ionicons name="mail-outline" size={14} color={c.warning} />
-                  <Text style={[styles.providerGateStatusText, { color: c.text }]}>
-                    Você e a equipe Ajudaê receberam uma cópia do envio por e-mail.
-                  </Text>
-                </View>
+                <Pressable
+                  onPress={() => router.push("/provider-validation" as never)}
+                  style={[styles.providerGateButton, { backgroundColor: c.blue }, shadows.md]}
+                >
+                  <Text style={styles.providerGateButtonText}>Visualizar envio</Text>
+                  <Ionicons name="document-text-outline" size={16} color="#fff" />
+                </Pressable>
               )}
             </View>
           </View>

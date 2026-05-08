@@ -37,6 +37,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
     toggleThemeMode,
     setAppLanguage,
     setNotificationPreference,
+    resetPermissionSettings,
     openSettings,
   } = usePermissions();
   const { pushToken, isRegisteringPushToken, pushRegistrationError, refreshPushToken } = useNotification();
@@ -239,8 +240,8 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
       ? isRegisteringPushToken
         ? "Sincronizando dispositivo"
         : pushToken
-          ? "Dispositivo conectado"
-          : "Permissão ativa"
+          ? "Ativo e sincronizado"
+          : "Ativo no aparelho"
       : notifications.canAsk
         ? "Toque para ativar"
         : "Abrir ajustes do aparelho";
@@ -249,16 +250,6 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
       key: keyof typeof notificationPreferences,
       nextValue: boolean,
     ) => {
-      if (nextValue && !notifications.granted) {
-        if (!notifications.canAsk) {
-          openSettings();
-          return;
-        }
-        const granted = await requestNotifications();
-        if (!granted) {
-          return;
-        }
-      }
       await setNotificationPreference(key, nextValue);
     };
 
@@ -306,8 +297,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
 
         <Pressable
           onPress={() => {
-            if (notifications.granted) return;
-            if (notifications.canAsk) {
+            if (!notifications.granted && notifications.canAsk) {
               requestNotifications();
             } else {
               openSettings();
@@ -329,7 +319,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
           </View>
           {notifications.granted ? (
             <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
-              <Text style={[subStyles.badgeText, { color: c.success }]}>Ativo</Text>
+              <Text style={[subStyles.badgeText, { color: c.success }]}>Sistema</Text>
             </View>
           ) : (
             <Ionicons name={notifications.canAsk ? "chevron-forward" : "open-outline"} size={16} color={notifications.canAsk ? c.softMuted : "#F97316"} />
@@ -383,6 +373,18 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
             </Pressable>
           );
         })}
+
+        <Pressable
+          onPress={() => {
+            resetPermissionSettings();
+          }}
+          style={[subStyles.compactRow, { borderColor: c.border }]}
+        >
+          <Ionicons name="refresh" size={16} color={c.sub} />
+          <Text style={[subStyles.compactRowText, { color: c.text }]}>
+            Redefinir permissões do app
+          </Text>
+        </Pressable>
 
         <Text style={[subStyles.sectionLabel, { color: c.softMuted }]}>Privacidade</Text>
 

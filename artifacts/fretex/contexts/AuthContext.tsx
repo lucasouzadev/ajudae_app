@@ -85,16 +85,34 @@ function toUiRole(dbRole: string): Role {
   return dbRole === 'client' ? 'cliente' : 'prestador';
 }
 
+function hasProviderSubmission(provider: ProviderRow | null) {
+  if (!provider) {
+    return false;
+  }
+
+  if (provider.onboarding_status === 'submitted') {
+    return true;
+  }
+
+  return Boolean(
+    provider.submitted_at ||
+      provider.doc_rg_url ||
+      provider.doc_residence_url ||
+      provider.doc_cnh_url ||
+      provider.doc_selfie_url,
+  );
+}
+
 function toAccountStatus(role: UserRole, provider: ProviderRow | null): Exclude<AccountStatus, 'signed_out' | 'pending_email'> {
   if (role !== 'provider') {
     return 'client_active';
   }
 
-  if (provider?.verified) {
+  if (provider?.verified || provider?.active || provider?.onboarding_status === 'approved') {
     return 'provider_verified';
   }
 
-  if (provider?.onboarding_status === 'submitted') {
+  if (hasProviderSubmission(provider) && provider?.onboarding_status !== 'rejected') {
     return 'provider_pending_review';
   }
 
@@ -122,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [pendingAccount, setPendingAccount] = useState<PendingAccount | null>(null);
   const [accountStatus, setAccountStatus] = useState<AccountStatus>('signed_out');
   const [isLoading, setIsLoading] = useState(true);
+  const providerRefreshInFlight = React.useRef(false);
 
   async function persistUser(next: User | null) {
     setUser(next);
@@ -218,7 +237,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (!session.user.email_confirmed_at) {
+      const statusData = session.user.email
+        ? await lookupAccountStatus(session.user.email)
+        : null;
+      const nextPending = statusData ? mapPendingAccount(statusData) : null;
+      await persistUser(null);
+      if (nextPending) {
+        await persistPending(nextPending);
+        setRole(nextPending.role);
+        setAccountStatus('pending_email');
+      } else {
+        await persistPending(null);
+        setRole('cliente');
+        setAccountStatus('signed_out');
+      }
+      return;
+    }
+
     await syncAuthenticatedUser(session.user.id, session.user.email || '');
+  }
+
+  async function restorePendingFromSession(sessionUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown>; email_confirmed_at?: string | null; }) {
+    const sessionEmail = sessionUser.email?.trim().toLowerCase() ?? '';
+    const statusData = sessionEmail ? await lookupAccountStatus(sessionEmail) : null;
+    const fallbackPending: PendingAccount = {
+      email: sessionEmail,
+      role: toUiRole(String(sessionUser.user_metadata?.role ?? 'client')),
+      name: typeof sessionUser.user_metadata?.name === 'string' ? sessionUser.user_metadata.name : undefined,
+      phone: typeof sessionUser.user_metadata?.phone === 'string' ? sessionUser.user_metadata.phone : undefined,
+      cpf: typeof sessionUser.user_metadata?.cpf === 'string' ? sessionUser.user_metadata.cpf : undefined,
+      status: 'pending_email_confirmation',
+    };
+    const nextPending = statusData ? (mapPendingAccount(statusData) ?? fallbackPending) : fallbackPending;
+
+    await persistUser(null);
+    await persistPending(nextPending);
+    setRole(nextPending.role);
+    setAccountStatus('pending_email');
   }
 
   useEffect(() => {
@@ -226,6 +282,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
+        if (!session.user.email_confirmed_at) {
+          await restorePendingFromSession(session.user);
+          return;
+        }
         try {
           await syncAuthenticatedUser(session.user.id, session.user.email || '');
         } catch {
@@ -261,6 +321,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
+        if (!session.user.email_confirmed_at) {
+          await restorePendingFromSession(session.user);
+          return;
+        }
         await syncAuthenticatedUser(session.user.id, session.user.email || '');
         return;
       }
@@ -310,6 +374,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Usuário não autenticado');
       }
 
+      if (!data.user.email_confirmed_at) {
+        const statusData = await lookupAccountStatus(data.user.email || email);
+        const nextPending = mapPendingAccount(statusData);
+
+        if (nextPending) {
+          await persistPending(nextPending);
+          setRole(nextPending.role);
+          setAccountStatus('pending_email');
+          await supabase.auth.signOut();
+          return 'pending_email';
+        }
+      }
+
       const nextUser = await syncAuthenticatedUser(data.user.id, data.user.email || email);
       return nextUser.accountStatus;
     } catch (error) {
@@ -325,6 +402,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     nextRole: Role,
     cpf?: string,
   ): Promise<'pending_email'> {
+    const { data: guardData, error: guardError } = await supabase.functions.invoke<{
+      available: boolean;
+      message?: string;
+    }>('auth_signup_guard', {
+      body: {
+        email: email.trim().toLowerCase(),
+        cpf: cpf ?? null,
+        role: toDbRole(nextRole),
+      },
+    });
+
+    if (guardError) {
+      throw guardError;
+    }
+
+    if (!guardData?.available) {
+      throw new Error(guardData?.message || 'Não foi possível validar os dados do cadastro.');
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password: senha,
@@ -356,6 +452,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     await persistPending(nextPending);
+
+    if (data.session?.user && !data.session.user.email_confirmed_at) {
+      await supabase.auth.signOut();
+    }
+
     setRole(nextRole);
     setAccountStatus('pending_email');
     return 'pending_email';
@@ -484,6 +585,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccountStatus(nextUser.accountStatus);
   }
 
+  useEffect(() => {
+    if (!user?.id || user.role !== 'provider') {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`provider-auth-sync:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'providers',
+          filter: `id=eq.${user.id}`,
+        },
+        async () => {
+          if (providerRefreshInFlight.current) {
+            return;
+          }
+          providerRefreshInFlight.current = true;
+          try {
+            await refreshUser();
+          } finally {
+            providerRefreshInFlight.current = false;
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, user?.role]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -515,7 +650,6 @@ export function useAuth() {
   return context;
 }
 
-// Safe version that returns defaults if context unavailable (for provider components)
 export function useAuthSafe() {
   const context = useContext(AuthContext);
   return context ?? {

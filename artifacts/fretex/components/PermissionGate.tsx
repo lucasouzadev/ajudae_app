@@ -1,14 +1,3 @@
-/**
- * PermissionGate — LGPD consent + OS permission onboarding
- *
- * Shows as a full-screen modal at the right moments:
- *  1. LGPD consent screen (blocking — user can't proceed without accepting)
- *  2. Location permission request
- *  3. Notifications permission request
- *
- * Only appears after authentication. After the first run, permission
- * changes happen via ProfileOverlay > Configurações.
- */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useState } from "react";
@@ -51,30 +40,35 @@ export function PermissionGate() {
 
   const [step, setStep] = useState<Step | null>(null);
 
-  // ── Decide which step to show ──────────────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated || !ready) return;
+    let active = true;
 
     AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
+      if (!active) return;
       const shown = val === "1";
+      let nextStep: Step = "done";
 
       if (!lgpdAccepted) {
-        setStep("lgpd");
+        nextStep = "lgpd";
       } else if (!shown) {
         if (!notifications.granted && notifications.canAsk) {
-          setStep("notifications");
+          nextStep = "notifications";
         } else if (!location.granted && location.canAsk) {
-          setStep("location");
+          nextStep = "location";
         } else if (!backgroundLocation.granted && backgroundLocation.canAsk) {
-          setStep("background-location");
+          nextStep = "background-location";
         } else {
           AsyncStorage.setItem(ONBOARDING_KEY, "1");
-          setStep("done");
         }
-      } else {
-        setStep("done");
       }
+
+      setStep((current) => (current === nextStep ? current : nextStep));
     });
+
+    return () => {
+      active = false;
+    };
   }, [isAuthenticated, ready, lgpdAccepted, notifications.granted, notifications.canAsk, location.granted, location.canAsk, backgroundLocation.granted, backgroundLocation.canAsk]);
 
   const afterNotifications = () => {
@@ -110,10 +104,9 @@ export function PermissionGate() {
       transparent={false}
       animationType="slide"
       statusBarTranslucent
-      onRequestClose={() => {}} // prevent back-button dismiss on LGPD
+      onRequestClose={() => {}}
     >
       <View style={[s.root, { backgroundColor: c.background }]}>
-        {/* Safe-area top spacer */}
         <View style={{ height: insets.top + 8 }} />
 
         {step === "lgpd" && (
@@ -123,7 +116,6 @@ export function PermissionGate() {
             onAccept={async () => {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               await acceptLGPD();
-              // Proceed to permission requests
               if (!notifications.granted && notifications.canAsk) {
                 setStep("notifications");
               } else if (!location.granted && location.canAsk) {
@@ -214,8 +206,6 @@ export function PermissionGate() {
   );
 }
 
-// ─── LGPD Screen ───────────────────────────────────────────────────────────────
-
 function LGPDScreen({
   c,
   insets,
@@ -254,7 +244,6 @@ function LGPDScreen({
 
   return (
     <View style={s.screen}>
-      {/* Header */}
       <View style={s.lgpdHeader}>
         <View style={[s.lgpdShield, { backgroundColor: "#FF6A0015" }]}>
           <Ionicons name="shield-checkmark" size={36} color="#FF6A00" />
@@ -267,7 +256,6 @@ function LGPDScreen({
         </Text>
       </View>
 
-      {/* Scrollable body */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={s.lgpdBody}
@@ -316,7 +304,6 @@ function LGPDScreen({
         </View>
       </ScrollView>
 
-      {/* Footer */}
       <View style={[s.lgpdFooter, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable style={[s.acceptBtn, { backgroundColor: "#FF6A00" }]} onPress={onAccept}>
           <Ionicons name="checkmark-circle" size={20} color="#fff" />
@@ -331,8 +318,6 @@ function LGPDScreen({
     </View>
   );
 }
-
-// ─── Permission Step Screen ─────────────────────────────────────────────────────
 
 function PermissionScreen({
   icon,
@@ -357,7 +342,6 @@ function PermissionScreen({
 }) {
   return (
     <View style={[s.screen, s.permScreen]}>
-      {/* Skip */}
       <View style={s.permSkipRow}>
         <Pressable onPress={onSkip} hitSlop={12}>
           <Text style={[s.permSkip, { color: c.muted, fontFamily: fonts.sans.regular }]}>
@@ -366,12 +350,10 @@ function PermissionScreen({
         </Pressable>
       </View>
 
-      {/* Icon */}
       <View style={[s.permIconWrap, { backgroundColor: iconColor + "15" }]}>
         <Ionicons name={icon} size={48} color={iconColor} />
       </View>
 
-      {/* Content */}
       <Text style={[s.permTitle, { color: c.text, fontFamily: fonts.serif.bold }]}>
         {title}
       </Text>
@@ -379,7 +361,6 @@ function PermissionScreen({
         {description}
       </Text>
 
-      {/* Buttons */}
       <View style={[s.permButtons, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable style={[s.permAllowBtn, { backgroundColor: iconColor }]} onPress={onAllow}>
           <Text style={[s.permAllowText, { fontFamily: fonts.sans.bold }]}>
@@ -391,13 +372,10 @@ function PermissionScreen({
   );
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   root: { flex: 1 },
   screen: { flex: 1 },
 
-  // LGPD
   lgpdHeader: { alignItems: "center", paddingHorizontal: 24, paddingBottom: 24 },
   lgpdShield: {
     width: 72, height: 72, borderRadius: 20,
@@ -430,7 +408,6 @@ const s = StyleSheet.create({
   acceptBtnText: { color: "#fff", fontSize: 16 },
   lgpdFooterNote: { fontSize: 11, textAlign: "center", lineHeight: 16 },
 
-  // Permission step
   permScreen: { paddingHorizontal: 32 },
   permSkipRow: { alignItems: "flex-end", paddingRight: 4, marginBottom: 48 },
   permSkip: { fontSize: 14 },
