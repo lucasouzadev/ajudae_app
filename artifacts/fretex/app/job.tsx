@@ -12,6 +12,7 @@ import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { useService } from "@/contexts/ServiceContext";
 import type { ServiceStatus } from "@/contexts/ServiceContext";
+import { sendQuickMessage } from "@/lib/quickMessages";
 
 const STAGES: {
   id: ServiceStatus;
@@ -80,6 +81,20 @@ export default function JobScreen() {
     }
   };
 
+  const openServiceChat = () => {
+    router.push({
+      pathname: "/chat",
+      params: {
+        id: active.id,
+        requestId: active.id,
+        name: active.customerName,
+        ini: active.customerInitials,
+        color: active.customerColor,
+        type: "dm",
+      },
+    } as never);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <TopNav
@@ -117,7 +132,7 @@ export default function JobScreen() {
             <Text style={[styles.clientName, { color: c.text }]}>{active.customerName}</Text>
             <Text style={[styles.clientMeta, { color: c.softMuted }]}>Cliente Ajudaê! · {active.customerRating} ★</Text>
           </View>
-          <Pressable onPress={() => router.push({ pathname: "/inbox", params: { openName: active.customerName } })} style={[styles.iconBtn, { backgroundColor: c.background, borderColor: c.border }]}>
+          <Pressable onPress={openServiceChat} style={[styles.iconBtn, { backgroundColor: c.background, borderColor: c.border }]}>
             <Ionicons name="chatbubble-ellipses" size={15} color={c.text} />
           </Pressable>
           <Pressable onPress={() => Linking.openURL("tel:+5521999998888").catch(() => {})} style={[styles.iconBtn, { backgroundColor: accent, borderColor: accent }]}>
@@ -209,7 +224,7 @@ export default function JobScreen() {
 
       {/* Sticky CTA */}
       <View style={[styles.ctaWrap, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: 16 + insets.bottom }]}>
-        <Pressable onPress={() => setQuickOpen(true)} style={[styles.ctaSecondary, { backgroundColor: c.background, borderColor: c.border }]}>
+        <Pressable onPress={openServiceChat} style={[styles.ctaSecondary, { backgroundColor: c.background, borderColor: c.border }]}>
           <Ionicons name="chatbubbles" size={15} color={c.text} />
           <Text style={[styles.ctaSecondaryText, { color: c.text }]}>Mensagem</Text>
         </Pressable>
@@ -229,9 +244,15 @@ export default function JobScreen() {
             {QUICK_MSGS_PROVIDER.map((m) => (
               <Pressable
                 key={m}
-                onPress={() => {
+                onPress={async () => {
                   setQuickOpen(false);
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  if (!user?.id) return;
+                  try {
+                    await sendQuickMessage(active.id, user.id, m);
+                  } catch {
+                    openServiceChat();
+                  }
                 }}
                 style={[styles.quickItem, { backgroundColor: c.background, borderColor: c.border }]}
               >

@@ -12,6 +12,7 @@ import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { useService } from "@/contexts/ServiceContext";
 import type { ServiceStatus } from "@/contexts/ServiceContext";
+import { sendQuickMessage } from "@/lib/quickMessages";
 
 const STAGES: { id: ServiceStatus; label: string; sub: string; icon: any }[] = [
   { id: "requested", label: "Aguardando aceite", sub: "Procurando o melhor prestador para você", icon: "search" },
@@ -88,10 +89,30 @@ export default function TrackScreen() {
   const remMin = Math.floor(remainingMs / 60000);
   const remSec = Math.floor((remainingMs % 60000) / 1000);
 
-  const sendMsg = (msg: string) => {
+  const openServiceChat = () => {
+    router.push({
+      pathname: "/chat",
+      params: {
+        id: active.id,
+        requestId: active.id,
+        name: active.providerName || "Prestador",
+        ini: active.providerInitials || "PR",
+        color: active.providerColor || accent,
+        type: "dm",
+      },
+    } as never);
+  };
+
+  const sendMsg = async (msg: string) => {
     setQuickOpen(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (msg.toLowerCase().includes("cancelar")) setCancelOpen(true);
+    if (!user?.id || active.status === "requested") return;
+    try {
+      await sendQuickMessage(active.id, user.id, msg);
+    } catch {
+      openServiceChat();
+    }
   };
 
   const confirmCancel = async () => {
@@ -184,7 +205,7 @@ export default function TrackScreen() {
               </View>
             </View>
             <Pressable
-              onPress={() => router.push("/inbox")}
+              onPress={openServiceChat}
               style={[styles.iconBtn, { backgroundColor: c.background, borderColor: c.border }]}
             >
               <Ionicons name="chatbubble-ellipses" size={15} color={c.text} />
@@ -293,7 +314,7 @@ export default function TrackScreen() {
       {/* Sticky actions */}
       {!isCancelled && active.status !== "completed" ? (
         <View style={[styles.ctaWrap, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: 14 + insets.bottom }]}>
-          <Pressable onPress={() => setQuickOpen(true)} style={[styles.actionBtn, { backgroundColor: c.background, borderColor: c.border }]}>
+          <Pressable onPress={openServiceChat} style={[styles.actionBtn, { backgroundColor: c.background, borderColor: c.border }]}>
             <Ionicons name="chatbubbles" size={15} color={c.text} />
             <Text style={[styles.actionTxt, { color: c.text }]}>Mensagem</Text>
           </Pressable>

@@ -1436,7 +1436,9 @@ function PerfilTab() {
 
         {/* Sign out */}
         <Pressable
-          onPress={logout}
+          onPress={() => {
+            logout();
+          }}
           style={[perfilStyles.menuRow, { backgroundColor: "#FFF5F5", borderColor: "#FEE2E2", marginTop: 8 }, shadows.sm]}
         >
           <View style={[perfilStyles.iconBox, { backgroundColor: "#FEE2E2" }]}>

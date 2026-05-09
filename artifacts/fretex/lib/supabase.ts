@@ -46,6 +46,8 @@ export type TicketStatus = 'open' | 'in_review' | 'resolved' | 'closed';
 export type VehicleType = 'car' | 'utility' | 'van' | 'truck_small' | 'truck_large';
 
 export type PaymentStatus = 'pending' | 'authorized' | 'captured' | 'refunded' | 'failed';
+export type PaymentProvider = 'stripe' | 'mercado_pago';
+export type ServiceProposalStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired';
 
 // ─── Table types (match actual DB schema) ──────────────────────────────────
 
@@ -159,9 +161,17 @@ export interface ServiceRequest {
   cancelled_by?: string;
   expires_at: string;
   payment_status?: PaymentStatus;
+  payment_provider?: PaymentProvider;
+  payment_provider_id?: string;
   payment_intent_id?: string;
+  payment_checkout_url?: string;
+  payment_qr_code?: string;
+  payment_qr_code_base64?: string;
+  payment_expires_at?: string;
   payment_captured_at?: string;
   payment_amount?: number;
+  payment_error?: string;
+  payment_metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -175,6 +185,31 @@ export interface RequestEvent {
   to_status: string;
   meta: Record<string, unknown>;
   created_at: string;
+}
+
+export interface ServiceProposal {
+  id: string;
+  client_id: string;
+  provider_id: string;
+  category_id: string;
+  status: ServiceProposalStatus;
+  address_origin: string;
+  address_dest?: string;
+  origin_lat?: number;
+  origin_lng?: number;
+  dest_lat?: number;
+  dest_lng?: number;
+  description?: string;
+  media_urls: string[];
+  needs_helper: boolean;
+  price_proposed?: number;
+  scheduled_for?: string;
+  decision_note?: string;
+  decided_at?: string;
+  accepted_request_id?: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /** public.tickets */

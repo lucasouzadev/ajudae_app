@@ -726,8 +726,8 @@ export function ProfileOverlay({ open, onClose, name, initials }: ProfileOverlay
 
               <Pressable
                 onPress={async () => {
-                  await logout();
                   onClose();
+                  await logout();
                 }}
                 style={[styles.logoutBtn, { borderColor: c.border }]}
               >

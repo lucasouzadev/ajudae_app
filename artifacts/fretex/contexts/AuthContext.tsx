@@ -553,11 +553,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
-    await supabase.auth.signOut();
-    await persistUser(null);
-    await persistPending(null);
-    setRole('cliente');
-    setAccountStatus('signed_out');
+    setIsLoading(true);
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((resolve) => setTimeout(resolve, 2500)),
+      ]);
+    } catch {
+    } finally {
+      await persistUser(null);
+      await persistPending(null);
+      setRole('cliente');
+      setAccountStatus('signed_out');
+      setIsLoading(false);
+    }
   }
 
   async function switchRole(newRole: Role) {

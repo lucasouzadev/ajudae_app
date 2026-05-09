@@ -16,6 +16,8 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/contexts/AuthContext";
 import colors, { fonts, shadows } from "@/constants/colors";
+import { supabase } from "@/lib/supabase";
+import { fetchQuickMessages, sendQuickMessage, type QuickMessageRow } from "@/lib/quickMessages";
 
 interface Msg {
   id: string;
@@ -28,6 +30,12 @@ interface Msg {
 const now = () => {
   const d = new Date();
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+};
+
+const formatTime = (value: string) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return now();
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 };
 
 /* ── Mock threads por conversa ── */
@@ -130,21 +138,22 @@ export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { id, name, ini, color, type } = useLocalSearchParams<{
+  const { id, name, ini, color, type, requestId } = useLocalSearchParams<{
     id: string;
     name: string;
     ini: string;
     color: string;
     type: "dm" | "support" | "financial" | "provider_support";
+    requestId?: string;
   }>();
 
   const chatColor = color || "#FF5500";
   const chatType = type || "dm";
   const threadKey = id || chatType;
+  const realtimeRequestId = requestId || "";
+  const isRealtimeChat = Boolean(realtimeRequestId && user?.id);
 
-  const [messages, setMessages] = useState<Msg[]>(
-    MOCK_THREADS[threadKey] || MOCK_THREADS[chatType] || []
-  );
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
   const flatRef = useRef<FlatList>(null);
@@ -155,22 +164,96 @@ export default function ChatScreen() {
   const quickReplies = isSupport ? QUICK_REPLIES_SUPPORT : QUICK_REPLIES_DM;
   const autoReplies = AUTO_REPLIES[chatType] || AUTO_REPLIES.dm;
 
-  useEffect(() => {
-    setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
-  }, []);
+  const mapRowToMessage = (row: QuickMessageRow): Msg => ({
+    id: row.id,
+    text: row.message,
+    from: row.sender_id === user?.id ? "me" : "them",
+    time: formatTime(row.created_at),
+    read: true,
+  });
 
-  const send = (msg: string) => {
+  useEffect(() => {
+    if (!isRealtimeChat) {
+      setMessages(MOCK_THREADS[threadKey] || MOCK_THREADS[chatType] || []);
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
+      return;
+    }
+
+    let mounted = true;
+    fetchQuickMessages(realtimeRequestId)
+      .then((rows) => {
+        if (!mounted) return;
+        setMessages(rows.map(mapRowToMessage));
+        setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
+      })
+      .catch(() => {
+        if (mounted) setMessages([]);
+      });
+
+    const channel = supabase
+      .channel(`quick-messages:${realtimeRequestId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "quick_messages",
+          filter: `request_id=eq.${realtimeRequestId}`,
+        },
+        (payload) => {
+          const row = payload.new as QuickMessageRow;
+          setMessages((prev) => {
+            if (prev.some((item) => item.id === row.id)) return prev;
+            return [...prev, mapRowToMessage(row)];
+          });
+          setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [chatType, isRealtimeChat, realtimeRequestId, threadKey, user?.id]);
+
+  const send = async (msg: string) => {
     if (!msg.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const clean = msg.trim();
+    setText("");
+
+    if (isRealtimeChat && user?.id) {
+      try {
+        const row = await sendQuickMessage(realtimeRequestId, user.id, clean);
+        setMessages((prev) => {
+          if (prev.some((item) => item.id === row.id)) return prev;
+          return [...prev, mapRowToMessage(row)];
+        });
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `local-error-${Date.now()}`,
+            text: "Não foi possível enviar. Tente novamente.",
+            from: "them",
+            time: now(),
+            read: false,
+          },
+        ]);
+      }
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+      return;
+    }
+
     const newMsg: Msg = {
       id: Date.now().toString(),
-      text: msg.trim(),
+      text: clean,
       from: "me",
       time: now(),
       read: false,
     };
     setMessages((prev) => [...prev, newMsg]);
-    setText("");
     setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
 
     setTyping(true);

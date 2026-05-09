@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -265,6 +266,7 @@ async function fire(
 }
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
+const NOTIFICATION_PROMPT_KEY = "@ajudae_notification_prompted_v1";
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { role, user, isAuthenticated } = useAuthSafe();
@@ -292,6 +294,31 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { roleRef.current = role; }, [role]);
+
+  useEffect(() => {
+    if (!isAuthenticated || notifications.granted || !notifications.canAsk || !Notifications) {
+      return;
+    }
+
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      AsyncStorage.getItem(NOTIFICATION_PROMPT_KEY)
+        .then(async (prompted) => {
+          if (cancelled || prompted === "1") return;
+          await AsyncStorage.setItem(NOTIFICATION_PROMPT_KEY, "1");
+          const granted = await requestNotifications();
+          if (granted) {
+            await registerPushToken(true);
+          }
+        })
+        .catch(() => {});
+    }, 900);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [isAuthenticated, notifications.canAsk, notifications.granted, requestNotifications]);
 
   useEffect(() => {
     return () => {
