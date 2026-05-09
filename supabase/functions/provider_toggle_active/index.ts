@@ -1,12 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3'
 
-// ─── CORS headers ──────────────────────────────────────────────────────────
-const corsHeaders = {
-  'Access-Control-Allow-Origin': Deno.env.get('APP_URL') ?? 'https://ajudaeh.com.br',
-  'Vary': 'Origin',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+const allowedOrigins = new Set(
+  [
+    Deno.env.get('APP_URL'),
+    Deno.env.get('CRM_APP_URL'),
+    'https://ajudaeh.com.br',
+    'https://ajudae-app.pages.dev',
+    'http://localhost:5173',
+    'http://localhost:8081',
+  ].filter(Boolean),
+)
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') ?? ''
+  return {
+    'Access-Control-Allow-Origin': allowedOrigins.has(origin) ? origin : 'https://ajudaeh.com.br',
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
 // ─── Cliente Supabase com service_role (bypass RLS intencional) ────────────
@@ -23,34 +36,34 @@ const ToggleActiveSchema = z.object({
 })
 
 // ─── Helpers de resposta ──────────────────────────────────────────────────
-function ok(data: unknown): Response {
+function ok(req: Request, data: unknown): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
   })
 }
 
-function error(status: number, message: string): Response {
+function error(req: Request, status: number, message: string): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
   })
 }
 
 // ─── Handler principal ────────────────────────────────────────────────────
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders(req) })
   }
 
   if (req.method !== 'POST') {
-    return error(405, 'Método não permitido')
+    return error(req, 405, 'Método não permitido')
   }
 
   // 1. Autenticar usuário via JWT
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) {
-    return error(401, 'Não autenticado')
+    return error(req, 401, 'Não autenticado')
   }
 
   const {
@@ -59,7 +72,7 @@ Deno.serve(async (req: Request) => {
   } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
 
   if (authError || !user) {
-    return error(401, 'Token inválido')
+    return error(req, 401, 'Token inválido')
   }
 
   // 2. Verificar role = 'provider' via profiles (fonte de verdade, não JWT)
@@ -69,9 +82,9 @@ Deno.serve(async (req: Request) => {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return error(401, 'Perfil não encontrado')
+  if (!profile) return error(req, 401, 'Perfil não encontrado')
   if (profile.role !== 'provider') {
-    return error(403, 'Apenas prestadores podem alterar disponibilidade')
+    return error(req, 403, 'Apenas prestadores podem alterar disponibilidade')
   }
 
   // 3. Buscar perfil do prestador
@@ -81,11 +94,11 @@ Deno.serve(async (req: Request) => {
     .eq('id', user.id)
     .single()
 
-  if (!provider) return error(403, 'Perfil de prestador não encontrado')
+  if (!provider) return error(req, 403, 'Perfil de prestador não encontrado')
 
   // 4. Verificar verificação (não verificado não pode ficar online)
   if (!provider.verified) {
-    return error(403, 'Sua conta ainda não foi verificada pelo administrador')
+    return error(req, 403, 'Sua conta ainda não foi verificada pelo administrador')
   }
 
   // 5. Validar body com Zod
@@ -93,13 +106,13 @@ Deno.serve(async (req: Request) => {
   try {
     body = await req.json()
   } catch {
-    return error(400, 'Body inválido — esperado JSON')
+    return error(req, 400, 'Body inválido — esperado JSON')
   }
 
   const parsed = ToggleActiveSchema.safeParse(body)
   if (!parsed.success) {
     const messages = parsed.error.errors.map((e) => e.message).join(', ')
-    return error(400, messages)
+    return error(req, 400, messages)
   }
 
   const { active, location_lat, location_lng } = parsed.data
@@ -114,7 +127,7 @@ Deno.serve(async (req: Request) => {
       .in('status', ['en_route', 'in_progress'])
 
     if ((activeRequests ?? 0) > 0) {
-      return error(409, 'Você tem um serviço em andamento — conclua antes de ficar offline')
+      return error(req, 409, 'Você tem um serviço em andamento — conclua antes de ficar offline')
     }
   }
 
@@ -139,11 +152,11 @@ Deno.serve(async (req: Request) => {
     .single()
 
   if (updateError || !updated) {
-    return error(500, 'Erro ao atualizar disponibilidade')
+    return error(req, 500, 'Erro ao atualizar disponibilidade')
   }
 
   // 9. Retornar resultado
-  return ok({
+  return ok(req, {
     provider_id: updated.id,
     active: updated.active,
     updated_at: new Date().toISOString(),

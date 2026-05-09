@@ -1,11 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': Deno.env.get('APP_URL') ?? 'https://ajudaeh.com.br',
-  Vary: 'Origin',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+const allowedOrigins = new Set(
+  [
+    Deno.env.get('APP_URL'),
+    Deno.env.get('CRM_APP_URL'),
+    'https://ajudaeh.com.br',
+    'https://ajudae-app.pages.dev',
+    'http://localhost:5173',
+    'http://localhost:8081',
+  ].filter(Boolean),
+)
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') ?? ''
+  return {
+    'Access-Control-Allow-Origin': allowedOrigins.has(origin) ? origin : 'https://ajudaeh.com.br',
+    Vary: 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
 const supabase = createClient(
@@ -19,17 +33,17 @@ const VerifyProviderSchema = z.object({
   notes: z.string().max(1000).optional(),
 })
 
-function ok(data: unknown): Response {
+function ok(req: Request, data: unknown): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
   })
 }
 
-function error(status: number, message: string): Response {
+function error(req: Request, status: number, message: string): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(req) },
   })
 }
 
@@ -235,16 +249,16 @@ function buildRejectedEmail(name: string, notes: string) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders(req) })
   }
 
   if (req.method !== 'POST') {
-    return error(405, 'Método não permitido')
+    return error(req, 405, 'Método não permitido')
   }
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) {
-    return error(401, 'Não autenticado')
+    return error(req, 401, 'Não autenticado')
   }
 
   const {
@@ -253,7 +267,7 @@ Deno.serve(async (req: Request) => {
   } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
 
   if (authError || !user) {
-    return error(401, 'Token inválido')
+    return error(req, 401, 'Token inválido')
   }
 
   const { data: profile } = await supabase
@@ -262,29 +276,29 @@ Deno.serve(async (req: Request) => {
     .eq('id', user.id)
     .single()
 
-  if (!profile) return error(401, 'Perfil não encontrado')
+  if (!profile) return error(req, 401, 'Perfil não encontrado')
   if (profile.role !== 'admin') {
-    return error(403, 'Apenas administradores podem verificar prestadores')
+    return error(req, 403, 'Apenas administradores podem verificar prestadores')
   }
 
   let body: unknown
   try {
     body = await req.json()
   } catch {
-    return error(400, 'Body inválido — esperado JSON')
+    return error(req, 400, 'Body inválido — esperado JSON')
   }
 
   const parsed = VerifyProviderSchema.safeParse(body)
   if (!parsed.success) {
     const messages = parsed.error.errors.map((entry) => entry.message).join(', ')
-    return error(400, messages)
+    return error(req, 400, messages)
   }
 
   const { provider_id, verified, notes } = parsed.data
   const decisionNotes = notes?.trim() ?? ''
 
   if (!verified && decisionNotes.length < 10) {
-    return error(400, 'Motivo obrigatório ao reprovar um prestador (mínimo 10 caracteres)')
+    return error(req, 400, 'Motivo obrigatório ao reprovar um prestador (mínimo 10 caracteres)')
   }
 
   const { data: provider } = await supabase
@@ -293,7 +307,7 @@ Deno.serve(async (req: Request) => {
     .eq('id', provider_id)
     .maybeSingle()
 
-  if (!provider) return error(404, 'Prestador não encontrado')
+  if (!provider) return error(req, 404, 'Prestador não encontrado')
 
   const { data: providerProfile } = await supabase
     .from('profiles')
@@ -329,7 +343,7 @@ Deno.serve(async (req: Request) => {
     .single()
 
   if (updateError || !updated) {
-    return error(500, 'Erro ao atualizar verificação do prestador')
+    return error(req, 500, 'Erro ao atualizar verificação do prestador')
   }
 
   let emailResult = { sent: false, skipped: true }
@@ -355,7 +369,7 @@ Deno.serve(async (req: Request) => {
         screen: 'index',
       })
 
-  return ok({
+  return ok(req, {
     provider_id: updated.id,
     verified: updated.verified,
     active: updated.active,

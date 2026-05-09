@@ -47,6 +47,8 @@ const PROVIDER_TRANSITIONS: AllowedTransition[] = [
 
 const CLIENT_TRANSITIONS: AllowedTransition[] = [
   { from: 'requested', to: 'cancelled' },
+  { from: 'en_route', to: 'in_progress' },
+  { from: 'en_route', to: 'disputed' },
 ]
 
 // Admin pode qualquer transição, exceto → completed (sem OTP)
@@ -115,6 +117,32 @@ async function logEvent(
     to_status: toStatus,
     meta,
   })
+}
+
+async function sendExpoPush(userId: string, title: string, body: string, data: Record<string, unknown> = {}) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('expo_push_token')
+    .eq('id', userId)
+    .maybeSingle()
+
+  const token = profile?.expo_push_token?.trim()
+  if (!token || token === 'local-only') return { sent: false, skipped: true }
+
+  const response = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: token, title, body, data, sound: 'default' }),
+  })
+
+  return { sent: response.ok, skipped: false }
+}
+
+const pushCopy: Record<string, { title: string; body: string }> = {
+  en_route: { title: 'Prestador a caminho', body: 'Seu prestador iniciou o deslocamento.' },
+  in_progress: { title: 'Serviço iniciado', body: 'O serviço foi iniciado.' },
+  cancelled: { title: 'Serviço cancelado', body: 'O serviço foi cancelado.' },
+  disputed: { title: 'Serviço em disputa', body: 'O serviço entrou em análise.' },
 }
 
 // ─── Handler principal ────────────────────────────────────────────────────
@@ -225,11 +253,18 @@ Deno.serve(async (req: Request) => {
     ...(cancel_note ? { cancel_note } : {}),
   })
 
+  const targetUserId = role === 'provider' ? request.client_id : request.provider_id
+  const copy = pushCopy[new_status] ?? { title: 'Serviço atualizado', body: 'O status do serviço foi atualizado.' }
+  const push = targetUserId
+    ? await sendExpoPush(targetUserId, copy.title, copy.body, { screen: 'track', request_id, status: new_status })
+    : { sent: false, skipped: true }
+
   // 11. Retornar resultado
   return ok({
     request_id,
     previous_status: currentStatus,
     new_status,
     updated_at: new Date().toISOString(),
+    push,
   })
 })

@@ -63,6 +63,25 @@ async function logEvent(
   })
 }
 
+async function sendExpoPush(userId: string, title: string, body: string, data: Record<string, unknown> = {}) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('expo_push_token')
+    .eq('id', userId)
+    .maybeSingle()
+
+  const token = profile?.expo_push_token?.trim()
+  if (!token || token === 'local-only') return { sent: false, skipped: true }
+
+  const response = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to: token, title, body, data, sound: 'default' }),
+  })
+
+  return { sent: response.ok, skipped: false }
+}
+
 // ─── Verificar OTP via pgcrypto (crypt no banco) ──────────────────────────
 //
 //    A verificação usa a mesma função hash_otp() da migration 013.
@@ -235,9 +254,13 @@ Deno.serve(async (req: Request) => {
     provider_amount: providerAmount,
   })
 
-  // 13. Retornar resultado
-  //     [Fase 2] Aqui entrará o enfileiramento do repasse ao prestador (D+1)
-  //     [Fase 2] Aqui entrará a notificação push ao cliente para avaliar
+  const push = await sendExpoPush(
+    request.client_id,
+    'Serviço concluído',
+    'Seu serviço foi concluído. Avalie o prestador.',
+    { screen: 'rate', request_id },
+  )
+
   return ok({
     request_id,
     status: 'completed',
@@ -245,5 +268,6 @@ Deno.serve(async (req: Request) => {
     platform_fee: platformFee,
     provider_amount: providerAmount,
     completed_at: completedAt,
+    push,
   })
 })
