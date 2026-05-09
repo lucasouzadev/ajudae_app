@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase, Provider } from '@/lib/supabase';
+import { supabase, type ProviderRow } from '@/lib/supabase';
 
 /**
  * Haversine distance calculation between two geographic points
@@ -21,7 +21,7 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-export interface NearbyProvider extends Provider {
+export interface NearbyProvider extends ProviderRow {
   distance_km?: number;
 }
 
@@ -116,12 +116,13 @@ export function useNearbyProviders(
 
       // Filter by distance and sort
       const nearby = (data || [])
-        .map((provider: Provider) => {
+        .filter((provider: ProviderRow) => provider.location_lat !== undefined && provider.location_lng !== undefined)
+        .map((provider: ProviderRow) => {
           const distance = haversineDistance(
             latitude,
             longitude,
-            provider.location_lat,
-            provider.location_lng,
+            provider.location_lat as number,
+            provider.location_lng as number,
           );
           return {
             ...provider,
@@ -160,7 +161,7 @@ export function useNearbyProviders(
  * Hook to fetch a single provider by ID
  */
 export function useProvider(providerId: string | undefined) {
-  const [provider, setProvider] = useState<Provider | null>(null);
+  const [provider, setProvider] = useState<ProviderRow | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 

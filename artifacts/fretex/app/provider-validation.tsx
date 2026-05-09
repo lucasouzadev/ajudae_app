@@ -109,9 +109,33 @@ const CONTACT_METHODS = [
 ];
 const KEYBOARD_ACCESSORY_ID = "provider-validation-keyboard-accessory";
 let DocumentPickerModule: typeof import("expo-document-picker") | null | undefined;
+let NativeModulesProxy:
+  | Record<string, unknown>
+  | null
+  | undefined;
+
+function hasNativeDocumentPicker() {
+  if (NativeModulesProxy === undefined) {
+    try {
+      const expoModulesCore = require("expo-modules-core") as {
+        NativeModulesProxy?: Record<string, unknown>;
+      };
+      NativeModulesProxy = expoModulesCore.NativeModulesProxy ?? null;
+    } catch {
+      NativeModulesProxy = null;
+    }
+  }
+
+  return Boolean(NativeModulesProxy?.ExpoDocumentPicker);
+}
 
 function getDocumentPicker() {
   if (DocumentPickerModule !== undefined) {
+    return DocumentPickerModule;
+  }
+
+  if (!hasNativeDocumentPicker()) {
+    DocumentPickerModule = null;
     return DocumentPickerModule;
   }
 
@@ -126,6 +150,16 @@ function getDocumentPicker() {
 
 function sanitize(raw: string) {
   return raw.replace(/<[^>]*>/g, "").replace(/[<>"'`\\]/g, "").trimStart();
+}
+
+function toStorageSlug(raw: string) {
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "prestador";
 }
 
 function maskCPF(raw: string) {
@@ -497,6 +531,10 @@ function DocPickerRow({
             <Text style={{ fontSize: 10, fontFamily: fonts.sans.regular, color: c.blue, marginTop: 2 }}>
               Galeria ou PDF
             </Text>
+          ) : !isCamera && !uri ? (
+            <Text style={{ fontSize: 10, fontFamily: fonts.sans.regular, color: c.blue, marginTop: 2 }}>
+              Galeria
+            </Text>
           ) : null}
         </View>
         <Ionicons name={uri ? "checkmark-circle" : "chevron-forward"} size={16} color={uri ? c.blue : c.softMuted} />
@@ -678,6 +716,7 @@ export default function ProviderValidationScreen() {
   }
 
   const providerUser = user;
+  const canPickFiles = hasNativeDocumentPicker();
 
   function setField<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((p) => ({ ...p, [field]: value }));
@@ -843,7 +882,7 @@ export default function ProviderValidationScreen() {
     if (!documentPicker) {
       Alert.alert(
         "Atualize o app",
-        "O envio de PDF e arquivos depende de uma versao mais recente do aplicativo. Por enquanto, selecione pela galeria.",
+        "Esta versao do app ainda nao tem suporte nativo para PDF e arquivos. Instale a build mais recente para liberar esse envio. Por enquanto, use a galeria.",
       );
       await pickFromGallery(field);
       return;
@@ -907,7 +946,10 @@ export default function ProviderValidationScreen() {
     const localAsset = field ? localDocumentAssets.current[field] : undefined;
     const mimeType = inferMimeType(value, localAsset?.mimeType);
     const ext = inferExtension(value, mimeType, localAsset?.fileName);
-    const path = `${providerUser.id}/${Date.now()}-${name}.${ext}`;
+    const providerSlug = toStorageSlug(
+      providerUser.name || form.fullName || providerUser.email || providerUser.id,
+    );
+    const path = `${providerUser.id}/${providerSlug}/${providerSlug}-${name}-${Date.now()}.${ext}`;
     let bytes: Uint8Array;
 
     try {
@@ -1440,8 +1482,8 @@ export default function ProviderValidationScreen() {
                   displayName={getDocumentMeta("docRg").displayName}
                   mimeType={getDocumentMeta("docRg").mimeType}
                   onPickGallery={() => pickFromGallery("docRg")}
-                  onPickDocument={() => pickDocument("docRg")}
-                  hint="Frente e verso · JPG, PNG ou PDF"
+                  onPickDocument={canPickFiles ? () => pickDocument("docRg") : undefined}
+                  hint={canPickFiles ? "Frente e verso · JPG, PNG ou PDF" : "Frente e verso · JPG ou PNG"}
                   error={errors.docRg}
                 />
 
@@ -1452,7 +1494,7 @@ export default function ProviderValidationScreen() {
                   displayName={getDocumentMeta("docResidence").displayName}
                   mimeType={getDocumentMeta("docResidence").mimeType}
                   onPickGallery={() => pickFromGallery("docResidence")}
-                  onPickDocument={() => pickDocument("docResidence")}
+                  onPickDocument={canPickFiles ? () => pickDocument("docResidence") : undefined}
                   hint="Emitido há no máx. 90 dias"
                   error={errors.docResidence}
                 />
@@ -1464,8 +1506,8 @@ export default function ProviderValidationScreen() {
                   displayName={getDocumentMeta("docCnh").displayName}
                   mimeType={getDocumentMeta("docCnh").mimeType}
                   onPickGallery={() => pickFromGallery("docCnh")}
-                  onPickDocument={() => pickDocument("docCnh")}
-                  hint="Dentro da validade — frente e verso"
+                  onPickDocument={canPickFiles ? () => pickDocument("docCnh") : undefined}
+                  hint={canPickFiles ? "Dentro da validade — frente e verso" : "Dentro da validade — envie como foto"}
                   error={errors.docCnh}
                 />
 
@@ -1475,7 +1517,7 @@ export default function ProviderValidationScreen() {
                   displayName={getDocumentMeta("docCrlv").displayName}
                   mimeType={getDocumentMeta("docCrlv").mimeType}
                   onPickGallery={() => pickFromGallery("docCrlv")}
-                  onPickDocument={() => pickDocument("docCrlv")}
+                  onPickDocument={canPickFiles ? () => pickDocument("docCrlv") : undefined}
                   hint="Opcional · Documento do veículo atual"
                   error={errors.docCrlv}
                 />

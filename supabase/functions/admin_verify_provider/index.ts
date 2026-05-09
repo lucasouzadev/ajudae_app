@@ -65,6 +65,49 @@ async function sendEmail(to: string, subject: string, html: string) {
   return { sent: true, skipped: false }
 }
 
+async function sendExpoPush(
+  userId: string,
+  payload: {
+    title: string
+    body: string
+    screen?: string
+  },
+) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('expo_push_token')
+    .eq('id', userId)
+    .maybeSingle()
+
+  const token = profile?.expo_push_token?.trim()
+  if (!token) {
+    return { sent: false, skipped: true }
+  }
+
+  const response = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      to: token,
+      title: payload.title,
+      body: payload.body,
+      sound: 'default',
+      data: payload.screen ? { screen: payload.screen } : {},
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('[admin_verify_provider] expo push:', errorText)
+    return { sent: false, skipped: false }
+  }
+
+  return { sent: true, skipped: false }
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -300,6 +343,18 @@ Deno.serve(async (req: Request) => {
     emailResult = await sendEmail(providerEmail, subject, html)
   }
 
+  const pushResult = await sendExpoPush(provider_id, verified
+    ? {
+        title: 'Perfil verificado!',
+        body: 'Parabéns! Você pode começar a aceitar pedidos no Ajudaê.',
+        screen: 'index',
+      }
+    : {
+        title: 'Validação com ajustes',
+        body: 'Sua documentação precisa de correções antes da aprovação final.',
+        screen: 'index',
+      })
+
   return ok({
     provider_id: updated.id,
     verified: updated.verified,
@@ -307,6 +362,7 @@ Deno.serve(async (req: Request) => {
     onboarding_status: updated.onboarding_status,
     rejection_reason: updated.rejection_reason,
     email: emailResult,
+    push: pushResult,
     updated_at: new Date().toISOString(),
   })
 })

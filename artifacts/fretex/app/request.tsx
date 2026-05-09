@@ -144,7 +144,7 @@ export default function RequestFlowScreen() {
     return (
       <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top, alignItems: "center", justifyContent: "center" }]}>
         <ActivityIndicator size="large" color={c.primary} />
-        <Text style={{ marginTop: 12, color: c.textSecondary, fontSize: 14 }}>Carregando prestador…</Text>
+        <Text style={{ marginTop: 12, color: c.softMuted, fontSize: 14 }}>Carregando prestador…</Text>
       </View>
     );
   }
@@ -152,11 +152,11 @@ export default function RequestFlowScreen() {
   if (providerNotFound) {
     return (
       <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }]}>
-        <Ionicons name="alert-circle-outline" size={48} color={c.error ?? "#FF3B30"} />
+        <Ionicons name="alert-circle-outline" size={48} color={c.destructive} />
         <Text style={{ marginTop: 16, fontSize: 18, fontWeight: "700", color: c.text, textAlign: "center" }}>
           Prestador não encontrado
         </Text>
-        <Text style={{ marginTop: 8, fontSize: 14, color: c.textSecondary, textAlign: "center" }}>
+        <Text style={{ marginTop: 8, fontSize: 14, color: c.softMuted, textAlign: "center" }}>
           Este prestador pode estar offline ou não está mais disponível.
         </Text>
         <Pressable

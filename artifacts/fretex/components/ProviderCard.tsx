@@ -20,15 +20,15 @@ export function ProviderCard({ provider, onPress, layout = 'horizontal' }: Provi
         style={[styles.vContainer, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={onPress}
       >
-        <Avatar src={provider.avatar} name={provider.name} size={64} showRing={provider.isOnline} />
+        <Avatar initials={provider.ini} size={64} color={provider.color} bordered={provider.isOnline} />
         <View style={styles.vContent}>
           <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>{provider.name}</Text>
-          <Text style={[styles.category, { color: colors.mutedForeground }]}>{provider.category}</Text>
+          <Text style={[styles.category, { color: colors.mutedForeground }]}>{provider.cat}</Text>
           
           <View style={styles.ratingRow}>
-            <Feather name="star" size={14} color={colors.warning} style={{ fill: colors.warning }} />
+            <Feather name="star" size={14} color={colors.warning} />
             <Text style={[styles.rating, { color: colors.foreground }]}>{provider.rating}</Text>
-            <Text style={[styles.reviews, { color: colors.mutedForeground }]}>({provider.reviews})</Text>
+            <Text style={[styles.reviews, { color: colors.mutedForeground }]}>({provider.jobs})</Text>
           </View>
         </View>
         
@@ -45,17 +45,17 @@ export function ProviderCard({ provider, onPress, layout = 'horizontal' }: Provi
       style={[styles.hContainer, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={onPress}
     >
-      <Avatar src={provider.avatar} name={provider.name} size={56} showRing={provider.isOnline} />
+      <Avatar initials={provider.ini} size={56} color={provider.color} bordered={provider.isOnline} />
       <View style={styles.hContent}>
         <View style={styles.hHeader}>
           <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>{provider.name}</Text>
           <View style={styles.ratingRow}>
-            <Feather name="star" size={14} color={colors.warning} style={{ fill: colors.warning }} />
+            <Feather name="star" size={14} color={colors.warning} />
             <Text style={[styles.rating, { color: colors.foreground }]}>{provider.rating}</Text>
           </View>
         </View>
         
-        <Text style={[styles.category, { color: colors.mutedForeground }]}>{provider.category} • {provider.neighborhood}</Text>
+        <Text style={[styles.category, { color: colors.mutedForeground }]}>{provider.cat} • {provider.area || `${provider.km} km`}</Text>
         
         <View style={styles.priceRow}>
           <Text style={[styles.price, { color: colors.foreground }]}>R$ {provider.priceFrom}</Text>

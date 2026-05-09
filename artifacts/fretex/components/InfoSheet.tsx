@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Animated,
   ScrollView,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -83,72 +84,75 @@ export function InfoSheet({
   if (!visible) return null;
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents="box-none">
-      {/* Backdrop */}
-      <Animated.View
-        style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.4)", opacity: backdropAnim }]}
-        pointerEvents="auto"
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} />
-      </Animated.View>
-
-      {/* Sheet */}
-      <Animated.View
-        style={[
-          s.sheet,
-          {
-            backgroundColor: c.card,
-            paddingBottom: insets.bottom + 16,
-            transform: [{ translateY: slideAnim }],
-          },
-          shadows.xl,
-        ]}
-      >
-        {/* Handle */}
-        <View style={[s.handle, { backgroundColor: c.border }]} />
-
-        {/* Header */}
-        <View style={s.header}>
-          <View style={[s.accentBar, { backgroundColor: accent }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={[s.title, { color: c.text }]}>{title}</Text>
-            {subtitle ? <Text style={[s.subtitle, { color: c.sub }]}>{subtitle}</Text> : null}
-          </View>
-          <Pressable onPress={close} style={[s.closeBtn, { backgroundColor: c.background }]}>
-            <Ionicons name="close" size={16} color={c.text} />
-          </Pressable>
-        </View>
-
-        {/* Items */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.itemsContainer}
+    <Modal
+      visible
+      transparent
+      animationType="none"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      onRequestClose={close}
+    >
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.4)", opacity: backdropAnim }]}
+          pointerEvents="auto"
         >
-          {items.map((item, i) => (
-            <View key={i} style={[s.item, { borderColor: c.borderLight }]}>
-              <View style={[s.itemIcon, { backgroundColor: `${item.color}18` }]}>
-                <Ionicons name={item.icon} size={18} color={item.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.itemTitle, { color: c.text }]}>{item.title}</Text>
-                <Text style={[s.itemDesc, { color: c.sub }]}>{item.description}</Text>
-              </View>
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            s.sheet,
+            {
+              backgroundColor: c.card,
+              paddingBottom: insets.bottom + 16,
+              transform: [{ translateY: slideAnim }],
+            },
+            shadows.xl,
+          ]}
+        >
+          <View style={[s.handle, { backgroundColor: c.border }]} />
+
+          <View style={s.header}>
+            <View style={[s.accentBar, { backgroundColor: accent }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={[s.title, { color: c.text }]}>{title}</Text>
+              {subtitle ? <Text style={[s.subtitle, { color: c.sub }]}>{subtitle}</Text> : null}
             </View>
-          ))}
-        </ScrollView>
+            <Pressable onPress={close} style={[s.closeBtn, { backgroundColor: c.background }]}>
+              <Ionicons name="close" size={16} color={c.text} />
+            </Pressable>
+          </View>
 
-        {/* CTA */}
-        <Pressable
-          onPress={close}
-          style={[s.cta, { backgroundColor: accent }, shadows.md, { shadowColor: accent, shadowOpacity: 0.3 }]}
-        >
-          <Ionicons name="checkmark-circle" size={17} color={accent === c.primary ? "#1A1714" : "#fff"} />
-          <Text style={[s.ctaText, { color: accent === c.primary ? "#1A1714" : "#fff" }]}>
-            Entendido, vamos lá!
-          </Text>
-        </Pressable>
-      </Animated.View>
-    </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={s.itemsContainer}
+          >
+            {items.map((item, i) => (
+              <View key={i} style={[s.item, { borderColor: c.borderLight }]}>
+                <View style={[s.itemIcon, { backgroundColor: `${item.color}18` }]}>
+                  <Ionicons name={item.icon} size={18} color={item.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.itemTitle, { color: c.text }]}>{item.title}</Text>
+                  <Text style={[s.itemDesc, { color: c.sub }]}>{item.description}</Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+
+          <Pressable
+            onPress={close}
+            style={[s.cta, { backgroundColor: accent }, shadows.md, { shadowColor: accent, shadowOpacity: 0.3 }]}
+          >
+            <Ionicons name="checkmark-circle" size={17} color={accent === c.primary ? "#1A1714" : "#fff"} />
+            <Text style={[s.ctaText, { color: accent === c.primary ? "#1A1714" : "#fff" }]}>
+              Entendido, vamos lá!
+            </Text>
+          </Pressable>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 

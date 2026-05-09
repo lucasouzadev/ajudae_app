@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { getSignedUrls, sanitizeText } from "@/lib/security";
+import { getSignedUrl, sanitizeText } from "@/lib/security";
 
 interface DocRecord {
   id: string;
@@ -18,12 +18,19 @@ interface DocRecord {
 interface ViewerState {
   label: string;
   url: string;
+  previewUrl: string | null;
   fileName: string;
   isImage: boolean;
   isPdf: boolean;
 }
 
-type SignedUrls = Record<string, string | null>;
+interface DocAsset {
+  signedUrl: string | null;
+  previewUrl: string | null;
+  mimeType: string | null;
+}
+
+type DocAssets = Record<string, DocAsset>;
 
 const BUCKET = "provider-docs";
 
@@ -57,13 +64,43 @@ export function Documents() {
   const [docs, setDocs] = useState<DocRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<DocRecord | null>(null);
-  const [signedUrls, setSignedUrls] = useState<SignedUrls>({});
+  const [docAssets, setDocAssets] = useState<DocAssets>({});
   const [failedPreviews, setFailedPreviews] = useState<Record<string, boolean>>({});
   const [signingUrls, setSigningUrls] = useState(false);
   const [actioning, setActioning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [decisionNotes, setDecisionNotes] = useState("");
   const [viewer, setViewer] = useState<ViewerState | null>(null);
+
+  function releaseAssets(assets: DocAssets) {
+    Object.values(assets).forEach((asset) => {
+      if (asset.previewUrl) {
+        URL.revokeObjectURL(asset.previewUrl);
+      }
+    });
+  }
+
+  async function buildDocAsset(path: string): Promise<DocAsset> {
+    const signedUrl = await getSignedUrl(BUCKET, path);
+    if (!signedUrl) {
+      return { signedUrl: null, previewUrl: null, mimeType: null };
+    }
+
+    try {
+      const response = await fetch(signedUrl);
+      if (!response.ok) {
+        return { signedUrl, previewUrl: null, mimeType: null };
+      }
+      const blob = await response.blob();
+      return {
+        signedUrl,
+        previewUrl: URL.createObjectURL(blob),
+        mimeType: blob.type || null,
+      };
+    } catch {
+      return { signedUrl, previewUrl: null, mimeType: null };
+    }
+  }
 
   async function loadDocs() {
     setLoading(true);
@@ -85,7 +122,8 @@ export function Documents() {
     }
 
     setDocs(
-      (data ?? []).map((row: any) => ({
+      (data ?? [])
+        .map((row: any) => ({
         id: row.id,
         provider_name: sanitizeText(row.profiles?.name ?? ""),
         service_type: sanitizeText(row.service_type ?? ""),
@@ -96,7 +134,16 @@ export function Documents() {
         doc_selfie_url: row.doc_selfie_url ?? "",
         onboarding_status: row.onboarding_status,
         submitted_at: row.updated_at,
-      })),
+        }))
+        .sort((a: DocRecord, b: DocRecord) => {
+          const nameCompare = (a.provider_name || "").localeCompare(b.provider_name || "", "pt-BR", {
+            sensitivity: "base",
+          });
+          if (nameCompare !== 0) {
+            return nameCompare;
+          }
+          return (a.submitted_at || "").localeCompare(b.submitted_at || "");
+        }),
     );
     setLoading(false);
   }
@@ -105,33 +152,41 @@ export function Documents() {
     loadDocs();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      releaseAssets(docAssets);
+    };
+  }, [docAssets]);
+
   async function selectProvider(doc: DocRecord) {
     setShowDetail(true);
     setSelected(doc);
-    setSignedUrls({});
+    setDocAssets((prev) => {
+      releaseAssets(prev);
+      return {};
+    });
     setFailedPreviews({});
     setActionError(null);
     setDecisionNotes("");
     setViewer(null);
     setSigningUrls(true);
 
-    const paths: Record<string, string> = {};
-    for (const { key } of DOC_FIELDS) {
-      const value = doc[key] as string;
-      if (value) {
-        paths[key as string] = value;
-      }
-    }
+    const assets = await Promise.all(
+      DOC_FIELDS.map(async ({ key }) => {
+        const value = doc[key] as string;
+        return [key as string, value ? await buildDocAsset(value) : { signedUrl: null, previewUrl: null, mimeType: null }] as const;
+      }),
+    );
 
-    const urls = await getSignedUrls(BUCKET, paths);
-    setSignedUrls(urls);
+    setDocAssets(Object.fromEntries(assets));
     setSigningUrls(false);
   }
 
-  function openViewer(label: string, rawPath: string, signedUrl: string) {
+  function openViewer(label: string, rawPath: string, asset: DocAsset) {
     setViewer({
       label,
-      url: signedUrl,
+      url: asset.signedUrl ?? "",
+      previewUrl: asset.previewUrl,
       fileName: fileNameFromPath(rawPath),
       isImage: isImagePath(rawPath),
       isPdf: isPdfPath(rawPath),
@@ -168,7 +223,10 @@ export function Documents() {
 
     setDocs((prev) => prev.filter((item) => item.id !== id));
     setSelected(null);
-    setSignedUrls({});
+    setDocAssets((prev) => {
+      releaseAssets(prev);
+      return {};
+    });
     setDecisionNotes("");
     setViewer(null);
     setShowDetail(false);
@@ -288,12 +346,14 @@ export function Documents() {
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {DOC_FIELDS.map(({ key, label }) => {
-                    const signedUrl = signedUrls[key as string];
+                    const asset = docAssets[key as string];
                     const rawPath = selected[key] as string;
                     const previewFailed = failedPreviews[key as string];
                     const isImage = isImagePath(rawPath);
                     const isPdf = isPdfPath(rawPath);
-                    const previewAvailable = Boolean(signedUrl);
+                    const previewUrl = asset?.previewUrl ?? null;
+                    const signedUrl = asset?.signedUrl ?? null;
+                    const previewAvailable = Boolean(previewUrl || signedUrl);
                     const fileName = fileNameFromPath(rawPath);
 
                     return (
@@ -305,12 +365,12 @@ export function Documents() {
                         {previewAvailable ? (
                           <button
                             type="button"
-                            onClick={() => signedUrl && openViewer(label, rawPath, signedUrl)}
+                            onClick={() => asset && openViewer(label, rawPath, asset)}
                             className="flex w-full flex-col text-left"
                           >
                             {isImage && !previewFailed ? (
                               <img
-                                src={signedUrl ?? undefined}
+                                src={previewUrl ?? signedUrl ?? undefined}
                                 alt={label}
                                 className="h-56 w-full object-cover"
                                 onError={() =>
@@ -412,7 +472,7 @@ export function Documents() {
               {viewer.isImage ? (
                 <div className="flex h-full items-center justify-center">
                   <img
-                    src={viewer.url}
+                    src={viewer.previewUrl ?? viewer.url}
                     alt={viewer.label}
                     className="max-h-full max-w-full rounded-2xl object-contain shadow-lg"
                   />
@@ -420,7 +480,7 @@ export function Documents() {
               ) : (
                 <iframe
                   title={viewer.label}
-                  src={viewer.url}
+                  src={viewer.previewUrl ?? viewer.url}
                   className="h-full w-full rounded-2xl border border-slate-200 bg-white"
                 />
               )}

@@ -73,6 +73,49 @@ async function sendEmail(to: string, subject: string, html: string) {
   return { sent: true, skipped: false }
 }
 
+async function sendExpoPush(
+  userId: string,
+  payload: {
+    title: string
+    body: string
+    screen?: string
+  },
+) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('expo_push_token')
+    .eq('id', userId)
+    .maybeSingle()
+
+  const token = profile?.expo_push_token?.trim()
+  if (!token) {
+    return { sent: false, skipped: true }
+  }
+
+  const response = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      to: token,
+      title: payload.title,
+      body: payload.body,
+      sound: 'default',
+      data: payload.screen ? { screen: payload.screen } : {},
+    }),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('[provider_validation_submit] expo push:', errorText)
+    return { sent: false, skipped: false }
+  }
+
+  return { sent: true, skipped: false }
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -386,7 +429,7 @@ Deno.serve(async (req: Request) => {
   const providerEmailHtml = buildProviderEmailHtml(input, providerEmail)
   const opsEmailHtml = buildOpsEmailHtml(input, providerEmail)
 
-  const [providerMail, opsMail] = await Promise.all([
+  const [providerMail, opsMail, providerPush] = await Promise.all([
     providerEmail
       ? sendEmail(
           providerEmail,
@@ -399,6 +442,11 @@ Deno.serve(async (req: Request) => {
       'Ajudaê - Nova validação de prestador',
       opsEmailHtml,
     ),
+    sendExpoPush(user.id, {
+      title: 'Documentos recebidos',
+      body: 'Nossa equipe recebeu seus documentos e iniciou a análise da sua validação.',
+      screen: 'index',
+    }),
   ])
 
   return json(200, {
@@ -406,6 +454,9 @@ Deno.serve(async (req: Request) => {
     emails: {
       provider: providerMail,
       operations: opsMail,
+    },
+    push: {
+      provider: providerPush,
     },
   })
 })

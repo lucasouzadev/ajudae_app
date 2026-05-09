@@ -84,8 +84,8 @@ interface ServiceContextType {
   }) => Promise<void>;
   advanceStatus: (next: ServiceStatus, note?: string) => Promise<{ ok: boolean; error?: string }>;
   cancelService: (reason: string) => Promise<{ ok: boolean; error?: string }>;
-  validateStartPin: (entered: string) => Promise<{ ok: boolean; attemptsLeft?: number; disputed?: boolean }>;
-  completeWithConclusion: (entered: string) => Promise<{ ok: boolean; attemptsLeft?: number; disputed?: boolean }>;
+  validateStartPin: (entered: string) => Promise<{ ok: boolean; attemptsLeft?: number; disputed?: boolean; error?: string }>;
+  completeWithConclusion: (entered: string) => Promise<{ ok: boolean; attemptsLeft?: number; disputed?: boolean; error?: string }>;
   openTicket: (ticketId: string) => Promise<void>;
   clear: () => Promise<void>;
 }
@@ -131,6 +131,27 @@ function djb2Hash(str: string): string {
 async function computeCommitment(serviceId: string, pinStart: string, pinConclusion: string): Promise<string> {
   const input = `${serviceId}|${pinStart}|${pinConclusion}`;
   return djb2Hash(input);
+}
+
+async function readEdgeErrorMessage(error: unknown): Promise<string> {
+  const fallback = error instanceof Error ? error.message : "Erro inesperado";
+  const context = (error as { context?: unknown })?.context;
+
+  if (context && typeof (context as Response).clone === "function") {
+    try {
+      const response = (context as Response).clone();
+      const data = await response.json();
+      if (typeof data?.error === "string") {
+        return data.error;
+      }
+      if (typeof data?.message === "string") {
+        return data.message;
+      }
+    } catch {
+    }
+  }
+
+  return fallback;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +200,6 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       const now = new Date().toISOString();
       const pin_start = genPin(4);        // 4 digits for offline validation
       const pin_conclusion = genPin(6);   // 6 digits for OTP completion
-      const commitment = await computeCommitment(`${Date.now()}`, pin_start, pin_conclusion);
 
       // Call Supabase Edge Function to create request
       // Resolve category UUID from DB by name before calling Edge Function
@@ -214,6 +234,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       const serviceId = data.id || `req-${Date.now()}`;
       // Use the server-generated OTP as pin_conclusion so provider's verification matches DB hash
       const serverOtp = data.otp_code || pin_conclusion;
+      const commitment = await computeCommitment(serviceId, pin_start, serverOtp);
 
       const next: ActiveService = {
         ...payload,
@@ -358,6 +379,18 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       const match = await computeCommitment(active.id, entered, active.pin_conclusion) === active.commitment;
 
       if (match) {
+        const { error } = await supabase.functions.invoke('request_update_status', {
+          body: {
+            request_id: active.id,
+            new_status: 'in_progress',
+          },
+        });
+
+        if (error) {
+          const message = await readEdgeErrorMessage(error);
+          return { ok: false, error: message };
+        }
+
         const now = new Date().toISOString();
         await persist({
           ...active,
@@ -369,6 +402,18 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
 
       const attempts = active.startPinAttempts + 1;
       if (attempts >= 5) {
+        const { error } = await supabase.functions.invoke('request_update_status', {
+          body: {
+            request_id: active.id,
+            new_status: 'disputed',
+          },
+        });
+
+        if (error) {
+          const message = await readEdgeErrorMessage(error);
+          return { ok: false, error: message };
+        }
+
         const now = new Date().toISOString();
         await persist({
           ...active,
@@ -383,7 +428,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, attemptsLeft: 5 - attempts };
     } catch (error) {
       console.error('Validate start PIN error:', error);
-      return { ok: false };
+      return { ok: false, error: error instanceof Error ? error.message : "Não foi possível validar o PIN" };
     }
   };
 
@@ -408,9 +453,30 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error('Complete with OTP error:', error);
-        // Backend tracks attempts and may return dispute status
-        throw error;
+        const message = await readEdgeErrorMessage(error);
+        const invalidOtp = message.includes("OTP inválido");
+        const tooManyAttempts = message.includes("Muitas tentativas");
+
+        if (!invalidOtp && !tooManyAttempts) {
+          return { ok: false, error: message };
+        }
+
+        const attempts = active.conclusionAttempts + 1;
+        const disputed = tooManyAttempts || attempts >= 5;
+
+        if (disputed) {
+          const now = new Date().toISOString();
+          await persist({
+            ...active,
+            conclusionAttempts: attempts,
+            status: "disputed",
+            events: [...active.events, { at: now, status: "disputed", note: "PIN de conclusão errado 5x" }],
+          });
+          return { ok: false, disputed: true };
+        }
+
+        await persist({ ...active, conclusionAttempts: attempts });
+        return { ok: false, attemptsLeft: 5 - attempts };
       }
 
       if (data?.ok) {
@@ -442,21 +508,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, attemptsLeft: 5 - attempts };
     } catch (error) {
       console.error('Complete with conclusion error:', error);
-      const attempts = active.conclusionAttempts + 1;
-
-      if (attempts >= 5) {
-        const now = new Date().toISOString();
-        await persist({
-          ...active,
-          conclusionAttempts: attempts,
-          status: "disputed",
-          events: [...active.events, { at: now, status: "disputed", note: "PIN de conclusão errado 5x" }],
-        });
-        return { ok: false, disputed: true };
-      }
-
-      await persist({ ...active, conclusionAttempts: attempts });
-      return { ok: false, attemptsLeft: 5 - attempts };
+      return { ok: false, error: error instanceof Error ? error.message : "Não foi possível concluir o serviço" };
     }
   };
 

@@ -69,7 +69,13 @@ export interface PermissionsContextType extends PermissionsState {
   ) => Promise<void>;
   resetPermissionSettings: () => Promise<void>;
   openSettings: () => void;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<{
+    location: OsPermission;
+    backgroundLocation: OsPermission;
+    camera: OsPermission;
+    mediaLibrary: OsPermission;
+    notifications: OsPermission;
+  }>;
 }
 
 const LGPD_KEY = "@ajudae_lgpd_accepted";
@@ -146,28 +152,40 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       Notifications ? Notifications.getPermissionsAsync() : Promise.resolve({ status: "denied", canAskAgain: false }),
     ]);
     const [locResult, bgLocResult, camResult, libResult, notifResult] = results;
+    const nextLocation =
+      locResult.status === "fulfilled"
+        ? toOsPerm(locResult.value.status, locResult.value.canAskAgain)
+        : DENIED;
+    const nextBackgroundLocation =
+      bgLocResult.status === "fulfilled"
+        ? toOsPerm(bgLocResult.value.status, bgLocResult.value.canAskAgain)
+        : DENIED;
+    const nextCamera =
+      camResult.status === "fulfilled"
+        ? toOsPerm(camResult.value.status, camResult.value.canAskAgain)
+        : DENIED;
+    const nextMediaLibrary =
+      libResult.status === "fulfilled"
+        ? toOsPerm(libResult.value.status, libResult.value.canAskAgain)
+        : DENIED;
+    const nextNotifications =
+      notifResult.status === "fulfilled"
+        ? toNotificationPerm(notifResult.value)
+        : DENIED;
 
-    if (locResult.status === "fulfilled") {
-      setLocation(toOsPerm(locResult.value.status, locResult.value.canAskAgain));
-    }
+    setLocation(nextLocation);
+    setBackgroundLocation(nextBackgroundLocation);
+    setCamera(nextCamera);
+    setMediaLibrary(nextMediaLibrary);
+    setNotifications(nextNotifications);
 
-    if (bgLocResult.status === "fulfilled") {
-      setBackgroundLocation(toOsPerm(bgLocResult.value.status, bgLocResult.value.canAskAgain));
-    }
-
-    if (camResult.status === "fulfilled") {
-      setCamera(toOsPerm(camResult.value.status, camResult.value.canAskAgain));
-    }
-
-    if (libResult.status === "fulfilled") {
-      setMediaLibrary(toOsPerm(libResult.value.status, libResult.value.canAskAgain));
-    }
-
-    if (notifResult.status === "fulfilled") {
-      setNotifications(toNotificationPerm(notifResult.value));
-    } else {
-      setNotifications(DENIED);
-    }
+    return {
+      location: nextLocation,
+      backgroundLocation: nextBackgroundLocation,
+      camera: nextCamera,
+      mediaLibrary: nextMediaLibrary,
+      notifications: nextNotifications,
+    };
   }, []);
 
   useEffect(() => {

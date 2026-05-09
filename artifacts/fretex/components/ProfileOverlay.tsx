@@ -32,17 +32,23 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
     themeMode,
     appLanguage,
     notificationPreferences,
-    requestNotifications,
     setBackgroundTrackingEnabled,
     toggleThemeMode,
     setAppLanguage,
     setNotificationPreference,
     resetPermissionSettings,
     openSettings,
+    refresh,
   } = usePermissions();
-  const { pushToken, isRegisteringPushToken, pushRegistrationError, refreshPushToken } = useNotification();
+  const {
+    pushToken,
+    isRegisteringPushToken,
+    pushRegistrationError,
+    refreshPushToken,
+    requestPermission,
+  } = useNotification();
   const [showDangerZone, setShowDangerZone] = useState(false);
-  const [settingsAccordion, setSettingsAccordion] = useState<"notifications" | null>("notifications");
+  const [settingsAccordion, setSettingsAccordion] = useState<"notifications" | null>(null);
 
   if (label === "Métodos de Pagamento") {
     return (
@@ -254,6 +260,28 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
       await setNotificationPreference(key, nextValue);
     };
 
+    const syncNotificationDevice = async () => {
+      const snapshot = await refresh();
+
+      if (snapshot.notifications.granted) {
+        await refreshPushToken();
+        await refresh();
+        return;
+      }
+
+      if (snapshot.notifications.canAsk) {
+        const granted = await requestPermission();
+        await refresh();
+        if (granted) {
+          await refreshPushToken();
+          await refresh();
+        }
+        return;
+      }
+
+      openSettings();
+    };
+
     const renderTogglePill = (enabled: boolean, activeColor: string) => (
       <View
         style={[
@@ -342,7 +370,6 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
                 Permissão do aparelho, categorias e redefinição
               </Text>
             </View>
-            {renderTogglePill(notifications.granted, c.success)}
             <Ionicons
               name={settingsAccordion === "notifications" ? "chevron-up" : "chevron-down"}
               size={16}
@@ -354,15 +381,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
             <View style={subStyles.accordionBody}>
               <Pressable
                 onPress={() => {
-                  if (notifications.granted) {
-                    openSettings();
-                    return;
-                  }
-                  if (notifications.canAsk) {
-                    requestNotifications();
-                  } else {
-                    openSettings();
-                  }
+                  syncNotificationDevice();
                 }}
                 style={[subStyles.row, { backgroundColor: c.card, borderColor: c.border }]}
               >
@@ -410,15 +429,7 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
 
               <Pressable
                 onPress={() => {
-                  if (!notifications.granted) {
-                    if (notifications.canAsk) {
-                      requestNotifications();
-                    } else {
-                      openSettings();
-                    }
-                    return;
-                  }
-                  refreshPushToken();
+                  syncNotificationDevice();
                 }}
                 style={[subStyles.compactRow, { borderColor: c.border }]}
               >
@@ -430,7 +441,9 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
                       : pushToken
                         ? "Dispositivo sincronizado"
                         : "Sincronizar dispositivo"
-                    : "Ativar push no aparelho"}
+                    : notifications.canAsk
+                      ? "Ativar push no aparelho"
+                      : "Revisar permissões no aparelho"}
                 </Text>
               </Pressable>
 

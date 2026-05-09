@@ -19,16 +19,16 @@ export function ServiceCard({ provider, onPress }: ServiceCardProps) {
       onPress={onPress}
     >
       <View style={styles.header}>
-        <Avatar src={provider.avatar} name={provider.name} size={48} showRing={provider.isOnline} />
+        <Avatar initials={provider.ini} size={48} color={provider.color} bordered={provider.isOnline} />
         <View style={styles.info}>
           <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>
             {provider.name}
           </Text>
           <View style={styles.metaRow}>
-            <Feather name="star" size={14} color={colors.warning} style={{ fill: colors.warning }} />
+            <Feather name="star" size={14} color={colors.warning} />
             <Text style={[styles.rating, { color: colors.foreground }]}>{provider.rating}</Text>
             <Text style={[styles.dot, { color: colors.mutedForeground }]}>•</Text>
-            <Text style={[styles.category, { color: colors.mutedForeground }]}>{provider.category}</Text>
+            <Text style={[styles.category, { color: colors.mutedForeground }]}>{provider.cat}</Text>
           </View>
         </View>
         <View style={styles.priceContainer}>
@@ -40,7 +40,7 @@ export function ServiceCard({ provider, onPress }: ServiceCardProps) {
       <View style={[styles.footer, { borderTopColor: colors.border }]}>
         <Feather name="map-pin" size={14} color={colors.mutedForeground} />
         <Text style={[styles.neighborhood, { color: colors.mutedForeground }]}>
-          Atende em: {provider.neighborhood}
+          Atende em: {provider.area || `${provider.km} km`}
         </Text>
       </View>
     </Pressable>

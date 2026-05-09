@@ -45,7 +45,7 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function AuthGate() {
-  const { isAuthenticated, isLoading, role, accountStatus } = useAuth();
+  const { isAuthenticated, isLoading, role, accountStatus, pendingAccount } = useAuth();
   const { active } = useService();
   const { themeMode } = usePermissions();
   const { bannerStatusBarColor, bannerStatusBarStyle } = useNotification();
@@ -57,8 +57,21 @@ function AuthGate() {
   const currentSegment = String(segments[segments.length - 1] ?? "");
   const authRedirectRef = React.useRef<string | null>(null);
   const activeServiceRedirectRef = React.useRef<string | null>(null);
+  const authRedirectFrameRef = React.useRef<number | null>(null);
+  const activeServiceRedirectFrameRef = React.useRef<number | null>(null);
 
   const terminalStatuses = ["completed", "cancelled", "disputed"];
+
+  useEffect(() => {
+    return () => {
+      if (authRedirectFrameRef.current !== null) {
+        cancelAnimationFrame(authRedirectFrameRef.current);
+      }
+      if (activeServiceRedirectFrameRef.current !== null) {
+        cancelAnimationFrame(activeServiceRedirectFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!Notifications) return;
@@ -77,7 +90,7 @@ function AuthGate() {
     const inPending = rootSegment === "account-pending";
     let target: string | null = null;
 
-    if (accountStatus === "pending_email" && pathname !== "/account-pending") {
+    if (accountStatus === "pending_email" && pendingAccount && pathname !== "/account-pending") {
       target = "/account-pending";
     } else if (!isAuthenticated && pathname !== "/auth" && !inPending) {
       target = "/auth";
@@ -85,16 +98,37 @@ function AuthGate() {
       target = "/";
     }
 
-    if (target && authRedirectRef.current !== target) {
-      authRedirectRef.current = target;
-      router.replace(target as never);
+    if (pathname === target) {
+      authRedirectRef.current = null;
+      if (authRedirectFrameRef.current !== null) {
+        cancelAnimationFrame(authRedirectFrameRef.current);
+        authRedirectFrameRef.current = null;
+      }
       return;
     }
 
-    if (!target || pathname === target) {
+    if (!target) {
       authRedirectRef.current = null;
+      if (authRedirectFrameRef.current !== null) {
+        cancelAnimationFrame(authRedirectFrameRef.current);
+        authRedirectFrameRef.current = null;
+      }
+      return;
     }
-  }, [accountStatus, isAuthenticated, isLoading, pathname, rootSegment]);
+
+    if (authRedirectRef.current === target) {
+      return;
+    }
+
+    authRedirectRef.current = target;
+    if (authRedirectFrameRef.current !== null) {
+      cancelAnimationFrame(authRedirectFrameRef.current);
+    }
+    authRedirectFrameRef.current = requestAnimationFrame(() => {
+      authRedirectFrameRef.current = null;
+      router.replace(target as never);
+    });
+  }, [accountStatus, isAuthenticated, isLoading, pathname, pendingAccount, rootSegment, router]);
 
   useEffect(() => {
     if (!isAuthenticated || isLoading) return;
@@ -108,13 +142,23 @@ function AuthGate() {
       const target = role === "prestador" ? "/job" : "/track";
       if (pathname !== target && activeServiceRedirectRef.current !== target) {
         activeServiceRedirectRef.current = target;
-        router.replace(target as never);
+        if (activeServiceRedirectFrameRef.current !== null) {
+          cancelAnimationFrame(activeServiceRedirectFrameRef.current);
+        }
+        activeServiceRedirectFrameRef.current = requestAnimationFrame(() => {
+          activeServiceRedirectFrameRef.current = null;
+          router.replace(target as never);
+        });
       }
       return;
     }
 
     activeServiceRedirectRef.current = null;
-  }, [active, currentSegment, isAuthenticated, isLoading, pathname, role]);
+    if (activeServiceRedirectFrameRef.current !== null) {
+      cancelAnimationFrame(activeServiceRedirectFrameRef.current);
+      activeServiceRedirectFrameRef.current = null;
+    }
+  }, [active, currentSegment, isAuthenticated, isLoading, pathname, role, router]);
 
   return (
     <>

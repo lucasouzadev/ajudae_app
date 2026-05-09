@@ -48,6 +48,10 @@ export default function JobOtpScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       setError("Pedido em disputa. Entre em contato com o suporte.");
       setTimeout(() => router.replace("/"), 1800);
+    } else if (result.error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      setError(result.error);
+      setSubmitting(false);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       setError(`Código incorreto. ${result.attemptsLeft} tentativa(s) restante(s).`);
