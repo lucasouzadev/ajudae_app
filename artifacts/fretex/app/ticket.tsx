@@ -4,15 +4,10 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useSupport } from "@/contexts/SupportContext";
 import { useService } from "@/contexts/ServiceContext";
-
-const PHOTO_MOCKS = [
-  "https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=300&q=80",
-  "https://images.unsplash.com/photo-1582719188393-bb71ca45dbb9?w=300&q=80",
-  "https://images.unsplash.com/photo-1558959356-2f3631030929?w=300&q=80",
-];
 
 export default function TicketScreen() {
   const c = colors.light;
@@ -23,24 +18,36 @@ export default function TicketScreen() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const valid = description.trim().length >= 20;
 
-  const togglePhoto = (uri: string) => {
-    setPhotos((prev) => (prev.includes(uri) ? prev.filter((p) => p !== uri) : [...prev, uri]));
+  const addPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.75,
+      selectionLimit: 5,
+    });
+    if (result.canceled) return;
+    setPhotos((prev) => Array.from(new Set([...prev, ...result.assets.map((asset) => asset.uri)])).slice(0, 5));
   };
 
   const submit = async () => {
     if (!valid) return;
     setSubmitting(true);
+    setError(null);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    const id = `tk-${Date.now()}`;
-    await createTicket(active?.id || "geral", description);
-    if (active) await openTicket(id);
-    setTimeout(() => {
+    try {
+      const id = await createTicket(active?.id || "", description);
+      if (active && id) await openTicket(id);
       setSent(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível abrir o ticket.");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    } finally {
       setSubmitting(false);
-    }, 400);
+    }
   };
 
   if (sent) {
@@ -111,26 +118,26 @@ export default function TicketScreen() {
         <Text style={[styles.helper, { color: description.length >= 20 ? c.softMuted : c.destructive }]}>
           {description.length} caracteres · mínimo 20
         </Text>
+        {error ? <Text style={[styles.errorText, { color: c.destructive }]}>{error}</Text> : null}
 
         <Text style={[styles.label, { color: c.softMuted, marginTop: 18 }]}>EVIDÊNCIAS (OPCIONAL)</Text>
         <View style={styles.photoGrid}>
-          {PHOTO_MOCKS.map((uri) => {
-            const sel = photos.includes(uri);
-            return (
+          {photos.map((uri) => (
+            <View key={uri} style={[styles.photoTile, { borderColor: c.border, borderWidth: 1 }]}>
+              <Image source={{ uri }} style={styles.photoImg} />
               <Pressable
-                key={uri}
-                onPress={() => togglePhoto(uri)}
-                style={[styles.photoTile, { borderColor: sel ? c.warning : c.border, borderWidth: sel ? 2 : 1 }]}
+                onPress={() => setPhotos((prev) => prev.filter((item) => item !== uri))}
+                style={[styles.photoCheck, { backgroundColor: c.destructive }]}
               >
-                <Image source={{ uri }} style={styles.photoImg} />
-                {sel ? (
-                  <View style={[styles.photoCheck, { backgroundColor: c.warning }]}>
-                    <Ionicons name="checkmark" size={11} color="#fff" />
-                  </View>
-                ) : null}
+                <Ionicons name="close" size={11} color="#fff" />
               </Pressable>
-            );
-          })}
+            </View>
+          ))}
+          {photos.length < 5 ? (
+            <Pressable onPress={addPhoto} style={[styles.photoAdd, { borderColor: c.border, backgroundColor: c.card }]}>
+              <Ionicons name="add" size={18} color={c.softMuted} />
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={[styles.infoBox, { backgroundColor: c.warningLight, borderColor: `${c.warning}66` }]}>
@@ -170,9 +177,11 @@ const styles = StyleSheet.create({
   label: { fontSize: 10, fontFamily: fonts.sans.bold, letterSpacing: 0.8, marginBottom: 6 },
   textArea: { minHeight: 130, borderRadius: 14, borderWidth: 1, padding: 14, fontSize: 13, fontFamily: fonts.sans.regular, textAlignVertical: "top" },
   helper: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 6 },
+  errorText: { fontSize: 12, fontFamily: fonts.sans.semibold, marginTop: 8 },
 
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   photoTile: { width: 70, height: 70, borderRadius: 12, overflow: "hidden" },
+  photoAdd: { width: 70, height: 70, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   photoImg: { width: "100%", height: "100%" },
   photoCheck: { position: "absolute", top: 4, right: 4, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
 

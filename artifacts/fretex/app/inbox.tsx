@@ -10,33 +10,7 @@ import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
 import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { Skeleton } from "@/components/Skeleton";
-
-interface Conversation {
-  id: string;
-  name: string;
-  ini: string;
-  color: string;
-  cat: string;
-  last: string;
-  when: string;
-  unread: number;
-  online: boolean;
-  fromMe?: boolean;
-}
-
-const CLIENTE_CONVERSATIONS: Conversation[] = [
-  { id: "c-1", name: "Carlos Oliveira", ini: "CO", color: "#FF5500", cat: "Mudança · em rota", last: "Cheguei no portão. Pode descer?", when: "2 min", unread: 1, online: true },
-  { id: "c-2", name: "Marcos Frete", ini: "MF", color: "#2563EB", cat: "Frete · combinado", last: "Combinado, até logo!", when: "1 h", unread: 0, online: true, fromMe: true },
-  { id: "c-3", name: "Pedro Entrega", ini: "PE", color: "#9333EA", cat: "Entrega · concluída", last: "Foto da entrega enviada", when: "ontem", unread: 0, online: false },
-  { id: "c-4", name: "Rafael Carreto", ini: "RC", color: "#16A34A", cat: "Frete · proposta", last: "Posso fazer por R$60", when: "ontem", unread: 0, online: false },
-];
-
-const PRESTADOR_CONVERSATIONS: Conversation[] = [
-  { id: "p-1", name: "Ricardo A.", ini: "RA", color: "#FF5500", cat: "Mudança · em andamento", last: "Pode subir o material?", when: "3 min", unread: 2, online: true },
-  { id: "p-2", name: "Julia Nunes", ini: "JN", color: "#2563EB", cat: "Frete · proposta aceita", last: "Aceito sua proposta de R$120", when: "30 min", unread: 1, online: true },
-  { id: "p-3", name: "Marcelo T.", ini: "MT", color: "#16A34A", cat: "Mudança · concluída", last: "Obrigado pelo serviço!", when: "ontem", unread: 0, online: false },
-  { id: "p-4", name: "Helena R.", ini: "HR", color: "#9333EA", cat: "Entrega · combinada", last: "Confirmado para às 19h", when: "ontem", unread: 0, online: false, fromMe: true },
-];
+import { chatInitials, fetchServiceChatThreads, type ServiceChatThread } from "@/lib/serviceChats";
 
 const SUPPORT_HUBS_CLIENTE = [
   { icon: "chatbubbles" as const, lib: "ion" as const, label: "Chat com suporte", sub: "Resposta em até 5 min", color: "#FF5500" },
@@ -50,6 +24,22 @@ const SUPPORT_HUBS_PRESTADOR = [
   { icon: "warning" as const, lib: "ion" as const, label: "Disputa ou no-show", sub: "Abrir ticket de incidente", color: "#FF5500" },
 ];
 
+const statusLabels: Record<string, string> = {
+  accepted: "aceito",
+  en_route: "em rota",
+  in_progress: "em andamento",
+  completed: "concluído",
+  cancelled: "cancelado",
+  disputed: "em disputa",
+};
+
+const formatWhen = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+};
+
 export default function InboxScreen() {
   const c = colors.light;
   const router = useRouter();
@@ -61,18 +51,33 @@ export default function InboxScreen() {
   const [tab, setTab] = useState<"all" | "unread">("all");
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [conversations, setConversations] = useState<ServiceChatThread[]>([]);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 700);
-    return () => clearTimeout(t);
-  }, []);
+    if (!user?.id) return;
+    let mounted = true;
+    setLoading(true);
+    fetchServiceChatThreads(user.id, role)
+      .then((threads) => {
+        if (!mounted) return;
+        setConversations(threads);
+      })
+      .catch(() => {
+        if (mounted) setConversations([]);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [role, user?.id]);
 
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const accent = role === "cliente" ? c.primary : c.blue;
   const accentEnd = role === "cliente" ? c.primaryDeep : "#60A5FA";
   const counterRoleLabel = role === "cliente" ? "prestadores" : "clientes";
-  const conversations = role === "cliente" ? CLIENTE_CONVERSATIONS : PRESTADOR_CONVERSATIONS;
   const hubs = role === "cliente" ? SUPPORT_HUBS_CLIENTE : SUPPORT_HUBS_PRESTADOR;
   const filtered = tab === "unread" ? conversations.filter((m) => m.unread > 0) : conversations;
   const totalUnread = conversations.reduce((sum, m) => sum + m.unread, 0);
@@ -80,10 +85,10 @@ export default function InboxScreen() {
   useEffect(() => {
     if (!openName) return;
     const match = conversations.find((c) =>
-      c.name.toLowerCase().includes((openName as string).toLowerCase().split(" ")[0])
+      c.participant_name.toLowerCase().includes((openName as string).toLowerCase().split(" ")[0])
     );
     if (match) {
-      setHighlightId(match.id);
+      setHighlightId(match.request_id);
       setTimeout(() => scrollRef.current?.scrollTo({ y: conversations.indexOf(match) * 90, animated: true }), 300);
     }
   }, [conversations, openName]);
@@ -120,8 +125,8 @@ export default function InboxScreen() {
             <Text style={styles.heroTitle}>Tudo no mesmo lugar</Text>
             <Text style={styles.heroSub}>
               {role === "cliente"
-                ? "Combine detalhes com seus prestadores."
-                : "Combine detalhes com seus clientes."}
+                ? "Mensagens apenas de serviços aceitos ou agendados."
+                : "Converse somente dentro de serviços aceitos ou agendados."}
             </Text>
           </View>
           <View style={styles.heroBadge}>
@@ -216,40 +221,52 @@ export default function InboxScreen() {
             </Text>
           </View>
         ) : (
-          filtered.map((m) => (
+          filtered.map((m) => {
+            const status = statusLabels[m.status] ?? m.status;
+            const when = formatWhen(m.last_message_at ?? m.scheduled_for ?? m.created_at);
+            const online = m.status === "en_route" || m.status === "in_progress";
+            const last = m.last_message ?? (m.scheduled_for ? "Serviço agendado. Chat liberado." : "Serviço aceito. Chat liberado.");
+            return (
             <Pressable
-              key={m.id}
-              onPress={() => router.push({ pathname: "/chat", params: { id: m.id, name: m.name, ini: m.ini, color: m.color, type: "dm" } } as any)}
+              key={m.request_id}
+              onPress={() => router.push({
+                pathname: "/chat",
+                params: {
+                  id: m.request_id,
+                  requestId: m.request_id,
+                  name: m.participant_name,
+                  ini: chatInitials(m.participant_name),
+                  color: accent,
+                  type: "dm",
+                },
+              } as any)}
               style={[
                 styles.convoCard,
-                { backgroundColor: c.card, borderColor: highlightId === m.id ? accent : c.border },
+                { backgroundColor: c.card, borderColor: highlightId === m.request_id ? accent : c.border },
                 shadows.sm,
-                highlightId === m.id && { borderWidth: 2 },
+                highlightId === m.request_id && { borderWidth: 2 },
               ]}
             >
               <View style={styles.convoAvatarWrap}>
                 <LinearGradient
-                  colors={[m.color, `${m.color}AA`]}
+                  colors={[accent, `${accent}AA`]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.convoAvatar}
                 >
-                  <Text style={styles.convoIni}>{m.ini}</Text>
+                  <Text style={styles.convoIni}>{chatInitials(m.participant_name)}</Text>
                 </LinearGradient>
-                {m.online ? (
+                {online ? (
                   <View style={[styles.convoOnline, { borderColor: c.card, backgroundColor: c.success }]} />
                 ) : null}
               </View>
               <View style={{ flex: 1 }}>
                 <View style={styles.convoHead}>
-                  <Text style={[styles.convoName, { color: c.text }]} numberOfLines={1}>{m.name}</Text>
-                  <Text style={[styles.convoWhen, { color: c.softMuted }]}>{m.when}</Text>
+                  <Text style={[styles.convoName, { color: c.text }]} numberOfLines={1}>{m.participant_name}</Text>
+                  <Text style={[styles.convoWhen, { color: c.softMuted }]}>{when}</Text>
                 </View>
-                <Text style={[styles.convoCat, { color: m.color }]} numberOfLines={1}>{m.cat}</Text>
+                <Text style={[styles.convoCat, { color: accent }]} numberOfLines={1}>{m.category} · {status}</Text>
                 <View style={styles.convoBody}>
-                  {m.fromMe ? (
-                    <Ionicons name="checkmark-done" size={13} color={c.softMuted} style={{ marginRight: 4 }} />
-                  ) : null}
                   <Text
                     style={[
                       styles.convoLast,
@@ -260,17 +277,18 @@ export default function InboxScreen() {
                     ]}
                     numberOfLines={1}
                   >
-                    {m.last}
+                    {last}
                   </Text>
                   {m.unread > 0 ? (
-                    <View style={[styles.unreadBadge, { backgroundColor: m.color }]}>
+                    <View style={[styles.unreadBadge, { backgroundColor: accent }]}>
                       <Text style={styles.unreadText}>{m.unread}</Text>
                     </View>
                   ) : null}
                 </View>
               </View>
             </Pressable>
-          ))
+          );
+          })
         )}
       </ScrollView>
 

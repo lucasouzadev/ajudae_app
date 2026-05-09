@@ -173,6 +173,7 @@ function AuthGate() {
         <Stack.Screen name="account-pending" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="provider-validation" options={{ headerShown: false }} />
         <Stack.Screen name="marketplace" options={{ headerShown: false }} />
+        <Stack.Screen name="proposals" options={{ headerShown: false }} />
         <Stack.Screen name="inbox" options={{ headerShown: false }} />
         <Stack.Screen name="support" options={{ headerShown: false }} />
         <Stack.Screen name="provider/[id]" options={{ presentation: "card", animation: "slide_from_right" }} />

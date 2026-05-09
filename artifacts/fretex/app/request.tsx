@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { CATEGORY_COLORS, type Provider } from "@/constants/mockData";
@@ -12,14 +13,6 @@ import { fetchProviderById } from "@/lib/providers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useService } from "@/contexts/ServiceContext";
 import { usePortfolio } from "@/contexts/PortfolioContext";
-
-const PHOTO_MOCKS = [
-  "https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=400&q=80",
-  "https://images.unsplash.com/photo-1582719188393-bb71ca45dbb9?w=400&q=80",
-  "https://images.unsplash.com/photo-1558959356-2f3631030929?w=400&q=80",
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=80",
-  "https://images.unsplash.com/photo-1494178270175-e96de2971df9?w=400&q=80",
-];
 
 const SCHEDULE_OPTIONS = [
   { id: "1h", label: "Em 1 hora", offset: 60 },
@@ -135,8 +128,15 @@ export default function RequestFlowScreen() {
     else router.back();
   };
 
-  const togglePhoto = (uri: string) => {
-    setPhotos((prev) => (prev.includes(uri) ? prev.filter((p) => p !== uri) : prev.length >= 5 ? prev : [...prev, uri]));
+  const addPhoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.75,
+      selectionLimit: 5,
+    });
+    if (result.canceled) return;
+    setPhotos((prev) => Array.from(new Set([...prev, ...result.assets.map((asset) => asset.uri)])).slice(0, 5));
   };
 
   // ── Loading / error guards (only when a specific providerId was requested) ─
@@ -292,29 +292,25 @@ export default function RequestFlowScreen() {
 
             <Text style={[styles.label, { color: c.softMuted, marginTop: 16 }]}>FOTOS (OPCIONAL · MÁX 5)</Text>
             <View style={styles.photoGrid}>
-              {PHOTO_MOCKS.map((uri) => {
-                const selected = photos.includes(uri);
-                return (
+              {photos.map((uri) => (
+                <View key={uri} style={[styles.photoTile, { borderColor: accent, borderWidth: 1 }]}>
+                  <Image source={{ uri }} style={styles.photoImg} />
                   <Pressable
-                    key={uri}
-                    onPress={() => togglePhoto(uri)}
-                    style={[
-                      styles.photoTile,
-                      { borderColor: selected ? accent : c.border, borderWidth: selected ? 2 : 1 },
-                    ]}
+                    onPress={() => setPhotos((prev) => prev.filter((item) => item !== uri))}
+                    style={[styles.photoCheck, { backgroundColor: accent }]}
                   >
-                    <Image source={{ uri }} style={styles.photoImg} />
-                    {selected ? (
-                      <View style={[styles.photoCheck, { backgroundColor: accent }]}>
-                        <Ionicons name="checkmark" size={11} color="#fff" />
-                      </View>
-                    ) : null}
+                    <Ionicons name="close" size={11} color="#fff" />
                   </Pressable>
-                );
-              })}
+                </View>
+              ))}
+              {photos.length < 5 ? (
+                <Pressable onPress={addPhoto} style={[styles.photoAdd, { borderColor: c.border, backgroundColor: c.card }]}>
+                  <Ionicons name="add" size={18} color={c.softMuted} />
+                </Pressable>
+              ) : null}
             </View>
             <Text style={[styles.helper, { color: c.softMuted, marginTop: 8 }]}>
-              Toque para selecionar · {photos.length}/5 escolhidas
+              {photos.length}/5 escolhidas
             </Text>
           </View>
         ) : null}
@@ -485,6 +481,7 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 110, borderRadius: 14, borderWidth: 1, padding: 14, fontSize: 14, fontFamily: fonts.sans.regular, textAlignVertical: "top" },
   photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   photoTile: { width: 70, height: 70, borderRadius: 12, overflow: "hidden" },
+  photoAdd: { width: 70, height: 70, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   photoImg: { width: "100%", height: "100%" },
   photoCheck: { position: "absolute", top: 4, right: 4, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   toggleCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, borderWidth: 1 },

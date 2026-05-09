@@ -289,7 +289,7 @@ export default function ProviderProfileScreen() {
             <Text style={[styles.ctaPrice, { color: accentText }]}>{provider.price}</Text>
           </View>
           <Pressable
-            onPress={() => router.push({ pathname: "/request", params: { providerId: provider.id } })}
+            onPress={() => router.push("/marketplace")}
             style={[
               styles.ctaBtn,
               { backgroundColor: provider.color },

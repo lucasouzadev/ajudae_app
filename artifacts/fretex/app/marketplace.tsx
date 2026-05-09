@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { MOCK_POSTINGS, FILTERS, CATEGORIES, type Category, type Provider } from "@/constants/mockData";
 import { fetchOnlineProviders } from "@/lib/providers";
+import { createProposal } from "@/lib/proposals";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { Skeleton } from "@/components/Skeleton";
 import { TopNav } from "@/components/TopNav";
@@ -38,9 +39,17 @@ export default function MarketplaceScreen() {
 }
 
 /* ─── Custom Order Modal (Cliente) ────────────────────────────────────── */
-function CustomOrderModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function CustomOrderModal({
+  visible,
+  onClose,
+  provider,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  provider: Provider | null;
+}) {
   const c = colors.light;
-  const [cat, setCat] = useState<Category>("Frete");
+  const [cat, setCat] = useState<Category>(provider?.cat ?? "Frete");
   const [budget, setBudget] = useState("");
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
@@ -48,6 +57,8 @@ function CustomOrderModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [scheduled, setScheduled] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const catColors: Record<Category, string> = {
     Mudança: c.primary,
@@ -55,18 +66,88 @@ function CustomOrderModal({ visible, onClose }: { visible: boolean; onClose: () 
     Entrega: c.success,
   };
 
-  const handleSubmit = () => {
-    if (!origin.trim()) return;
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      onClose();
-      setBudget(""); setOrigin(""); setDestination(""); setDescription(""); setScheduleDate("");
-    }, 1800);
+  useEffect(() => {
+    if (provider?.cat) setCat(provider.cat);
+  }, [provider?.cat]);
+
+  const parseSchedule = () => {
+    const clean = scheduleDate.trim();
+    if (!clean) return undefined;
+    const match = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+    if (!match) return null;
+    const [, day, month, year, hour, minute] = match;
+    const parsed = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+  };
+
+  const reset = () => {
+    setSubmitted(false);
+    setSubmitting(false);
+    setBudget("");
+    setOrigin("");
+    setDestination("");
+    setDescription("");
+    setScheduleDate("");
+    setScheduled(false);
+    setError(null);
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (!provider) {
+      setError("Selecione um prestador para enviar a proposta.");
+      return;
+    }
+    if (!origin.trim()) {
+      setError("Informe o endereço de origem.");
+      return;
+    }
+
+    const scheduledFor = scheduled ? parseSchedule() : undefined;
+    if (scheduled && !scheduledFor) {
+      setError("Informe a data no formato DD/MM/AAAA HH:MM.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await createProposal({
+        provider_id: provider.id,
+        category_name: cat,
+        address_origin: origin.trim(),
+        address_dest: destination.trim() || undefined,
+        description: description.trim() || undefined,
+        price_proposed: budget ? Number(budget) : undefined,
+        needs_helper: false,
+        scheduled_for: scheduledFor || undefined,
+      });
+      setSubmitted(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setTimeout(() => {
+        reset();
+        onClose();
+      }, 1200);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Não foi possível enviar a proposta.";
+      setError(message);
+      if (message.toLowerCase().includes("data") || message.toLowerCase().includes("horário") || message.toLowerCase().includes("agenda")) {
+        setScheduled(true);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: c.background }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -75,10 +156,10 @@ function CustomOrderModal({ visible, onClose }: { visible: boolean; onClose: () 
           <View style={{ flex: 1 }}>
             {/* Header */}
             <View style={[modalStyles.header, { backgroundColor: c.card, borderBottomColor: c.border }]}>
-              <Pressable onPress={onClose} style={modalStyles.headerClose}>
+              <Pressable onPress={handleClose} style={modalStyles.headerClose}>
                 <Ionicons name="close" size={20} color={c.text} />
               </Pressable>
-              <Text style={[modalStyles.headerTitle, { color: c.text }]}>Criar pedido customizado</Text>
+              <Text style={[modalStyles.headerTitle, { color: c.text }]}>{provider ? "Enviar proposta" : "Selecione um prestador"}</Text>
               <View style={{ width: 36 }} />
             </View>
 
@@ -87,7 +168,18 @@ function CustomOrderModal({ visible, onClose }: { visible: boolean; onClose: () 
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Category */}
+              {provider ? (
+                <View style={[modalStyles.providerSummary, { backgroundColor: c.card, borderColor: c.border }]}>
+                  <View style={[modalStyles.providerDot, { backgroundColor: provider.color }]}>
+                    <Text style={modalStyles.providerIni}>{provider.ini}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[modalStyles.providerName, { color: c.text }]}>{provider.name}</Text>
+                    <Text style={[modalStyles.providerSub, { color: c.softMuted }]}>{provider.cat} · {provider.isOnline ? "online" : "indisponível"}</Text>
+                  </View>
+                </View>
+              ) : null}
+
               <Text style={[modalStyles.label, { color: c.sub }]}>Categoria</Text>
               <View style={modalStyles.catRow}>
                 {CATEGORIES.map((c2) => {
@@ -213,32 +305,36 @@ function CustomOrderModal({ visible, onClose }: { visible: boolean; onClose: () 
                 </View>
               ) : null}
 
-              {/* CTA */}
+              {error ? (
+                <View style={[modalStyles.errorBox, { backgroundColor: "#FFF1F2", borderColor: c.destructive }]}>
+                  <Ionicons name="alert-circle" size={16} color={c.destructive} />
+                  <Text style={[modalStyles.errorText, { color: c.destructive }]}>{error}</Text>
+                </View>
+              ) : null}
+
               <Pressable
                 onPress={handleSubmit}
+                disabled={submitting || submitted}
                 style={[
                   modalStyles.cta,
-                  { backgroundColor: submitted ? c.success : catColors[cat] },
+                  { backgroundColor: submitted ? c.success : catColors[cat], opacity: submitting ? 0.7 : 1 },
                 ]}
               >
                 {submitted ? (
                   <>
                     <Ionicons name="checkmark-circle" size={18} color={submitted ? "#fff" : "#1A1714"} />
-                    <Text style={[modalStyles.ctaText, { color: "#fff" }]}>Pedido publicado!</Text>
+                    <Text style={[modalStyles.ctaText, { color: "#fff" }]}>Proposta enviada!</Text>
                   </>
                 ) : (
                   <>
                     <Ionicons name="send" size={16} color={cat === "Mudança" ? "#1A1714" : "#fff"} />
                     <Text style={[modalStyles.ctaText, { color: cat === "Mudança" ? "#1A1714" : "#fff" }]}>
-                      Publicar pedido
+                      {submitting ? "Enviando..." : "Enviar proposta"}
                     </Text>
                   </>
                 )}
               </Pressable>
 
-              <Text style={[modalStyles.hint, { color: c.softMuted }]}>
-                Seu pedido ficará visível para prestadores da sua região darem lances ou aceitarem imediatamente.
-              </Text>
             </ScrollView>
           </View>
         </TouchableWithoutFeedback>
@@ -327,7 +423,6 @@ function MapExpandModal({
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
                   onRequest?.(active.id);
                   onClose();
-                  router.push({ pathname: "/request", params: { providerId: active.id } });
                 }}
                 style={{ backgroundColor: active.color, borderRadius: 14, height: 48, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}
               >
@@ -375,6 +470,7 @@ function ClienteMarketplace() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [activePin, setActivePin] = useState<string | null>(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
   const [mapExpanded, setMapExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -421,6 +517,10 @@ function ClienteMarketplace() {
   }, [filtered, activePin]);
 
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
+  const openProposalModal = (provider: Provider | null) => {
+    setSelectedProvider(provider);
+    setOrderModalOpen(true);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#EDEAE3" }}>
@@ -472,11 +572,11 @@ function ClienteMarketplace() {
 
         {/* Criar pedido customizado — abaixo do mapa */}
         <Pressable
-          onPress={() => setOrderModalOpen(true)}
+          onPress={() => openProposalModal(sortedList[0] ?? null)}
           style={[styles.orderBtn, { backgroundColor: c.text }]}
         >
           <Ionicons name="add" size={15} color={c.primary} />
-          <Text style={[styles.orderBtnText, { color: c.primary }]}>Criar pedido customizado</Text>
+          <Text style={[styles.orderBtnText, { color: c.primary }]}>Enviar proposta com detalhes</Text>
           <Ionicons name="chevron-forward" size={13} color={`${c.primary}99`} />
         </Pressable>
 
@@ -569,7 +669,15 @@ function ClienteMarketplace() {
                 <Text style={[styles.priceFrom, { color: c.softMuted }]}>a partir de</Text>
                 <Text style={[styles.priceVal, { color: p.color === "#FFCC00" ? "#8B6F00" : p.color }]}>{p.price}</Text>
                 <View style={{ flex: 1 }} />
-                <Ionicons name="chevron-forward" size={16} color={c.softMuted} />
+                <Pressable
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    openProposalModal(p);
+                  }}
+                  style={[styles.proposalBtn, { backgroundColor: `${p.color}18`, borderColor: `${p.color}44` }]}
+                >
+                  <Text style={[styles.proposalBtnText, { color: p.color === "#FFCC00" ? "#8B6F00" : p.color }]}>Proposta</Text>
+                </Pressable>
               </View>
             </View>
           </Pressable>
@@ -585,8 +693,18 @@ function ClienteMarketplace() {
 
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
       <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Cliente"} initials={initials} />
-      <CustomOrderModal visible={orderModalOpen} onClose={() => setOrderModalOpen(false)} />
-      <MapExpandModal visible={mapExpanded} onClose={() => setMapExpanded(false)} pins={onlinePins} role="cliente" onRequest={(id) => { setActivePin(id); }} />
+      <CustomOrderModal visible={orderModalOpen} onClose={() => setOrderModalOpen(false)} provider={selectedProvider} />
+      <MapExpandModal
+        visible={mapExpanded}
+        onClose={() => setMapExpanded(false)}
+        pins={onlinePins}
+        role="cliente"
+        onRequest={(id) => {
+          const provider = providers.find((p) => p.id === id) ?? null;
+          setActivePin(id);
+          openProposalModal(provider);
+        }}
+      />
       <InfoSheet
         storageKey="ajudae_info_marketplace_cliente"
         title="Bem-vindo ao Marketplace"
@@ -863,6 +981,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   orderBtnText: { flex: 1, fontSize: 13, fontFamily: fonts.sans.bold },
+  proposalBtn: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  proposalBtnText: { fontSize: 10, fontFamily: fonts.sans.bold },
   readonlyBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -1004,4 +1129,11 @@ const modalStyles = StyleSheet.create({
   },
   ctaText: { fontSize: 15, fontFamily: fonts.sans.bold },
   hint: { fontSize: 11, fontFamily: fonts.sans.regular, textAlign: "center", marginTop: 12, lineHeight: 16 },
+  providerSummary: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 6 },
+  providerDot: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  providerIni: { color: "#fff", fontSize: 13, fontFamily: fonts.serif.extra },
+  providerName: { fontSize: 13, fontFamily: fonts.sans.bold },
+  providerSub: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 2 },
+  errorBox: { flexDirection: "row", alignItems: "flex-start", gap: 8, borderRadius: 12, borderWidth: 1, padding: 10, marginTop: 14 },
+  errorText: { flex: 1, fontSize: 12, fontFamily: fonts.sans.semibold, lineHeight: 17 },
 });

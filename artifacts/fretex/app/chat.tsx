@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { supabase } from "@/lib/supabase";
 import { fetchQuickMessages, sendQuickMessage, type QuickMessageRow } from "@/lib/quickMessages";
+import { fetchServiceChatDetails, type ServiceChatDetails } from "@/lib/serviceChats";
 
 interface Msg {
   id: string;
@@ -133,6 +134,34 @@ const QUICK_REPLIES_DM = [
   "Pode confirmar o endereço?",
 ];
 
+const readOnlyStatuses = new Set(["completed", "cancelled", "disputed"]);
+const openChatStatuses = new Set(["accepted", "en_route", "in_progress", "completed", "cancelled", "disputed"]);
+const serviceStatusLabels: Record<string, string> = {
+  accepted: "Aceito",
+  en_route: "Em rota",
+  in_progress: "Em andamento",
+  completed: "Concluído",
+  cancelled: "Cancelado",
+  disputed: "Em disputa",
+};
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return "Agora";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Agora";
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatPrice = (value: number | null) => {
+  if (!value) return "A combinar";
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+};
+
 export default function ChatScreen() {
   const c = colors.light;
   const router = useRouter();
@@ -156,6 +185,10 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
+  const [service, setService] = useState<ServiceChatDetails | null>(null);
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const [serviceError, setServiceError] = useState<string | null>(null);
+  const [serviceOpen, setServiceOpen] = useState(true);
   const flatRef = useRef<FlatList>(null);
   const replyIdx = useRef(0);
 
@@ -163,6 +196,9 @@ export default function ChatScreen() {
   const accent = isSupport ? c.blue : chatColor;
   const quickReplies = isSupport ? QUICK_REPLIES_SUPPORT : QUICK_REPLIES_DM;
   const autoReplies = AUTO_REPLIES[chatType] || AUTO_REPLIES.dm;
+  const isBlockedDm = chatType === "dm" && !isRealtimeChat;
+  const serviceReadOnly = Boolean(service && readOnlyStatuses.has(service.status));
+  const canSend = !isBlockedDm && !serviceReadOnly && (!isRealtimeChat || Boolean(service && !serviceError));
 
   const mapRowToMessage = (row: QuickMessageRow): Msg => ({
     id: row.id,
@@ -173,8 +209,44 @@ export default function ChatScreen() {
   });
 
   useEffect(() => {
+    if (!isRealtimeChat || !user?.id) {
+      setService(null);
+      setServiceError(null);
+      return;
+    }
+
+    let mounted = true;
+    setServiceLoading(true);
+    setServiceError(null);
+    fetchServiceChatDetails(realtimeRequestId, user.id)
+      .then((details) => {
+        if (!mounted) return;
+        if (!details || !openChatStatuses.has(details.status)) {
+          setService(null);
+          setServiceError("Chat indisponível para este serviço.");
+          return;
+        }
+        setService(details);
+      })
+      .catch(() => {
+        if (mounted) setServiceError("Não foi possível carregar os dados do serviço.");
+      })
+      .finally(() => {
+        if (mounted) setServiceLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [isRealtimeChat, realtimeRequestId, user?.id]);
+
+  useEffect(() => {
     if (!isRealtimeChat) {
-      setMessages(MOCK_THREADS[threadKey] || MOCK_THREADS[chatType] || []);
+      if (chatType === "dm") {
+        setMessages([]);
+      } else {
+        setMessages(MOCK_THREADS[threadKey] || MOCK_THREADS[chatType] || []);
+      }
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
       return;
     }
@@ -218,6 +290,7 @@ export default function ChatScreen() {
   }, [chatType, isRealtimeChat, realtimeRequestId, threadKey, user?.id]);
 
   const send = async (msg: string) => {
+    if (!canSend) return;
     if (!msg.trim()) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const clean = msg.trim();
@@ -331,7 +404,7 @@ export default function ChatScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[chatStyles.headerName, { color: c.text }]} numberOfLines={1}>{name || "Suporte"}</Text>
           <Text style={[chatStyles.headerSub, { color: c.success }]}>
-            {typing ? "digitando..." : "online"}
+            {typing ? "digitando..." : isSupport ? "online" : serviceLoading ? "carregando serviço" : service ? (serviceStatusLabels[service.status] ?? service.status) : "chat bloqueado"}
           </Text>
         </View>
         {isSupport && (
@@ -355,6 +428,17 @@ export default function ChatScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
+          ListEmptyComponent={
+            isBlockedDm || serviceError ? (
+              <View style={[chatStyles.blockedState, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Ionicons name="lock-closed" size={20} color={c.softMuted} />
+                <Text style={[chatStyles.blockedTitle, { color: c.text }]}>Chat indisponível</Text>
+                <Text style={[chatStyles.blockedText, { color: c.softMuted }]}>
+                  {serviceError ?? "O chat só abre após uma proposta aceita ou um serviço agendado."}
+                </Text>
+              </View>
+            ) : null
+          }
           ListFooterComponent={
             typing ? (
               <View style={[msgStyles.row]}>
@@ -379,8 +463,60 @@ export default function ChatScreen() {
           }
         />
 
-        {/* Quick replies */}
-        {messages.length <= 3 && (
+        {service ? (
+          <View style={[chatStyles.serviceSheet, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Pressable style={chatStyles.serviceSheetHead} onPress={() => setServiceOpen((value) => !value)}>
+              <View style={{ flex: 1 }}>
+                <Text style={[chatStyles.serviceSheetTitle, { color: c.text }]} numberOfLines={1}>
+                  {service.category} · {serviceStatusLabels[service.status] ?? service.status}
+                </Text>
+                <Text style={[chatStyles.serviceSheetSub, { color: c.softMuted }]} numberOfLines={1}>
+                  {formatPrice(service.price)} · {formatDateTime(service.scheduled_for)}
+                </Text>
+              </View>
+              <Ionicons name={serviceOpen ? "chevron-down" : "chevron-up"} size={18} color={c.softMuted} />
+            </Pressable>
+            {serviceOpen ? (
+              <View style={chatStyles.serviceSheetBody}>
+                <View style={chatStyles.serviceInfoRow}>
+                  <Text style={[chatStyles.serviceInfoLabel, { color: c.softMuted }]}>Cliente</Text>
+                  <Text style={[chatStyles.serviceInfoValue, { color: c.text }]}>{service.client_name}</Text>
+                </View>
+                <View style={chatStyles.serviceInfoRow}>
+                  <Text style={[chatStyles.serviceInfoLabel, { color: c.softMuted }]}>Prestador</Text>
+                  <Text style={[chatStyles.serviceInfoValue, { color: c.text }]}>{service.provider_name}</Text>
+                </View>
+                <View style={chatStyles.serviceInfoRow}>
+                  <Text style={[chatStyles.serviceInfoLabel, { color: c.softMuted }]}>Origem</Text>
+                  <Text style={[chatStyles.serviceInfoValue, { color: c.text }]}>{service.address_origin}</Text>
+                </View>
+                {service.address_dest ? (
+                  <View style={chatStyles.serviceInfoRow}>
+                    <Text style={[chatStyles.serviceInfoLabel, { color: c.softMuted }]}>Destino</Text>
+                    <Text style={[chatStyles.serviceInfoValue, { color: c.text }]}>{service.address_dest}</Text>
+                  </View>
+                ) : null}
+                {service.description ? (
+                  <View style={chatStyles.serviceInfoRow}>
+                    <Text style={[chatStyles.serviceInfoLabel, { color: c.softMuted }]}>Detalhes</Text>
+                    <Text style={[chatStyles.serviceInfoValue, { color: c.text }]}>{service.description}</Text>
+                  </View>
+                ) : null}
+                <View style={chatStyles.serviceInfoRow}>
+                  <Text style={[chatStyles.serviceInfoLabel, { color: c.softMuted }]}>Ajudante</Text>
+                  <Text style={[chatStyles.serviceInfoValue, { color: c.text }]}>{service.needs_helper ? "Sim" : "Não"}</Text>
+                </View>
+                {service.media_urls.length > 0 ? (
+                  <Text style={[chatStyles.serviceSheetSub, { color: c.softMuted }]}>
+                    {service.media_urls.length} foto(s) anexada(s)
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {messages.length <= 3 && canSend && (
           <View style={chatStyles.quickWrap}>
             {quickReplies.map((q) => (
               <Pressable
@@ -394,8 +530,16 @@ export default function ChatScreen() {
           </View>
         )}
 
-        {/* Input */}
         <View style={[chatStyles.inputBar, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: insets.bottom || 16 }]}>
+          {!canSend ? (
+            <View style={[chatStyles.readOnlyBar, { backgroundColor: c.background, borderColor: c.borderLight }]}>
+              <Ionicons name="lock-closed" size={15} color={c.softMuted} />
+              <Text style={[chatStyles.readOnlyText, { color: c.softMuted }]}>
+                {serviceReadOnly ? "Histórico visível. Envio desabilitado." : "Chat liberado apenas para serviço aceito ou agendado."}
+              </Text>
+            </View>
+          ) : (
+            <>
           <View style={[chatStyles.inputWrap, { backgroundColor: c.background, borderColor: c.borderLight }]}>
             <TextInput
               value={text}
@@ -410,11 +554,13 @@ export default function ChatScreen() {
           </View>
           <Pressable
             onPress={() => send(text)}
-            disabled={!text.trim()}
+            disabled={!text.trim() || !canSend}
             style={[chatStyles.sendBtn, { backgroundColor: text.trim() ? accent : c.borderLight }]}
           >
             <Ionicons name="send" size={16} color={text.trim() ? "#fff" : c.softMuted} />
           </Pressable>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -459,6 +605,36 @@ const chatStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  blockedState: {
+    marginTop: 28,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 22,
+    alignItems: "center",
+    gap: 8,
+  },
+  blockedTitle: { fontSize: 14, fontFamily: fonts.sans.bold },
+  blockedText: { fontSize: 12, fontFamily: fonts.sans.regular, textAlign: "center", lineHeight: 17 },
+  serviceSheet: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  serviceSheetHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  serviceSheetTitle: { fontSize: 13, fontFamily: fonts.sans.bold },
+  serviceSheetSub: { fontSize: 11, fontFamily: fonts.sans.medium, marginTop: 2 },
+  serviceSheetBody: { paddingHorizontal: 14, paddingBottom: 12, gap: 8 },
+  serviceInfoRow: { gap: 2 },
+  serviceInfoLabel: { fontSize: 10, fontFamily: fonts.sans.bold, letterSpacing: 0.5 },
+  serviceInfoValue: { fontSize: 12, fontFamily: fonts.sans.medium, lineHeight: 17 },
   quickWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -502,6 +678,17 @@ const chatStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  readOnlyBar: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  readOnlyText: { flex: 1, fontSize: 12, fontFamily: fonts.sans.medium },
 });
 
 const msgStyles = StyleSheet.create({

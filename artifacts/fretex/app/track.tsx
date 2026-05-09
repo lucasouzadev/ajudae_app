@@ -333,7 +333,7 @@ export default function TrackScreen() {
         </View>
       ) : isCancelled ? (
         <View style={[styles.ctaWrap, { backgroundColor: c.card, borderTopColor: c.border, paddingBottom: 14 + insets.bottom }]}>
-          <Pressable onPress={() => router.replace("/request")} style={[styles.cta, { backgroundColor: c.primary, flex: 1 }]}>
+          <Pressable onPress={() => router.replace("/marketplace")} style={[styles.cta, { backgroundColor: c.primary, flex: 1 }]}>
             <Text style={styles.ctaTxt}>Criar novo pedido</Text>
           </Pressable>
         </View>

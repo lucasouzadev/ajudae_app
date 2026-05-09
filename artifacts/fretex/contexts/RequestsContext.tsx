@@ -1,7 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
-export type ServiceStatus = 'draft' | 'requested' | 'matching' | 'accepted' | 'provider_en_route' | 'provider_arrived' | 'in_progress' | 'completed_pending_confirmation' | 'completed' | 'cancelled' | 'disputed';
+export type ServiceStatus = "draft" | "requested" | "matching" | "accepted" | "provider_en_route" | "provider_arrived" | "in_progress" | "completed_pending_confirmation" | "completed" | "cancelled" | "disputed";
 
 export interface ServiceRequest {
   id: string;
@@ -17,59 +17,58 @@ export interface ServiceRequest {
 
 interface RequestsContextType {
   requests: ServiceRequest[];
-  createRequest: (req: Omit<ServiceRequest, 'id' | 'createdAt' | 'status'>) => Promise<void>;
+  createRequest: (req: Omit<ServiceRequest, "id" | "createdAt" | "status">) => Promise<void>;
   updateStatus: (id: string, status: ServiceStatus) => Promise<void>;
 }
 
-const mockRequests: ServiceRequest[] = [
-  {
-    id: 'req-1',
-    customerId: '1',
-    providerId: 'p-1',
-    status: 'completed',
-    origin: 'Vila Madalena, SP',
-    destination: 'Pinheiros, SP',
-    price: 150,
-    serviceType: 'Mudança',
-    createdAt: new Date().toISOString(),
-  },
-];
-
 const RequestsContext = createContext<RequestsContextType | null>(null);
+
+function mapRequest(row: any): ServiceRequest {
+  return {
+    id: row.id,
+    customerId: row.client_id,
+    providerId: row.provider_id ?? undefined,
+    status: row.status,
+    origin: row.address_origin,
+    destination: row.address_dest ?? "",
+    price: Number(row.price_final ?? row.price_estimated ?? 0),
+    serviceType: row.categories?.name ?? "Serviço",
+    createdAt: row.created_at,
+  };
+}
 
 export function RequestsProvider({ children }: { children: React.ReactNode }) {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
 
-  useEffect(() => {
-    load();
-  }, []);
-
   const load = async () => {
-    const stored = await AsyncStorage.getItem('@fretex_requests');
-    if (stored) {
-      setRequests(JSON.parse(stored));
-    } else {
-      setRequests(mockRequests);
-      await AsyncStorage.setItem('@fretex_requests', JSON.stringify(mockRequests));
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setRequests([]);
+      return;
     }
+
+    const { data } = await supabase
+      .from("requests")
+      .select("id, client_id, provider_id, status, address_origin, address_dest, price_final, price_estimated, created_at, categories(name)")
+      .or(`client_id.eq.${user.id},provider_id.eq.${user.id}`)
+      .order("created_at", { ascending: false });
+
+    setRequests((data ?? []).map(mapRequest));
   };
 
-  const createRequest = async (req: Omit<ServiceRequest, 'id' | 'createdAt' | 'status'>) => {
-    const newReq: ServiceRequest = {
-      ...req,
-      id: `req-${Date.now()}`,
-      status: 'requested',
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [newReq, ...requests];
-    setRequests(updated);
-    await AsyncStorage.setItem('@fretex_requests', JSON.stringify(updated));
+  useEffect(() => {
+    load().catch(() => setRequests([]));
+  }, []);
+
+  const createRequest = async (_req: Omit<ServiceRequest, "id" | "createdAt" | "status">) => {
+    await load();
   };
 
   const updateStatus = async (id: string, status: ServiceStatus) => {
-    const updated = requests.map(r => r.id === id ? { ...r, status } : r);
-    setRequests(updated);
-    await AsyncStorage.setItem('@fretex_requests', JSON.stringify(updated));
+    setRequests((current) => current.map((request) => request.id === id ? { ...request, status } : request));
   };
 
   return (
@@ -81,6 +80,6 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
 
 export const useRequests = () => {
   const context = useContext(RequestsContext);
-  if (!context) throw new Error('useRequests must be used within RequestsProvider');
+  if (!context) throw new Error("useRequests must be used within RequestsProvider");
   return context;
 };

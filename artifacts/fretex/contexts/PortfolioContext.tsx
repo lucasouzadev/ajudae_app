@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export interface PortfolioService {
   title: string;
@@ -15,24 +16,21 @@ export interface PortfolioData {
   reviewAuthor: string;
   supportsHelpers: boolean;
   helpersCount: number;
-  photoSections: boolean; // toggle para mostrar a seção de fotos no perfil público
+  photoSections: boolean;
   reviewSection: boolean;
   servicesSection: boolean;
 }
 
-const DEFAULT_PORTFOLIO: PortfolioData = {
-  bio: "Especialista em mudanças residenciais e comerciais na Zona Norte do Rio. Mais de 5 anos de experiência, equipe treinada e veículo segurado.",
-  promoText: "Mudança completa com 10% OFF",
-  promoDue: "30/05",
-  services: [
-    { title: "Mudança Residencial", price: "R$89", desc: "Apartamento ou casa, com 2 ajudantes incluídos" },
-    { title: "Frete Rápido", price: "R$49", desc: "Itens avulsos, entrega em até 2h na região" },
-  ],
-  featuredReview: "Excelente profissional! Cuidou de tudo com muito cuidado e chegou no horário marcado. Super recomendo!",
-  reviewAuthor: "Maria S.",
-  supportsHelpers: true,
-  helpersCount: 2,
-  photoSections: true,
+const EMPTY_PORTFOLIO: PortfolioData = {
+  bio: "",
+  promoText: "",
+  promoDue: "",
+  services: [],
+  featuredReview: "",
+  reviewAuthor: "",
+  supportsHelpers: false,
+  helpersCount: 0,
+  photoSections: false,
   reviewSection: true,
   servicesSection: true,
 };
@@ -45,7 +43,31 @@ interface PortfolioContextType {
 const PortfolioContext = createContext<PortfolioContextType | null>(null);
 
 export function PortfolioProvider({ children }: { children: React.ReactNode }) {
-  const [portfolio, setPortfolio] = useState<PortfolioData>(DEFAULT_PORTFOLIO);
+  const [portfolio, setPortfolioState] = useState<PortfolioData>(EMPTY_PORTFOLIO);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("providers")
+        .select("bio")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (data?.bio) setPortfolioState((current) => ({ ...current, bio: data.bio }));
+    }).catch(() => {});
+  }, []);
+
+  const setPortfolio: React.Dispatch<React.SetStateAction<PortfolioData>> = (next) => {
+    setPortfolioState((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return;
+        supabase.from("providers").update({ bio: resolved.bio }).eq("id", user.id).then(() => {});
+      }).catch(() => {});
+      return resolved;
+    });
+  };
+
   return (
     <PortfolioContext.Provider value={{ portfolio, setPortfolio }}>
       {children}

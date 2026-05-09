@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useService } from "@/contexts/ServiceContext";
+import { submitServiceRating } from "@/lib/ratings";
 
 const STAR_LABELS = ["Péssimo", "Ruim", "Regular", "Bom", "Excelente"];
 
@@ -17,6 +18,7 @@ export default function RateScreen() {
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!active) {
     return (
@@ -34,11 +36,17 @@ export default function RateScreen() {
   const submit = async () => {
     if (stars === 0) return;
     setSubmitting(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    setTimeout(async () => {
+    setError(null);
+    try {
+      await submitServiceRating(active.id, stars as 1 | 2 | 3 | 4 | 5, comment);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await clear();
       router.replace("/");
-    }, 600);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível enviar a avaliação.");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      setSubmitting(false);
+    }
   };
 
   const skip = async () => {
@@ -112,6 +120,9 @@ export default function RateScreen() {
           onChangeText={setComment}
         />
         <Text style={[styles.helper, { color: c.softMuted }]}>{comment.length}/300</Text>
+        {error ? (
+          <Text style={[styles.errorText, { color: c.destructive }]}>{error}</Text>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.bottomBar, { backgroundColor: c.card, borderTopColor: c.borderLight, paddingBottom: insets.bottom + 14 }]}>
@@ -155,6 +166,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 10, fontFamily: fonts.sans.bold, letterSpacing: 0.8, marginBottom: 6 },
   textArea: { minHeight: 100, borderRadius: 14, borderWidth: 1, padding: 14, fontSize: 13, fontFamily: fonts.sans.regular, textAlignVertical: "top" },
   helper: { fontSize: 11, fontFamily: fonts.sans.regular, marginTop: 4, textAlign: "right" },
+  errorText: { fontSize: 12, fontFamily: fonts.sans.semibold, marginTop: 10, textAlign: "center" },
 
   bottomBar: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 16, borderTopWidth: 1, flexDirection: "row", gap: 8 },
   skipBtn: { paddingHorizontal: 18, height: 50, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },

@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { useService } from "@/contexts/ServiceContext";
 import { FILTERS, CATEGORY_COLORS, type Category, type Provider } from "@/constants/mockData";
 import { fetchOnlineProviders } from "@/lib/providers";
+import { toggleProviderActive } from "@/lib/providerAvailability";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
@@ -777,7 +778,7 @@ const hubStyles = StyleSheet.create({
   divider: { height: 1, marginHorizontal: 0, marginVertical: 16 },
 });
 
-type TabKey = "inicio" | "pedidos" | "marketplace" | "inbox" | "portfolio";
+type TabKey = "inicio" | "pedidos" | "marketplace" | "inbox" | "portfolio" | "proposals";
 
 export default function HomeScreen() {
   const { user, role } = useAuth();
@@ -793,6 +794,7 @@ function ClienteTabsWrapper() {
   const hasBadge = !!(active && active.status !== "completed" && active.status !== "cancelled");
   const handleTabPress = (key: string) => {
     if (key === "marketplace") { router.push("/marketplace"); return; }
+    if (key === "proposals") { router.push("/proposals" as any); return; }
     setTab(key as "inicio" | "pedidos");
   };
   return (
@@ -822,6 +824,7 @@ function PrestadorTabsWrapper() {
   const handleTabPress = (key: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     if (key === "inbox") { router.push("/inbox"); return; }
+    if (key === "proposals") { router.push("/proposals" as any); return; }
     if (key === "marketplace") { router.push("/marketplace"); return; }
     if (key === "portfolio") { setPortfolioOpen(true); return; }
   };
@@ -866,10 +869,12 @@ function BottomTabBar({
       ? [
           { key: "inicio" as TabKey, label: "Início", icon: "home" as const, lib: "ion" as const },
           { key: "pedidos" as TabKey, label: "Pedidos", icon: "truck" as const, lib: "mc" as const, badge: hasBadge },
+          { key: "proposals" as TabKey, label: "Propostas", icon: "file-tray-full" as const, lib: "ion" as const },
           { key: "marketplace" as TabKey, label: "Explorar", icon: "storefront" as const, lib: "ion" as const },
         ]
       : [
           { key: "inicio" as TabKey, label: "Home", icon: "home" as const, lib: "ion" as const, badge: hasBadge },
+          { key: "proposals" as TabKey, label: "Propostas", icon: "file-tray-full" as const, lib: "ion" as const },
           { key: "inbox" as TabKey, label: "Mensagens", icon: "chatbubbles" as const, lib: "ion" as const },
           { key: "marketplace" as TabKey, label: "Mercado", icon: "storefront" as const, lib: "ion" as const },
           { key: "portfolio" as TabKey, label: "Portfólio", icon: "briefcase" as const, lib: "ion" as const },
@@ -1178,7 +1183,7 @@ function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
 
         <View style={[pedidosStyles.quickRow]}>
           <Pressable
-            onPress={() => router.push("/request")}
+            onPress={() => router.push("/marketplace")}
             style={[pedidosStyles.quickBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
           >
             <Ionicons name="add-circle" size={18} color={c.primary} />
@@ -1811,7 +1816,7 @@ function ClienteHome() {
         onClose={() => setModalProvider(null)}
         onRequest={(p) => {
           setModalProvider(null);
-          router.push({ pathname: "/request", params: { providerId: p.id } });
+          router.push("/marketplace");
         }}
         onProfile={(p) => {
           setModalProvider(null);
@@ -1899,7 +1904,6 @@ function PrestadorHome() {
       let lat = -22.9068;
       let lng = -43.1729;
       if (next) {
-        // Try to get current position when going online
         try {
           if (locationPerm.granted) {
             const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
@@ -1913,31 +1917,13 @@ function PrestadorHome() {
             }
           }
         } catch {
-          // Fallback to Rio de Janeiro defaults — non-fatal
         }
       }
-      const { data: updated, error } = await supabase
-        .from("providers")
-        .update({
-          active: next,
-          ...(next ? { location_lat: lat, location_lng: lng, location_updated_at: new Date().toISOString() } : {}),
-        })
-        .eq("id", user.id)
-        .select("id");
-      if (error) {
-        console.warn("[PrestadorHome] Erro ao atualizar status online:", error.message);
-        Alert.alert("Erro", "Não foi possível atualizar seu status. Tente novamente.");
-      } else if (!updated || updated.length === 0) {
-        console.warn("[PrestadorHome] Nenhuma linha de provider encontrada para id:", user.id);
-        Alert.alert(
-          "Perfil não encontrado",
-          "Seu perfil de prestador não foi localizado. Verifique seu cadastro ou contate o suporte."
-        );
-      } else {
-        setOnline(next);
-      }
+      const updated = await toggleProviderActive(next, next ? { lat, lng } : undefined);
+      setOnline(Boolean(updated.active));
     } catch (err: unknown) {
       console.warn("[PrestadorHome] Erro inesperado no toggle online:", err);
+      Alert.alert("Erro", err instanceof Error ? err.message : "Não foi possível atualizar seu status. Tente novamente.");
     } finally {
       setOnlineLoading(false);
     }

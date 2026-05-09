@@ -152,8 +152,10 @@ export function useProviderLocation(
         },
         (payload) => {
           if (payload.new) {
-            const { latitude, longitude } = payload.new;
-            onLocationUpdate(latitude, longitude);
+            const row = payload.new as { lat?: number; lng?: number };
+            if (typeof row.lat === "number" && typeof row.lng === "number") {
+              onLocationUpdate(row.lat, row.lng);
+            }
           }
         },
       )
