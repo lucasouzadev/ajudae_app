@@ -1,9 +1,9 @@
 import {
-  Fraunces_700Bold,
-  Fraunces_800ExtraBold,
-  Fraunces_900Black,
-  useFonts as useFraunces,
-} from "@expo-google-fonts/fraunces";
+  Nunito_700Bold,
+  Nunito_800ExtraBold,
+  Nunito_900Black,
+  useFonts as useNunito,
+} from "@expo-google-fonts/nunito";
 import {
   Figtree_400Regular,
   Figtree_500Medium,
@@ -17,6 +17,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -31,6 +32,7 @@ import { PortfolioProvider } from "@/contexts/PortfolioContext";
 import { NotificationProvider, useNotification } from "@/contexts/NotificationContext";
 import { PermissionsProvider, usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionGate } from "@/components/PermissionGate";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { StatusBar } from "expo-status-bar";
 import colors from "@/constants/colors";
 
@@ -161,7 +163,7 @@ function AuthGate() {
   }, [active, currentSegment, isAuthenticated, isLoading, pathname, role, router]);
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar
         style={bannerStatusBarStyle ?? (themeMode === "dark" ? "light" : "dark")}
         backgroundColor={bannerStatusBarColor ?? c.background}
@@ -191,15 +193,16 @@ function AuthGate() {
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="reset-password" options={{ headerShown: false, gestureEnabled: false }} />
       </Stack>
-    </>
+      <BottomTabBar />
+    </View>
   );
 }
 
 export default function RootLayout() {
-  const [frauncesLoaded, frauncesError] = useFraunces({
-    Fraunces_700Bold,
-    Fraunces_800ExtraBold,
-    Fraunces_900Black,
+  const [nunitoLoaded, nunitoError] = useNunito({
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+    Nunito_900Black,
   });
 
   const [figtreeLoaded, figtreeError] = useFigtree({
@@ -210,8 +213,8 @@ export default function RootLayout() {
     Figtree_800ExtraBold,
   });
 
-  const fontsLoaded = frauncesLoaded && figtreeLoaded;
-  const fontError = frauncesError || figtreeError;
+  const fontsLoaded = nunitoLoaded && figtreeLoaded;
+  const fontError = nunitoError || figtreeError;
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

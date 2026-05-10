@@ -369,10 +369,10 @@ export default function ChatScreen() {
             )}
           </View>
         )}
-        <View style={[msgStyles.bubble, isMe ? [msgStyles.bubbleMe, { backgroundColor: accent }] : [msgStyles.bubbleThem, { backgroundColor: c.card, borderColor: c.borderLight }]]}>
-          <Text style={[msgStyles.bubbleText, { color: isMe ? "#fff" : c.text }]}>{item.text}</Text>
+        <View style={[msgStyles.bubble, isMe ? [msgStyles.bubbleMe, { backgroundColor: isSupport ? accent : c.primary }] : [msgStyles.bubbleThem, { backgroundColor: c.card, borderColor: c.borderLight }]]}>
+          <Text style={[msgStyles.bubbleText, { color: isMe ? (isSupport ? "#fff" : c.text) : c.text }]}>{item.text}</Text>
           <View style={msgStyles.bubbleMeta}>
-            <Text style={[msgStyles.bubbleTime, { color: isMe ? "rgba(255,255,255,0.6)" : c.softMuted }]}>{item.time}</Text>
+            <Text style={[msgStyles.bubbleTime, { color: isMe ? (isSupport ? "rgba(255,255,255,0.6)" : `${c.text}80`) : c.softMuted }]}>{item.time}</Text>
             {isMe && (
               <Ionicons name={item.read ? "checkmark-done" : "checkmark"} size={12} color="rgba(255,255,255,0.6)" style={{ marginLeft: 3 }} />
             )}

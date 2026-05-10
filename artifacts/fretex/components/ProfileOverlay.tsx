@@ -214,15 +214,15 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
           </View>
         </View>
         <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
-          <View style={[subStyles.iconBox, { backgroundColor: "#9333EA18" }]}>
-            <Ionicons name="finger-print" size={18} color="#9333EA" />
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.success}18` }]}>
+            <Ionicons name="finger-print" size={18} color={c.success} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[subStyles.rowLabel, { color: c.text }]}>Biometria</Text>
             <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Face ID / Touch ID</Text>
           </View>
-          <View style={[subStyles.badge, { backgroundColor: "#9333EA18" }]}>
-            <Text style={[subStyles.badgeText, { color: "#9333EA" }]}>Ativo</Text>
+          <View style={[subStyles.badge, { backgroundColor: `${c.success}18` }]}>
+            <Text style={[subStyles.badgeText, { color: c.success }]}>Ativo</Text>
           </View>
         </View>
       </View>
@@ -282,28 +282,12 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
       openSettings();
     };
 
-    const renderTogglePill = (enabled: boolean, activeColor: string) => (
-      <View
-        style={[
-          subStyles.togglePill,
-          {
-            backgroundColor: enabled ? `${activeColor}18` : c.card,
-            borderColor: enabled ? `${activeColor}44` : c.border,
-          },
-        ]}
-      >
-        <View style={[subStyles.toggleTrack, { backgroundColor: enabled ? activeColor : "#D4D0CB" }]}>
-          <View style={[subStyles.toggleThumb, { left: enabled ? 16 : 2 }]} />
-        </View>
-        <Text
-          style={[
-            subStyles.toggleLabel,
-            { color: enabled ? activeColor : c.softMuted },
-          ]}
-        >
-          {enabled ? "Ligado" : "Desligado"}
-        </Text>
-      </View>
+    const renderTogglePill = (enabled: boolean, _activeColor: string) => (
+      <Ionicons
+        name={enabled ? "checkmark-circle" : "ellipse-outline"}
+        size={22}
+        color={enabled ? c.success : c.softMuted}
+      />
     );
 
     const notificationRows: Array<{
