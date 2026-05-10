@@ -13,7 +13,7 @@ module.exports = {
     splash: {
       image: "./assets/images/icon.png",
       resizeMode: "contain",
-      backgroundColor: "#FF5500",
+      backgroundColor: "#FFC90E",
     },
     ios: {
       supportsTablet: false,
@@ -27,7 +27,7 @@ module.exports = {
       package: "com.ajuda.app",
       adaptiveIcon: {
         foregroundImage: "./assets/images/icon.png",
-        backgroundColor: "#FF5500",
+        backgroundColor: "#FFC90E",
       },
       config: googleMapsApiKey ? { googleMaps: { apiKey: googleMapsApiKey } } : undefined,
     },

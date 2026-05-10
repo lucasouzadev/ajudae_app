@@ -1,11 +1,11 @@
 const palette = {
-  primary: "#FFCC00",
-  primaryLight: "#FFFBE0",
-  primaryMid: "#FFE566",
-  primaryDeep: "#E8B400",
+  primary: "#FFC90E",
+  primaryLight: "#FFF8D6",
+  primaryMid: "#FFE040",
+  primaryDeep: "#E6B400",
 
-  bg: "#F8F5EC",
-  bgDeep: "#EDE8DA",
+  bg: "#FAF9ED",
+  bgDeep: "#F0EDD8",
   white: "#FFFFFF",
 
   text: "#1A1714",
@@ -136,9 +136,9 @@ const colors = {
 
 export const fonts = {
   serif: {
-    bold: "Fraunces_700Bold",
-    extra: "Fraunces_800ExtraBold",
-    black: "Fraunces_900Black",
+    bold: "Nunito_700Bold",
+    extra: "Nunito_800ExtraBold",
+    black: "Nunito_900Black",
   },
   sans: {
     regular: "Figtree_400Regular",

@@ -54,13 +54,7 @@ const BEST_HOURS = [
 
 function ActivityHeatmap() {
   const c = colors.light;
-  const cellColor = (count: number) => {
-    if (count === 0) return c.border;
-    if (count === 1) return `${c.primary}55`;
-    if (count === 2) return `${c.primary}99`;
-    if (count === 3) return c.primary;
-    return c.primaryDeep;
-  };
+  const cellColor = (count: number) => count > 0 ? c.primary : c.bgDeep;
 
   const totalServices = ACTIVITY_DATA.reduce((s, d) => s + (d.count > 0 ? d.count : 0), 0);
   const activeDays = ACTIVITY_DATA.filter((d) => d.count > 0).length;
@@ -82,16 +76,16 @@ function ActivityHeatmap() {
 
       {/* Stats row */}
       <View style={heatStyles.statsRow}>
-        <View style={[heatStyles.statPill, { backgroundColor: `${c.primary}22` }]}>
-          <Text style={[heatStyles.statVal, { color: "#8B6F00" }]}>{totalServices}</Text>
+        <View style={[heatStyles.statPill, { backgroundColor: c.bgDeep }]}>
+          <Text style={[heatStyles.statVal, { color: c.text }]}>{totalServices}</Text>
           <Text style={[heatStyles.statLbl, { color: c.sub }]}>serviços</Text>
         </View>
-        <View style={[heatStyles.statPill, { backgroundColor: c.blueLight }]}>
-          <Text style={[heatStyles.statVal, { color: c.blue }]}>{activeDays}</Text>
+        <View style={[heatStyles.statPill, { backgroundColor: c.bgDeep }]}>
+          <Text style={[heatStyles.statVal, { color: c.text }]}>{activeDays}</Text>
           <Text style={[heatStyles.statLbl, { color: c.sub }]}>dias ativos</Text>
         </View>
-        <View style={[heatStyles.statPill, { backgroundColor: c.successLight }]}>
-          <Text style={[heatStyles.statVal, { color: c.success }]}>{streak}</Text>
+        <View style={[heatStyles.statPill, { backgroundColor: c.bgDeep }]}>
+          <Text style={[heatStyles.statVal, { color: c.text }]}>{streak}</Text>
           <Text style={[heatStyles.statLbl, { color: c.sub }]}>sequência</Text>
         </View>
       </View>
@@ -145,11 +139,10 @@ function ActivityHeatmap() {
 
       {/* Legend */}
       <View style={heatStyles.legend}>
-        <Text style={[heatStyles.legendText, { color: c.softMuted }]}>Menos</Text>
-        {[0, 1, 2, 3, 4].map((v) => (
-          <View key={v} style={[heatStyles.legendCell, { backgroundColor: cellColor(v) }]} />
-        ))}
-        <Text style={[heatStyles.legendText, { color: c.softMuted }]}>Mais</Text>
+        <View style={[heatStyles.legendCell, { backgroundColor: c.bgDeep }]} />
+        <Text style={[heatStyles.legendText, { color: c.softMuted }]}>Inativo</Text>
+        <View style={[heatStyles.legendCell, { backgroundColor: c.primary }]} />
+        <Text style={[heatStyles.legendText, { color: c.softMuted }]}>Ativo</Text>
       </View>
 
       {/* Best hours report */}
@@ -212,9 +205,12 @@ function HotAreaBanner({ onPress }: { onPress: () => void }) {
     >
       <View style={[pStyles.hotDot, { backgroundColor: c.primary }]} />
       <View style={{ flex: 1 }}>
-        <Text style={[pStyles.hotTitle, { color: c.text }]}>
-          🔥 {spot.count} pedidos abertos em {spot.area} agora
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="flame" size={13} color={c.warning} />
+          <Text style={[pStyles.hotTitle, { color: c.text }]}>
+            {spot.count} pedidos abertos em {spot.area} agora
+          </Text>
+        </View>
         <Text style={[pStyles.hotSub, { color: c.sub }]}>
           Categoria {spot.cat} · aceite médio 4 min
         </Text>
@@ -370,11 +366,11 @@ function MonthlyGoals() {
 
 /* 5. Badges / conquistas */
 const BADGES = [
-  { icon: "🏆", label: "100 serviços", unlocked: false, target: 100, current: 71 },
-  { icon: "⭐", label: "5 estrelas", unlocked: true, target: 1, current: 1 },
-  { icon: "🔥", label: "7 dias", unlocked: true, target: 7, current: 7 },
-  { icon: "⚡", label: "50 fretes", unlocked: false, target: 50, current: 36 },
-  { icon: "🛡️", label: "Verificado", unlocked: true, target: 1, current: 1 },
+  { icon: "trophy" as const, label: "100 serviços", unlocked: false, target: 100, current: 71 },
+  { icon: "star" as const, label: "5 estrelas", unlocked: true, target: 1, current: 1 },
+  { icon: "flame" as const, label: "7 dias", unlocked: true, target: 7, current: 7 },
+  { icon: "flash" as const, label: "50 fretes", unlocked: false, target: 50, current: 36 },
+  { icon: "shield-checkmark" as const, label: "Verificado", unlocked: true, target: 1, current: 1 },
 ];
 function BadgeRow() {
   const c = colors.light;
@@ -400,7 +396,9 @@ function BadgeRow() {
               },
             ]}
           >
-            <Text style={pStyles.badgeEmoji}>{b.icon}</Text>
+            <View style={[pStyles.badgeIconWrap, { backgroundColor: b.unlocked ? `${c.primary}22` : c.muted }]}>
+              <Ionicons name={b.icon} size={18} color={b.unlocked ? c.primaryDeep : c.softMuted} />
+            </View>
             <Text style={[pStyles.badgeLabel, { color: b.unlocked ? c.text : c.softMuted }]}>{b.label}</Text>
             {!b.unlocked ? (
               <Text style={[pStyles.badgeProgress, { color: c.softMuted }]}>
@@ -525,7 +523,7 @@ const pStyles = StyleSheet.create({
     gap: 4,
     position: "relative",
   },
-  badgeEmoji: { fontSize: 22 },
+  badgeIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   badgeLabel: { fontSize: 11, fontFamily: fonts.sans.bold, textAlign: "center" },
   badgeProgress: { fontSize: 11, fontFamily: fonts.sans.regular },
   badgeCheck: { position: "absolute", top: 6, right: 6, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
@@ -1955,9 +1953,9 @@ function PrestadorHome() {
     : c.primary;
 
   const stats = [
-    { v: "R$247", l: "Hoje", color: c.success, bg: c.successLight },
-    { v: "4.9 ★", l: "Avaliação", color: c.warning, bg: c.warningLight },
-    { v: "3", l: "Serviços", color: c.blue, bg: c.blueLight },
+    { v: "R$247", l: "Hoje", color: c.text, bg: c.card },
+    { v: "4.9", l: "Avaliação", color: c.text, bg: c.card },
+    { v: "3", l: "Serviços", color: c.text, bg: c.card },
   ];
   const market = [
     { label: "Frete", value: "R$120", trend: "+8%" },

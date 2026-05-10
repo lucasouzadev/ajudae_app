@@ -17,7 +17,7 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
@@ -66,10 +66,10 @@ interface LocalDocumentAsset {
   displayName?: string;
 }
 
-const SERVICE_TYPES = [
-  { value: "frete" as ServiceType, icon: "🚚", label: "Frete", desc: "Transporte leve a médio" },
-  { value: "mudanca" as ServiceType, icon: "📦", label: "Mudança", desc: "Residencial ou comercial" },
-  { value: "entrega" as ServiceType, icon: "📬", label: "Entrega", desc: "Entregas urbanas" },
+const SERVICE_TYPES: { value: ServiceType; iconLib: "mci" | "ion"; icon: string; label: string; desc: string }[] = [
+  { value: "frete", iconLib: "mci", icon: "truck-delivery-outline", label: "Frete", desc: "Transporte leve a médio" },
+  { value: "mudanca", iconLib: "ion", icon: "home-outline", label: "Mudança", desc: "Residencial ou comercial" },
+  { value: "entrega", iconLib: "ion", icon: "cube-outline", label: "Entrega", desc: "Entregas urbanas" },
 ];
 
 const SERVICE_CATEGORIES: Record<ServiceType, { value: string; label: string }[]> = {
@@ -88,12 +88,12 @@ const SERVICE_CATEGORIES: Record<ServiceType, { value: string; label: string }[]
   ],
 };
 
-const VEHICLE_TYPES = [
-  { value: "car" as VehicleType, icon: "🚗", label: "Carro utilitário / pickup pequena" },
-  { value: "utility" as VehicleType, icon: "🛻", label: "Pickup média" },
-  { value: "van" as VehicleType, icon: "🚐", label: "Furgão / Van de carga" },
-  { value: "truck_small" as VehicleType, icon: "🚌", label: "Van grande / Caminhão pequeno" },
-  { value: "truck_large" as VehicleType, icon: "🚛", label: "Caminhão" },
+const VEHICLE_TYPES: { value: VehicleType; iconLib: "mci" | "ion"; icon: string; label: string }[] = [
+  { value: "car", iconLib: "ion", icon: "car-outline", label: "Carro utilitário / pickup pequena" },
+  { value: "utility", iconLib: "mci", icon: "truck-outline", label: "Pickup média" },
+  { value: "van", iconLib: "mci", icon: "van-utility", label: "Furgão / Van de carga" },
+  { value: "truck_small", iconLib: "mci", icon: "truck", label: "Van grande / Caminhão pequeno" },
+  { value: "truck_large", iconLib: "mci", icon: "truck-plus-outline", label: "Caminhão" },
 ];
 
 const AVAILABILITY_OPTIONS = [
@@ -373,7 +373,7 @@ function StyledInput({
 }
 
 function RadioRow({ options, value, onSelect, error }: {
-  options: { value: string; label: string; icon?: string }[];
+  options: { value: string; label: string; icon?: string; iconLib?: "mci" | "ion" }[];
   value: string; onSelect: (v: string) => void; error?: string;
 }) {
   const c = colors.light;
@@ -401,7 +401,9 @@ function RadioRow({ options, value, onSelect, error }: {
                 {active && <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: c.blue }} />}
               </View>
               {opt.icon && (
-                <Ionicons name={opt.icon as any} size={18} color={active ? c.blue : c.softMuted} />
+                opt.iconLib === "mci"
+                  ? <MaterialCommunityIcons name={opt.icon as any} size={18} color={active ? c.blue : c.softMuted} />
+                  : <Ionicons name={opt.icon as any} size={18} color={active ? c.blue : c.softMuted} />
               )}
               <Text style={{ fontSize: 13, fontFamily: active ? fonts.sans.bold : fonts.sans.regular, color: c.text }}>
                 {opt.label}
@@ -417,7 +419,7 @@ function RadioRow({ options, value, onSelect, error }: {
 }
 
 function ServiceTypeCard({ options, value, onSelect, error }: {
-  options: { value: string; icon: string; label: string; desc: string }[];
+  options: { value: string; iconLib: "mci" | "ion"; icon: string; label: string; desc: string }[];
   value: string; onSelect: (v: string) => void; error?: string;
 }) {
   const c = colors.light;
@@ -426,6 +428,7 @@ function ServiceTypeCard({ options, value, onSelect, error }: {
       <View style={{ flexDirection: "row", gap: 10 }}>
         {options.map((opt) => {
           const active = value === opt.value;
+          const iconColor = active ? c.blue : c.text;
           return (
             <Pressable
               key={opt.value}
@@ -437,7 +440,9 @@ function ServiceTypeCard({ options, value, onSelect, error }: {
                 alignItems: "center", gap: 6, position: "relative",
               }}
             >
-              <Text style={{ fontSize: 26 }}>{opt.icon}</Text>
+              {opt.iconLib === "mci"
+                ? <MaterialCommunityIcons name={opt.icon as any} size={28} color={iconColor} />
+                : <Ionicons name={opt.icon as any} size={28} color={iconColor} />}
               <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text }}>{opt.label}</Text>
               <Text style={{ fontSize: 10, fontFamily: fonts.sans.regular, color: c.softMuted, textAlign: "center" }}>{opt.desc}</Text>
               {active && (
@@ -1088,7 +1093,7 @@ export default function ProviderValidationScreen() {
 
   const reviewSections = [
     {
-      icon: "👤", title: "Dados pessoais",
+      icon: "person-outline" as const, title: "Dados pessoais",
       rows: [
         ["Nome", form.fullName],
         ["CPF", form.cpf],
@@ -1097,7 +1102,7 @@ export default function ProviderValidationScreen() {
       ],
     },
     {
-      icon: "🚚", title: "Serviço e veículo",
+      icon: "car-outline" as const, title: "Serviço e veículo",
       rows: [
         ["Tipo", SERVICE_TYPES.find((s) => s.value === form.serviceType)?.label || "—"],
         ["Categoria", SERVICE_CATEGORIES[form.serviceType as ServiceType]?.find((s) => s.value === form.serviceCategory)?.label || form.serviceCategory || "—"],
@@ -1108,14 +1113,14 @@ export default function ProviderValidationScreen() {
       ],
     },
     {
-      icon: "📞", title: "Contato",
+      icon: "call-outline" as const, title: "Contato",
       rows: [
         ["Método", CONTACT_METHODS.find((m) => m.value === form.contactMethod)?.label || "—"],
         ["Disponibilidade", AVAILABILITY_OPTIONS.find((a) => a.value === form.contactAvailability)?.label || "—"],
       ],
     },
     {
-      icon: "📄", title: "Documentos",
+      icon: "document-text-outline" as const, title: "Documentos",
       rows: [
         ["RG", form.docRg ? "✓ Enviado" : "—"],
         ["Comprovante", form.docResidence ? "✓ Enviado" : "—"],
@@ -1177,9 +1182,10 @@ export default function ProviderValidationScreen() {
 
           {reviewSections.map((section) => (
             <View key={section.title} style={[st.reviewCard, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text, marginBottom: 10 }}>
-                {section.icon} {section.title}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                <Ionicons name={section.icon} size={14} color={c.primary} />
+                <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text }}>{section.title}</Text>
+              </View>
               {section.rows.map(([label, value]) => (
                 <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.borderLight }}>
                   <Text style={{ fontSize: 12, fontFamily: fonts.sans.regular, color: c.softMuted }}>{label}</Text>
@@ -1354,7 +1360,7 @@ export default function ProviderValidationScreen() {
                 <View ref={setFieldAnchor("vehicleType")}>
                   <Label text="TIPO DE VEÍCULO" required />
                   <RadioRow
-                    options={VEHICLE_TYPES.map((v) => ({ ...v, icon: undefined, label: `${v.icon} ${v.label}` }))}
+                    options={VEHICLE_TYPES}
                     value={form.vehicleType}
                     onSelect={(v) => {
                       focusField("vehicleType");
@@ -1562,9 +1568,10 @@ export default function ProviderValidationScreen() {
 
                 {reviewSections.map((section) => (
                   <View key={section.title} style={[st.reviewCard, { backgroundColor: c.card, borderColor: c.border }]}>
-                    <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text, marginBottom: 10 }}>
-                      {section.icon} {section.title}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                      <Ionicons name={section.icon} size={14} color={c.primary} />
+                      <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text }}>{section.title}</Text>
+                    </View>
                     {section.rows.map(([label, value]) => (
                       <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.borderLight }}>
                         <Text style={{ fontSize: 12, fontFamily: fonts.sans.regular, color: c.softMuted }}>{label}</Text>

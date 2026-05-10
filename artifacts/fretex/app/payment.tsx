@@ -7,6 +7,7 @@ import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { TopNav } from "@/components/TopNav";
 import { useService } from "@/contexts/ServiceContext";
 import { createPayment, type CreatedPayment } from "@/lib/payments";
 
@@ -69,13 +70,8 @@ export default function PaymentScreen() {
 
   if (!active) {
     return (
-      <View style={[styles.emptyWrap, { backgroundColor: c.background, paddingTop: insets.top }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={[styles.iconBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
-        >
-          <Ionicons name="close" size={18} color={c.text} />
-        </Pressable>
+      <View style={[styles.emptyWrap, { backgroundColor: c.background }]}>
+        <TopNav title="Pagamento" onBack={() => router.back()} />
         <View style={[styles.emptyCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
           <Ionicons name="receipt-outline" size={32} color={c.softMuted} />
           <Text style={[styles.emptyTitle, { color: c.text }]}>Nenhum pedido ativo</Text>
@@ -86,17 +82,8 @@ export default function PaymentScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={[styles.iconBtn, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
-        >
-          <Ionicons name="close" size={18} color={c.text} />
-        </Pressable>
-        <Text style={[styles.headerTitle, { color: c.text }]}>Pagamento</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={[styles.container, { backgroundColor: c.background }]}>
+      <TopNav title="Pagamento" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.summaryCard, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>

@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
@@ -667,10 +667,11 @@ function ProviderOnboarding() {
                 <Text style={[prov.sectionTitle, { color: c.text, marginTop: 0 }]}>Tipo de serviço *</Text>
                 <View style={{ flexDirection: "row", gap: 12, marginBottom: 8 }}>
                   {[
-                    { value: "frete" as const, icon: "🚚", label: "Frete", desc: "Transporte leve a médio" },
-                    { value: "mudanca" as const, icon: "📦", label: "Mudança", desc: "Pequena, média ou grande" },
+                    { value: "frete" as const, iconLib: "mci" as const, icon: "truck-delivery-outline", label: "Frete", desc: "Transporte leve a médio" },
+                    { value: "mudanca" as const, iconLib: "ion" as const, icon: "home-outline", label: "Mudança", desc: "Pequena, média ou grande" },
                   ].map((opt) => {
                     const active = form.tipoServico === opt.value;
+                    const iconColor = active ? c.blue : c.text;
                     return (
                       <Pressable
                         key={opt.value}
@@ -681,7 +682,9 @@ function ProviderOnboarding() {
                           active && { borderWidth: 2 },
                         ]}
                       >
-                        <Text style={{ fontSize: 28 }}>{opt.icon}</Text>
+                        {opt.iconLib === "mci"
+                          ? <MaterialCommunityIcons name={opt.icon as any} size={28} color={iconColor} />
+                          : <Ionicons name={opt.icon as any} size={28} color={iconColor} />}
                         <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>{opt.label}</Text>
                         <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, textAlign: "center" }}>{opt.desc}</Text>
                         {active && (
@@ -897,34 +900,34 @@ function ProviderOnboarding() {
 
                 {[
                   {
-                    icon: "👤", title: "Dados pessoais",
+                    iconLib: "ion" as const, icon: "person-outline", title: "Dados pessoais",
                     rows: [
                       ["Nome", form.nome],
                       ["CPF", form.cpf],
                       ["Nascimento", form.dataNasc],
                       ["Telefone", form.telefone],
                       ["E-mail", form.email],
-                      ["Foto de perfil", form.fotoUri ? "✓ Enviada" : "—"],
+                      ["Foto de perfil", form.fotoUri ? "Enviada" : "—"],
                     ],
                   },
                   {
-                    icon: "🚚", title: "Tipo de serviço",
+                    iconLib: "mci" as const, icon: "truck-delivery-outline", title: "Tipo de serviço",
                     rows: [
                       ["Tipo", form.tipoServico === "frete" ? "Frete" : form.tipoServico === "mudanca" ? "Mudança" : "—"],
                       ["Categoria", (CATEGORIAS[form.tipoServico as "frete" | "mudanca"] ?? []).find((o) => o.value === form.categoria)?.label || form.categoria || "—"],
                     ],
                   },
                   {
-                    icon: "📄", title: "Documentos",
+                    iconLib: "ion" as const, icon: "document-text-outline", title: "Documentos",
                     rows: [
-                      ["RG / Identidade", form.docRgUri ? "✓ Enviado" : "—"],
-                      ["Comprovante", form.docResidenciaUri ? "✓ Enviado" : "—"],
-                      ["CNH", form.docCnhUri ? "✓ Enviada" : "—"],
-                      ["CRLV", form.docCrlvUri ? "✓ Enviado" : "—"],
+                      ["RG / Identidade", form.docRgUri ? "Enviado" : "—"],
+                      ["Comprovante", form.docResidenciaUri ? "Enviado" : "—"],
+                      ["CNH", form.docCnhUri ? "Enviada" : "—"],
+                      ["CRLV", form.docCrlvUri ? "Enviado" : "—"],
                     ],
                   },
                   {
-                    icon: "🚗", title: "Veículo",
+                    iconLib: "ion" as const, icon: "car-outline", title: "Veículo",
                     rows: [
                       ["Modelo", form.veiculoModelo],
                       ["Ano", form.veiculoAno],
@@ -933,7 +936,7 @@ function ProviderOnboarding() {
                     ],
                   },
                   {
-                    icon: "📞", title: "Verificação de identidade",
+                    iconLib: "ion" as const, icon: "call-outline", title: "Verificação de identidade",
                     rows: [
                       ["Método", form.contatoMetodo === "ligacao" ? "Ligação telefônica" : form.contatoMetodo === "whatsapp" ? "WhatsApp" : "—"],
                       ["Disponibilidade", DISPONIBILIDADE.find((d) => d.value === form.contatoDisponibilidade)?.label || "—"],
@@ -941,9 +944,12 @@ function ProviderOnboarding() {
                   },
                 ].map((card) => (
                   <View key={card.title} style={[prov.reviewCard, { backgroundColor: c.card, borderColor: c.border }]}>
-                    <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text, marginBottom: 10 }}>
-                      {card.icon} {card.title}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                      {card.iconLib === "mci"
+                        ? <MaterialCommunityIcons name={card.icon as any} size={14} color={c.primary} />
+                        : <Ionicons name={card.icon as any} size={14} color={c.primary} />}
+                      <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: c.text }}>{card.title}</Text>
+                    </View>
                     {card.rows.map(([label, value]) => (
                       <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: c.borderLight }}>
                         <Text style={{ fontSize: 12, fontFamily: fonts.sans.regular, color: c.softMuted }}>{label}</Text>
