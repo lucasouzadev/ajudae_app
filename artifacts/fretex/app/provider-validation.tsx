@@ -647,6 +647,7 @@ export default function ProviderValidationScreen() {
 
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
@@ -716,6 +717,31 @@ export default function ProviderValidationScreen() {
         <Text style={[st.title, { color: c.text }]}>Acesso indisponível</Text>
         <Pressable onPress={() => router.replace("/")} style={[st.submitBtn, { backgroundColor: c.blue, marginTop: 24 }]}>
           <Text style={st.submitBtnTxt}>Voltar</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (submitSuccess) {
+    const refCode = `AJD-${user.id.slice(0, 6).toUpperCase()}`;
+    return (
+      <View style={{ flex: 1, backgroundColor: c.background, alignItems: "center", justifyContent: "center", padding: 32 }}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: `${c.success}18`, alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+          <Ionicons name="checkmark-circle" size={48} color={c.success} />
+        </View>
+        <Text style={[st.title, { color: c.text, textAlign: "center" }]}>Cadastro enviado!</Text>
+        <Text style={[st.sub, { color: c.sub, textAlign: "center", marginTop: 8 }]}>
+          Nossa equipe vai analisar seus documentos em até 2 dias úteis e entrará em contato.
+        </Text>
+        <View style={{ marginTop: 24, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, alignItems: "center", width: "100%" }}>
+          <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.8 }}>PROTOCOLO</Text>
+          <Text style={{ fontSize: 22, fontFamily: fonts.sans.bold, color: c.text, letterSpacing: 3, marginTop: 6 }}>{refCode}</Text>
+          <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 4 }}>
+            Guarde este código para acompanhar sua validação.
+          </Text>
+        </View>
+        <Pressable onPress={() => router.replace("/")} style={[st.submitBtn, { backgroundColor: c.blue, marginTop: 28, width: "100%" }]}>
+          <Text style={st.submitBtnTxt}>Ir para o início</Text>
         </Pressable>
       </View>
     );
@@ -1083,7 +1109,7 @@ export default function ProviderValidationScreen() {
       await refreshUser();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       await send("provider_validation_received");
-      router.replace("/");
+      setSubmitSuccess(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Não foi possível enviar. Tente novamente.";
       Alert.alert("Erro", msg);

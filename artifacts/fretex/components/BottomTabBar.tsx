@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useService } from "@/contexts/ServiceContext";
+import { supabase } from "@/lib/supabase";
 import { fonts } from "@/constants/colors";
 
 const TAB_BG = "#1F1F1F";
@@ -32,7 +33,7 @@ const PROVIDER_TABS: TabDef[] = [
   { route: "/portfolio", icon: "briefcase-outline", iconActive: "briefcase", label: "Portfólio" },
 ];
 
-function TabItem({ tab, isActive }: { tab: TabDef; isActive: boolean }) {
+function TabItem({ tab, isActive, badge }: { tab: TabDef; isActive: boolean; badge?: number }) {
   const router = useRouter();
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -53,11 +54,18 @@ function TabItem({ tab, isActive }: { tab: TabDef; isActive: boolean }) {
       accessibilityLabel={tab.label}
     >
       <Animated.View style={[styles.tabInner, { transform: [{ scale }] }]}>
-        <Ionicons
-          name={isActive ? tab.iconActive : tab.icon}
-          size={22}
-          color={isActive ? ACTIVE_COLOR : INACTIVE_COLOR}
-        />
+        <View>
+          <Ionicons
+            name={isActive ? tab.iconActive : tab.icon}
+            size={22}
+            color={isActive ? ACTIVE_COLOR : INACTIVE_COLOR}
+          />
+          {badge != null && badge > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge > 9 ? "9+" : String(badge)}</Text>
+            </View>
+          ) : null}
+        </View>
         {isActive && (
           <Text style={styles.label}>{tab.label}</Text>
         )}
@@ -67,19 +75,58 @@ function TabItem({ tab, isActive }: { tab: TabDef; isActive: boolean }) {
 }
 
 export function BottomTabBar() {
-  const { role, isAuthenticated } = useAuth();
+  const { role, isAuthenticated, user } = useAuth();
   const { active } = useService();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const [pendingProposals, setPendingProposals] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    let mounted = true;
+
+    const fetchBadge = async () => {
+      if (role === "prestador") {
+        const { count } = await supabase
+          .from("proposals")
+          .select("id", { count: "exact", head: true })
+          .eq("provider_id", user.id)
+          .eq("status", "pending");
+        if (mounted) setPendingProposals(count ?? 0);
+      } else {
+        const { count } = await supabase
+          .from("proposals")
+          .select("id", { count: "exact", head: true })
+          .eq("client_id", user.id)
+          .eq("status", "pending");
+        if (mounted) setPendingProposals(count ?? 0);
+      }
+    };
+
+    fetchBadge().catch(() => {});
+    const interval = setInterval(() => fetchBadge().catch(() => {}), 30_000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, [isAuthenticated, user?.id, role]);
 
   if (!isAuthenticated || active) return null;
 
   const tabs = role === "prestador" ? PROVIDER_TABS : CLIENT_TABS;
 
+  const getBadge = (route: string): number | undefined => {
+    if (role === "prestador" && route === "/proposals") return pendingProposals || undefined;
+    if (role === "cliente" && route === "/inbox") return pendingProposals || undefined;
+    return undefined;
+  };
+
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8), backgroundColor: TAB_BG }]}>
       {tabs.map((tab) => (
-        <TabItem key={tab.route} tab={tab} isActive={pathname === tab.route} />
+        <TabItem
+          key={tab.route}
+          tab={tab}
+          isActive={pathname === tab.route}
+          badge={getBadge(tab.route)}
+        />
       ))}
     </View>
   );
@@ -105,5 +152,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: fonts.sans.semibold,
     color: ACTIVE_COLOR,
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontFamily: fonts.sans.bold,
+    color: "#fff",
   },
 });
