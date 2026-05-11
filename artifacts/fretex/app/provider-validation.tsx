@@ -7,6 +7,7 @@ import {
   InputAccessoryView,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -1480,6 +1481,26 @@ export default function ProviderValidationScreen() {
                     Documentos com boa iluminação, sem cortes, dentro da validade e com nome idêntico ao cadastro.
                   </Text>
                 </View>
+
+                <Pressable
+                  onPress={() =>
+                    Linking.openURL(
+                      "https://wa.me/5521998765432?text=Ol%C3%A1%2C+preciso+de+ajuda+para+enviar+meus+documentos+no+cadastro+do+Ajuda%C3%AA%21",
+                    ).catch(() => {})
+                  }
+                  style={[st.infoBox, { backgroundColor: "#25D36614", borderColor: "#25D36630", marginTop: 8 }]}
+                >
+                  <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: fonts.sans.bold, color: "#25D366" }}>
+                      Precisa de ajuda?
+                    </Text>
+                    <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.sub, marginTop: 1 }}>
+                      Fale com nossa equipe pelo WhatsApp — te ajudamos a enviar os documentos.
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color="#25D366" />
+                </Pressable>
 
                 <DocPickerRow
                   label="RG OU DOCUMENTO DE IDENTIDADE"

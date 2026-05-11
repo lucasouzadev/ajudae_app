@@ -54,7 +54,7 @@ export default function RequestFlowScreen() {
     : true; // quando sem prestador fixo, mostra a opção
   const catColor = CATEGORY_COLORS[category];
 
-  const [origin, setOrigin] = useState("Rua Conde de Bonfim, 200 — Tijuca");
+  const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [description, setDescription] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);

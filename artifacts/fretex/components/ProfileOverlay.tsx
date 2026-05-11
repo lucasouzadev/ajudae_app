@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Modal, View, Text, Pressable, StyleSheet, Animated, ScrollView, Easing } from "react-native";
+import { Modal, View, Text, Pressable, StyleSheet, Animated, ScrollView, Easing, Share } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,11 +20,21 @@ const ITEMS_BASE = [
   { icon: "location" as const, label: "Meus Endereços", sub: "Tijuca, Rio de Janeiro" },
   { icon: "list" as const, label: "Histórico de Pedidos", sub: "12 pedidos realizados" },
   { icon: "star" as const, label: "Avaliações", sub: "Média 4.9 de 5" },
+  { icon: "gift" as const, label: "Indicar amigos", sub: "Ganhe créditos por indicação" },
   { icon: "lock-closed" as const, label: "Segurança", sub: "PIN e documentos" },
   { icon: "settings" as const, label: "Configurações", sub: "Notificações, privacidade" },
 ];
 
+function genReferralCode(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = ((hash << 5) - hash + userId.charCodeAt(i)) >>> 0;
+  }
+  return `AJD${hash.toString(36).toUpperCase().slice(0, 5)}`;
+}
+
 function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Object.assign> }) {
+  const { user } = useAuth();
   const {
     notifications,
     backgroundLocation,
@@ -170,6 +180,48 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
             <Text style={[subStyles.rowSub, { color: c.sub }]}>{r.text}</Text>
           </View>
         ))}
+      </View>
+    );
+  }
+
+  if (label === "Indicar amigos") {
+    const code = genReferralCode(user?.id ?? "ajudae");
+    const shareText = `Olá! Uso o Ajudaê para fretes e mudanças. Baixe agora e use meu código *${code}* para ganhar desconto no primeiro serviço! 🚚`;
+    return (
+      <View style={subStyles.container}>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border, flexDirection: "column", alignItems: "flex-start", gap: 10 }]}>
+          <Text style={[subStyles.rowLabel, { color: c.text }]}>Seu código de indicação</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Text style={{ fontSize: 26, fontFamily: fonts.sans.bold, color: c.text, letterSpacing: 2 }}>{code}</Text>
+          </View>
+          <Text style={[subStyles.rowSub, { color: c.softMuted }]}>
+            Cada amigo que usar seu código te gera R$ 10 de crédito no próximo serviço.
+          </Text>
+        </View>
+        <Pressable
+          onPress={() =>
+            Share.share({ message: shareText }).catch(() => {})
+          }
+          style={[subStyles.row, { backgroundColor: `${c.success}12`, borderColor: `${c.success}30` }]}
+        >
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.success}18` }]}>
+            <Ionicons name="share-social" size={18} color={c.success} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Compartilhar código</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>WhatsApp, Instagram, SMS…</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={c.success} />
+        </Pressable>
+        <View style={[subStyles.row, { backgroundColor: c.background, borderColor: c.border }]}>
+          <View style={[subStyles.iconBox, { backgroundColor: `${c.warning}18` }]}>
+            <Ionicons name="people" size={18} color={c.warning} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[subStyles.rowLabel, { color: c.text }]}>Amigos indicados</Text>
+            <Text style={[subStyles.rowSub, { color: c.softMuted }]}>0 amigos · R$ 0 em créditos</Text>
+          </View>
+        </View>
       </View>
     );
   }
