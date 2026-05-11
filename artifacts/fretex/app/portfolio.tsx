@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
+  Alert,
   View,
   Text,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
@@ -266,8 +268,18 @@ function PlaceholderBlock({ icon, label, hint, c }: { icon: any; label: string; 
 /* ─── Edit ───────────────────────────────────────────────────────────────── */
 function PortfolioEdit({ portfolio, onChange, c, insets }: any) {
   const [openSection, setOpenSection] = useState<string | null>("bio");
+  const [saved, setSaved] = useState(false);
 
-  const update = (key: string, val: any) => onChange((prev: any) => ({ ...prev, [key]: val }));
+  const update = (key: string, val: any) => {
+    setSaved(false);
+    onChange((prev: any) => ({ ...prev, [key]: val }));
+  };
+
+  const handleSave = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    onChange((prev: any) => prev);
+    setSaved(true);
+  };
 
   const updateService = (i: number, field: string, val: string) => {
     const updated = [...portfolio.services];
@@ -480,9 +492,9 @@ function PortfolioEdit({ portfolio, onChange, c, insets }: any) {
         })}
 
         {/* Save CTA */}
-        <Pressable style={[s.saveBtn, { backgroundColor: c.primary }]}>
-          <Ionicons name="checkmark-circle" size={18} color="#1A1714" />
-          <Text style={[s.saveBtnText, { color: "#1A1714" }]}>Salvar portfólio</Text>
+        <Pressable onPress={handleSave} style={[s.saveBtn, { backgroundColor: saved ? c.success : c.primary }]}>
+          <Ionicons name={saved ? "checkmark-circle" : "save-outline"} size={18} color="#1A1714" />
+          <Text style={[s.saveBtnText, { color: "#1A1714" }]}>{saved ? "Portfólio salvo!" : "Salvar portfólio"}</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

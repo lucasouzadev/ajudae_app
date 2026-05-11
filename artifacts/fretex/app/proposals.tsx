@@ -198,16 +198,41 @@ export default function ProposalsScreen() {
         <View style={styles.modalBackdrop}>
           <View style={[styles.scheduleModal, { backgroundColor: c.card }]}>
             <Text style={[styles.modalTitle, { color: c.text }]}>Agendar proposta</Text>
-            <Text style={[styles.modalSub, { color: c.softMuted }]}>Informe data e hora para aceitar o serviço.</Text>
+            <Text style={[styles.modalSub, { color: c.softMuted }]}>Selecione uma opção rápida ou informe a data.</Text>
+
+            <View style={styles.quickDates}>
+              {[
+                { label: "Hoje 14h", offset: 0, hour: 14 },
+                { label: "Hoje 18h", offset: 0, hour: 18 },
+                { label: "Amanhã 9h", offset: 1, hour: 9 },
+                { label: "Amanhã 14h", offset: 1, hour: 14 },
+              ].map((opt) => {
+                const d = new Date();
+                d.setDate(d.getDate() + opt.offset);
+                d.setHours(opt.hour, 0, 0, 0);
+                const formatted = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} ${String(opt.hour).padStart(2,"0")}:00`;
+                const selected = scheduleText === formatted;
+                return (
+                  <Pressable
+                    key={opt.label}
+                    onPress={() => setScheduleText(formatted)}
+                    style={[styles.quickDateChip, { backgroundColor: selected ? `${accent}15` : c.background, borderColor: selected ? accent : c.border }]}
+                  >
+                    <Text style={[styles.quickDateText, { color: selected ? accent : c.text }]}>{opt.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <TextInput
               value={scheduleText}
               onChangeText={setScheduleText}
-              placeholder="DD/MM/AAAA HH:MM"
+              placeholder="DD/MM/AAAA HH:MM — ou escolha acima"
               placeholderTextColor={c.softMuted}
               style={[styles.scheduleInput, { backgroundColor: c.background, borderColor: c.border, color: c.text }]}
             />
             <View style={styles.modalActions}>
-              <Pressable onPress={() => setScheduleTarget(null)} style={[styles.modalBtn, { borderColor: c.border }]}>
+              <Pressable onPress={() => { setScheduleTarget(null); setScheduleText(""); }} style={[styles.modalBtn, { borderColor: c.border }]}>
                 <Text style={[styles.modalBtnText, { color: c.text }]}>Cancelar</Text>
               </Pressable>
               <Pressable onPress={submitSchedule} style={[styles.modalBtn, { backgroundColor: accent, borderColor: accent }]}>
@@ -315,8 +340,11 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center", padding: 20 },
   scheduleModal: { width: "100%", borderRadius: 20, padding: 18 },
   modalTitle: { fontSize: 18, fontFamily: fonts.serif.extra },
-  modalSub: { fontSize: 12, fontFamily: fonts.sans.regular, marginTop: 4, marginBottom: 14 },
-  scheduleInput: { height: 48, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, fontSize: 14, fontFamily: fonts.sans.medium },
+  modalSub: { fontSize: 12, fontFamily: fonts.sans.regular, marginTop: 4, marginBottom: 8 },
+  scheduleInput: { height: 48, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, fontSize: 14, fontFamily: fonts.sans.medium, marginTop: 10 },
+  quickDates: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  quickDateChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  quickDateText: { fontSize: 12, fontFamily: fonts.sans.bold },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 14 },
   modalBtn: { flex: 1, height: 44, borderRadius: 13, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   modalBtnText: { fontSize: 13, fontFamily: fonts.sans.bold },

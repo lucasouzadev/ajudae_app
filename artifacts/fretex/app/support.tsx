@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSupport } from "@/contexts/SupportContext";
-import { MOCK_FAQS } from "@/constants/mockData";
+import { STATIC_FAQS } from "@/constants/mockData";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { TopNav } from "@/components/TopNav";
 import { SideSheet } from "@/components/SideSheet";
@@ -46,7 +46,7 @@ export default function SupportScreen() {
   const initials = (user.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const accent = role === "cliente" ? c.primary : c.blue;
   const accentEnd = role === "cliente" ? c.primaryDeep : "#60A5FA";
-  const faqs = MOCK_FAQS[role];
+  const faqs = STATIC_FAQS[role];
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>

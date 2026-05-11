@@ -39,93 +39,6 @@ const formatTime = (value: string) => {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 };
 
-/* ── Mock threads por conversa ── */
-const MOCK_THREADS: Record<string, Msg[]> = {
-  "c-1": [
-    { id: "1", text: "Oi! Estou a caminho do seu endereço.", from: "them", time: "14:20", read: true },
-    { id: "2", text: "Ótimo! Pode chamar quando chegar.", from: "me", time: "14:21", read: true },
-    { id: "3", text: "Cheguei no portão. Pode descer?", from: "them", time: "14:32", read: false },
-  ],
-  "c-2": [
-    { id: "1", text: "Olá! Vi sua solicitação de frete.", from: "them", time: "10:05", read: true },
-    { id: "2", text: "Sim! Preciso transportar móveis para Tijuca.", from: "me", time: "10:07", read: true },
-    { id: "3", text: "Tenho disponibilidade amanhã às 9h. Posso fazer por R$120.", from: "them", time: "10:10", read: true },
-    { id: "4", text: "Combinado, até logo!", from: "me", time: "10:12", read: true },
-  ],
-  "c-3": [
-    { id: "1", text: "Boa tarde! Seu pedido foi entregue.", from: "them", time: "16:45", read: true },
-    { id: "2", text: "Foto da entrega enviada.", from: "them", time: "16:46", read: true },
-    { id: "3", text: "Obrigado!", from: "me", time: "16:50", read: true },
-  ],
-  "c-4": [
-    { id: "1", text: "Oi, tudo bem? Vi seu anúncio.", from: "me", time: "11:00", read: true },
-    { id: "2", text: "Tudo sim! Posso fazer por R$60, traço orçamento completo?", from: "them", time: "11:03", read: true },
-  ],
-  "p-1": [
-    { id: "1", text: "Bom dia! Pedido confirmado para hoje.", from: "me", time: "09:00", read: true },
-    { id: "2", text: "Perfeito! Vou precisar de acesso ao elevador.", from: "them", time: "09:05", read: true },
-    { id: "3", text: "Pode subir o material?", from: "them", time: "11:20", read: false },
-    { id: "4", text: "Olha, preciso de 3 pessoas para o piano.", from: "them", time: "11:21", read: false },
-  ],
-  "p-2": [
-    { id: "1", text: "Olá! Vi seu perfil no Ajudaê.", from: "them", time: "08:30", read: true },
-    { id: "2", text: "Tenho disponibilidade para sexta.", from: "me", time: "08:35", read: true },
-    { id: "3", text: "Aceito sua proposta de R$120.", from: "them", time: "08:40", read: false },
-  ],
-  "p-3": [
-    { id: "1", text: "Serviço concluído com sucesso!", from: "me", time: "17:00", read: true },
-    { id: "2", text: "Obrigado pelo serviço!", from: "them", time: "17:10", read: true },
-  ],
-  "p-4": [
-    { id: "1", text: "Confirmado para amanhã às 19h.", from: "me", time: "14:00", read: true },
-    { id: "2", text: "Confirmado para às 19h.", from: "them", time: "14:05", read: true },
-  ],
-  support: [
-    { id: "1", text: "Olá! Bem-vindo ao suporte Ajudaê. Como posso ajudar?", from: "them", time: "09:00", read: true },
-  ],
-  financial: [
-    { id: "1", text: "Olá! Sou da equipe financeira. Como posso ajudar com sua cobrança?", from: "them", time: "09:00", read: true },
-  ],
-  provider_support: [
-    { id: "1", text: "Canal exclusivo para prestadores 24/7. Como posso ajudar?", from: "them", time: "09:00", read: true },
-  ],
-};
-
-/* ── Auto-replies mock por contexto ── */
-const AUTO_REPLIES: Record<string, string[]> = {
-  support: [
-    "Entendido! Vou verificar isso para você.",
-    "Pode me dar mais detalhes sobre o problema?",
-    "Estou consultando nossa equipe. Um momento.",
-    "Resolvido! Há algo mais que posso ajudar?",
-  ],
-  financial: [
-    "Verificando seu histórico de pagamentos...",
-    "Identifiquei o registro. Pode confirmar a data do serviço?",
-    "O repasse é processado em até 2 dias úteis.",
-    "Emiti o comprovante, verifique seu email.",
-  ],
-  provider_support: [
-    "Canal 24/7 ativo. Qual é sua dúvida?",
-    "Estou verificando sua conta de prestador.",
-    "Encontrei sua solicitação. Vou escalar para o time.",
-    "Resolvido! Qualquer dúvida, estamos aqui.",
-  ],
-  dm: [
-    "Ok, perfeito!",
-    "Combinado.",
-    "Pode deixar.",
-    "Estou a caminho.",
-    "Entendido, sem problema.",
-  ],
-};
-
-const QUICK_REPLIES_SUPPORT = [
-  "Preciso de ajuda com um pedido",
-  "Problema com pagamento",
-  "Questão de segurança",
-  "Outro assunto",
-];
 
 const QUICK_REPLIES_DM = [
   "Ok!",
@@ -184,21 +97,18 @@ export default function ChatScreen() {
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
-  const [typing, setTyping] = useState(false);
   const [service, setService] = useState<ServiceChatDetails | null>(null);
   const [serviceLoading, setServiceLoading] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [serviceOpen, setServiceOpen] = useState(true);
   const flatRef = useRef<FlatList>(null);
-  const replyIdx = useRef(0);
 
   const isSupport = chatType !== "dm";
   const accent = isSupport ? c.blue : chatColor;
-  const quickReplies = isSupport ? QUICK_REPLIES_SUPPORT : QUICK_REPLIES_DM;
-  const autoReplies = AUTO_REPLIES[chatType] || AUTO_REPLIES.dm;
+  const quickReplies = QUICK_REPLIES_DM;
   const isBlockedDm = chatType === "dm" && !isRealtimeChat;
   const serviceReadOnly = Boolean(service && readOnlyStatuses.has(service.status));
-  const canSend = !isBlockedDm && !serviceReadOnly && (!isRealtimeChat || Boolean(service && !serviceError));
+  const canSend = !isSupport && !isBlockedDm && !serviceReadOnly && (!isRealtimeChat || Boolean(service && !serviceError));
 
   const mapRowToMessage = (row: QuickMessageRow): Msg => ({
     id: row.id,
@@ -242,11 +152,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (!isRealtimeChat) {
-      if (chatType === "dm") {
-        setMessages([]);
-      } else {
-        setMessages(MOCK_THREADS[threadKey] || MOCK_THREADS[chatType] || []);
-      }
+      setMessages([]);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
       return;
     }
@@ -319,31 +225,6 @@ export default function ChatScreen() {
       return;
     }
 
-    const newMsg: Msg = {
-      id: Date.now().toString(),
-      text: clean,
-      from: "me",
-      time: now(),
-      read: false,
-    };
-    setMessages((prev) => [...prev, newMsg]);
-    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
-
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      const reply: Msg = {
-        id: (Date.now() + 1).toString(),
-        text: autoReplies[replyIdx.current % autoReplies.length],
-        from: "them",
-        time: now(),
-        read: false,
-      };
-      replyIdx.current += 1;
-      setMessages((prev) => [...prev, reply]);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
-    }, 1500 + Math.random() * 1000);
   };
 
   const renderMsg = ({ item, index }: { item: Msg; index: number }) => {
@@ -404,7 +285,7 @@ export default function ChatScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[chatStyles.headerName, { color: c.text }]} numberOfLines={1}>{name || "Suporte"}</Text>
           <Text style={[chatStyles.headerSub, { color: c.success }]}>
-            {typing ? "digitando..." : isSupport ? "online" : serviceLoading ? "carregando serviço" : service ? (serviceStatusLabels[service.status] ?? service.status) : "chat bloqueado"}
+            {isSupport ? "suporte via ticket" : serviceLoading ? "carregando serviço" : service ? (serviceStatusLabels[service.status] ?? service.status) : "chat bloqueado"}
           </Text>
         </View>
         {isSupport && (
@@ -429,35 +310,21 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
-            isBlockedDm || serviceError ? (
+            isSupport ? (
+              <View style={[chatStyles.blockedState, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Ionicons name="ticket-outline" size={20} color={c.softMuted} />
+                <Text style={[chatStyles.blockedTitle, { color: c.text }]}>Suporte via Ticket</Text>
+                <Text style={[chatStyles.blockedText, { color: c.softMuted }]}>
+                  Para falar com o suporte, abra um ticket na tela de suporte. Nossa equipe responde em até 24h.
+                </Text>
+              </View>
+            ) : isBlockedDm || serviceError ? (
               <View style={[chatStyles.blockedState, { backgroundColor: c.card, borderColor: c.border }]}>
                 <Ionicons name="lock-closed" size={20} color={c.softMuted} />
                 <Text style={[chatStyles.blockedTitle, { color: c.text }]}>Chat indisponível</Text>
                 <Text style={[chatStyles.blockedText, { color: c.softMuted }]}>
                   {serviceError ?? "O chat só abre após uma proposta aceita ou um serviço agendado."}
                 </Text>
-              </View>
-            ) : null
-          }
-          ListFooterComponent={
-            typing ? (
-              <View style={[msgStyles.row]}>
-                <View style={msgStyles.avatar}>
-                  <View style={[msgStyles.avatarCircle, { backgroundColor: accent }]}>
-                    {isSupport ? (
-                      <Ionicons name="headset" size={14} color="#fff" />
-                    ) : (
-                      <Text style={msgStyles.avatarIni}>{(ini || "?").charAt(0)}</Text>
-                    )}
-                  </View>
-                </View>
-                <View style={[msgStyles.bubble, msgStyles.bubbleThem, { backgroundColor: c.card, borderColor: c.borderLight }]}>
-                  <View style={msgStyles.typingDots}>
-                    {[0, 1, 2].map((i) => (
-                      <View key={i} style={[msgStyles.dot, { backgroundColor: c.softMuted }]} />
-                    ))}
-                  </View>
-                </View>
               </View>
             ) : null
           }
