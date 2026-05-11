@@ -7,6 +7,8 @@ export interface ServiceRequest {
   id: string;
   customerId: string;
   providerId?: string;
+  providerName?: string;
+  clientName?: string;
   status: ServiceStatus;
   origin: string;
   destination: string;
@@ -28,6 +30,8 @@ function mapRequest(row: any): ServiceRequest {
     id: row.id,
     customerId: row.client_id,
     providerId: row.provider_id ?? undefined,
+    providerName: row.provider?.profiles?.name ?? undefined,
+    clientName: row.client?.name ?? undefined,
     status: row.status,
     origin: row.address_origin,
     destination: row.address_dest ?? "",
@@ -52,7 +56,13 @@ export function RequestsProvider({ children }: { children: React.ReactNode }) {
 
     const { data } = await supabase
       .from("requests")
-      .select("id, client_id, provider_id, status, address_origin, address_dest, price_final, price_estimated, created_at, categories(name)")
+      .select(`
+        id, client_id, provider_id, status, address_origin, address_dest,
+        price_final, price_estimated, created_at,
+        categories(name),
+        provider:providers!provider_id(profiles(name)),
+        client:profiles!client_id(name)
+      `)
       .or(`client_id.eq.${user.id},provider_id.eq.${user.id}`)
       .order("created_at", { ascending: false });
 

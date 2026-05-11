@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { supabase } from "@/lib/supabase";
 import { useService } from "@/contexts/ServiceContext";
+import { useRequests, type ServiceRequest } from "@/contexts/RequestsContext";
 import { FILTERS, CATEGORY_COLORS, type Category, type Provider } from "@/constants/mockData";
 import { fetchOnlineProviders } from "@/lib/providers";
 import { toggleProviderActive } from "@/lib/providerAvailability";
@@ -29,39 +30,42 @@ const DAYS = 7;
 const CELL = 14;
 const CELL_GAP = 3;
 
-function generateActivityData(): { count: number; day: Date }[] {
+function buildHeatmapCells(requests: ServiceRequest[]): { count: number; day: Date }[] {
+  const countMap: Record<string, number> = {};
+  for (const req of requests) {
+    if (req.status === "completed") {
+      const d = new Date(req.createdAt);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      countMap[key] = (countMap[key] ?? 0) + 1;
+    }
+  }
   const today = new Date();
   const cells: { count: number; day: Date }[] = [];
   for (let w = WEEKS - 1; w >= 0; w--) {
     for (let d = 0; d < DAYS; d++) {
       const date = new Date(today);
       date.setDate(today.getDate() - (w * DAYS + (DAYS - 1 - d)));
-      const rand = Math.random();
-      const count = rand < 0.25 ? 0 : rand < 0.55 ? 1 : rand < 0.75 ? 2 : rand < 0.9 ? 3 : 4;
-      cells.push({ count, day: date });
+      const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+      cells.push({ count: countMap[key] ?? 0, day: date });
     }
   }
   return cells;
 }
 
-const ACTIVITY_DATA = generateActivityData();
-
-const BEST_HOURS = [
-  { hour: "08h–10h", score: 87, label: "Frete" },
-  { hour: "13h–15h", score: 73, label: "Mudança" },
-  { hour: "17h–19h", score: 65, label: "Entrega" },
-];
-
 function ActivityHeatmap() {
   const c = colors.light;
+  const { requests } = useRequests();
+  const { user } = useAuth();
+  const providerRequests = requests.filter((r) => r.providerId === user?.id);
+  const activityData = buildHeatmapCells(providerRequests);
   const cellColor = (count: number) => count > 0 ? c.primary : c.bgDeep;
 
-  const totalServices = ACTIVITY_DATA.reduce((s, d) => s + (d.count > 0 ? d.count : 0), 0);
-  const activeDays = ACTIVITY_DATA.filter((d) => d.count > 0).length;
+  const totalServices = activityData.reduce((s, d) => s + (d.count > 0 ? d.count : 0), 0);
+  const activeDays = activityData.filter((d) => d.count > 0).length;
   const streak = (() => {
     let s = 0;
-    for (let i = ACTIVITY_DATA.length - 1; i >= 0; i--) {
-      if (ACTIVITY_DATA[i].count > 0) s++;
+    for (let i = activityData.length - 1; i >= 0; i--) {
+      if (activityData[i].count > 0) s++;
       else break;
     }
     return s;
@@ -107,8 +111,8 @@ function ActivityHeatmap() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: "row", gap: CELL_GAP }}>
                   {Array.from({ length: WEEKS }).map((_, w) => {
-                    const firstDay = ACTIVITY_DATA[w * DAYS];
-                    const prevFirstDay = w > 0 ? ACTIVITY_DATA[(w - 1) * DAYS] : null;
+                    const firstDay = activityData[w * DAYS];
+                    const prevFirstDay = w > 0 ? activityData[(w - 1) * DAYS] : null;
                     const showMonth = !prevFirstDay || firstDay?.day.getMonth() !== prevFirstDay?.day.getMonth();
                     return (
                       <View key={w} style={{ flexDirection: "column", gap: CELL_GAP }}>
@@ -116,7 +120,7 @@ function ActivityHeatmap() {
                           {showMonth ? monthNames[firstDay?.day.getMonth() ?? 0] : ""}
                         </Text>
                         {Array.from({ length: DAYS }).map((_, d) => {
-                          const cell = ACTIVITY_DATA[w * DAYS + d];
+                          const cell = activityData[w * DAYS + d];
                           return (
                             <View
                               key={d}
@@ -145,21 +149,13 @@ function ActivityHeatmap() {
         <Text style={[heatStyles.legendText, { color: c.softMuted }]}>Ativo</Text>
       </View>
 
-      {/* Best hours report */}
-      <View style={[heatStyles.divider, { backgroundColor: c.border }]} />
-      <Text style={[heatStyles.reportTitle, { color: c.text }]}>Melhores horários</Text>
-      {BEST_HOURS.map((h) => (
-        <View key={h.hour} style={heatStyles.hourRow}>
-          <Text style={[heatStyles.hourLabel, { color: c.text }]}>{h.hour}</Text>
-          <View style={[heatStyles.hourBar, { backgroundColor: c.border }]}>
-            <View style={[heatStyles.hourFill, { width: `${h.score}%` as any, backgroundColor: c.primary }]} />
-          </View>
-          <Text style={[heatStyles.hourScore, { color: "#8B6F00" }]}>{h.score}%</Text>
-          <View style={[heatStyles.hourCat, { backgroundColor: `${c.blue}18` }]}>
-            <Text style={[heatStyles.hourCatText, { color: c.blue }]}>{h.label}</Text>
-          </View>
+      {totalServices === 0 && (
+        <View style={{ alignItems: "center", paddingVertical: 8 }}>
+          <Text style={{ fontSize: 12, fontFamily: fonts.sans.regular, color: c.softMuted, textAlign: "center" }}>
+            Complete seus primeiros serviços para ver análises de atividade.
+          </Text>
         </View>
-      ))}
+      )}
     </View>
   );
 }
@@ -221,10 +217,6 @@ function HotAreaBanner({ onPress }: { onPress: () => void }) {
 }
 
 /* 2. Price suggestion */
-const PRICE_INSIGHTS = [
-  { cat: "Frete", yours: 120, market: 138, delta: +18 },
-  { cat: "Mudança", yours: 214, market: 199, delta: -15 },
-];
 function PriceSuggestion() {
   const c = colors.light;
   return (
@@ -232,125 +224,77 @@ function PriceSuggestion() {
       <View style={pStyles.cardHead}>
         <Ionicons name="trending-up" size={15} color={c.blue} />
         <Text style={[pStyles.cardTitle, { color: c.text }]}>Sugestão de preço</Text>
-        <Text style={[pStyles.cardBadge, { backgroundColor: c.blueLight, color: c.blue }]}>Hoje</Text>
+        <Text style={[pStyles.cardBadge, { backgroundColor: c.blueLight, color: c.blue }]}>Em breve</Text>
       </View>
-      {PRICE_INSIGHTS.map((p) => {
-        const above = p.delta > 0;
-        return (
-          <View key={p.cat} style={[pStyles.insightRow, { borderTopColor: c.borderLight }]}>
-            <Text style={[pStyles.insightCat, { color: c.sub }]}>{p.cat}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[pStyles.insightMsg, { color: c.text }]}>
-                {above
-                  ? `Mercado cobra R$${p.delta} a mais que você`
-                  : `Você está R$${Math.abs(p.delta)} acima da média`}
-              </Text>
-            </View>
-            <View style={[pStyles.insightDelta, { backgroundColor: above ? c.successLight : c.warningLight }]}>
-              <Text style={[pStyles.insightDeltaText, { color: above ? c.success : c.warning }]}>
-                {above ? "+" : "-"}R${Math.abs(p.delta)}
-              </Text>
-            </View>
-          </View>
-        );
-      })}
+      <View style={{ alignItems: "center", paddingVertical: 16 }}>
+        <Ionicons name="analytics-outline" size={28} color={c.softMuted} />
+        <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.softMuted, textAlign: "center", marginTop: 8 }}>
+          Análise de mercado disponível em breve.
+        </Text>
+      </View>
     </View>
   );
 }
 
-/* 3. Demand forecast — 48h bar chart */
-const DEMAND_DATA = [
-  { hour: "08h", frete: 3, mudanca: 1, entrega: 2 },
-  { hour: "10h", frete: 5, mudanca: 2, entrega: 4 },
-  { hour: "12h", frete: 2, mudanca: 3, entrega: 3 },
-  { hour: "14h", frete: 7, mudanca: 4, entrega: 2 },
-  { hour: "16h", frete: 6, mudanca: 2, entrega: 5 },
-  { hour: "18h", frete: 4, mudanca: 5, entrega: 3 },
-  { hour: "20h", frete: 2, mudanca: 1, entrega: 2 },
-  { hour: "22h", frete: 1, mudanca: 0, entrega: 1 },
-];
-const CHART_MAX = 10;
-
 function DemandForecast() {
   const c = colors.light;
-  const [activeCat, setActiveCat] = useState<"frete" | "mudanca" | "entrega">("frete");
-  const catColors: Record<string, string> = { frete: c.blue, mudanca: c.primary, entrega: c.success };
-  const catLabels: Record<string, string> = { frete: "Frete", mudanca: "Mudança", entrega: "Entrega" };
-
   return (
     <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
       <View style={pStyles.cardHead}>
         <Ionicons name="pulse" size={15} color={c.blue} />
         <Text style={[pStyles.cardTitle, { color: c.text }]}>Previsão de demanda</Text>
-        <Text style={[pStyles.cardBadge, { backgroundColor: c.blueLight, color: c.blue }]}>Próximas 48h</Text>
+        <Text style={[pStyles.cardBadge, { backgroundColor: c.blueLight, color: c.blue }]}>Em breve</Text>
       </View>
-
-      {/* Category toggle */}
-      <View style={[pStyles.catToggle, { backgroundColor: c.background }]}>
-        {(["frete", "mudanca", "entrega"] as const).map((k) => (
-          <Pressable
-            key={k}
-            onPress={() => setActiveCat(k)}
-            style={[
-              pStyles.catToggleBtn,
-              activeCat === k && { backgroundColor: catColors[k], borderRadius: 8 },
-            ]}
-          >
-            <Text style={[pStyles.catToggleText, { color: activeCat === k ? (k === "mudanca" ? "#1A1714" : "#fff") : c.sub }]}>
-              {catLabels[k]}
-            </Text>
-          </Pressable>
-        ))}
+      <View style={{ alignItems: "center", paddingVertical: 16 }}>
+        <Ionicons name="bar-chart-outline" size={28} color={c.softMuted} />
+        <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.softMuted, textAlign: "center", marginTop: 8 }}>
+          Previsão de demanda disponível em breve.
+        </Text>
       </View>
-
-      {/* Bars */}
-      <View style={pStyles.chartRow}>
-        {DEMAND_DATA.map((d) => {
-          const val = d[activeCat as keyof typeof d] as number;
-          const heightPct = (val / CHART_MAX) * 100;
-          const color = catColors[activeCat];
-          return (
-            <View key={d.hour} style={pStyles.barCol}>
-              <View style={[pStyles.barTrack, { backgroundColor: c.background }]}>
-                <View style={[pStyles.barFill, { height: `${heightPct}%` as any, backgroundColor: color }]} />
-              </View>
-              <Text style={[pStyles.barLabel, { color: c.softMuted }]}>{d.hour}</Text>
-            </View>
-          );
-        })}
-      </View>
-      <Text style={[pStyles.chartHint, { color: c.softMuted }]}>
-        Pico estimado: 14h–16h · {DEMAND_DATA.reduce((s, d) => s + (d[activeCat as keyof typeof d] as number), 0)} pedidos esperados
-      </Text>
     </View>
   );
 }
 
-/* 4. Monthly goals */
-const GOALS = [
-  { label: "Renda do mês", current: 1840, target: 3000, unit: "R$", color: "#16A34A", bg: "#DCFCE7" },
-  { label: "Serviços", current: 14, target: 20, unit: "", color: "#2563EB", bg: "#DBEAFE" },
-  { label: "Avaliação média", current: 4.9, target: 5.0, unit: "★", color: "#D97706", bg: "#FEF3C7" },
-];
 function MonthlyGoals() {
   const c = colors.light;
+  const { requests } = useRequests();
+  const { user } = useAuth();
   const month = new Date().toLocaleDateString("pt-BR", { month: "long" });
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const providerCompleted = requests.filter(
+    (r) => r.providerId === user?.id && r.status === "completed" && new Date(r.createdAt) >= monthStart
+  );
+  const monthEarned = providerCompleted.reduce((s, r) => s + r.price * 0.85, 0);
+  const monthServices = providerCompleted.length;
+
+  const goals = [
+    { label: "Renda do mês", current: monthEarned, target: 3000, unit: "R$", color: "#16A34A", isFloat: true },
+    { label: "Serviços", current: monthServices, target: 20, unit: "", color: "#2563EB", isFloat: false },
+  ];
+
   return (
     <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
       <View style={pStyles.cardHead}>
         <Ionicons name="flag" size={15} color={c.warning} />
-        <Text style={[pStyles.cardTitle, { color: c.text }]}>Metas de {month}</Text>
+        <Text style={[pStyles.cardTitle, { color: c.text }]}>Progresso de {month}</Text>
       </View>
-      {GOALS.map((g) => {
+      {goals.map((g) => {
         const pct = Math.min(g.current / g.target, 1);
+        const display = g.isFloat
+          ? g.current.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          : String(g.current);
+        const targetDisplay = g.isFloat
+          ? g.target.toLocaleString("pt-BR")
+          : String(g.target);
         return (
           <View key={g.label} style={pStyles.goalRow}>
             <View style={pStyles.goalLabelRow}>
               <Text style={[pStyles.goalLabel, { color: c.text }]}>{g.label}</Text>
               <Text style={[pStyles.goalValue, { color: g.color }]}>
-                {g.unit}{typeof g.current === "number" && g.current >= 100 ? g.current.toLocaleString("pt-BR") : g.current}
+                {g.unit}{display}
                 <Text style={[pStyles.goalTarget, { color: c.softMuted }]}>
-                  {" "}/ {g.unit}{g.target}
+                  {" "}/ {g.unit}{targetDisplay}
                 </Text>
               </Text>
             </View>
@@ -364,27 +308,41 @@ function MonthlyGoals() {
   );
 }
 
-/* 5. Badges / conquistas */
-const BADGES = [
-  { icon: "trophy" as const, label: "100 serviços", unlocked: false, target: 100, current: 71 },
-  { icon: "star" as const, label: "5 estrelas", unlocked: true, target: 1, current: 1 },
-  { icon: "flame" as const, label: "7 dias", unlocked: true, target: 7, current: 7 },
-  { icon: "flash" as const, label: "50 fretes", unlocked: false, target: 50, current: 36 },
-  { icon: "shield-checkmark" as const, label: "Verificado", unlocked: true, target: 1, current: 1 },
-];
 function BadgeRow() {
   const c = colors.light;
+  const { requests } = useRequests();
+  const { user } = useAuth();
+  const providerCompleted = requests.filter((r) => r.providerId === user?.id && r.status === "completed");
+  const totalCompleted = providerCompleted.length;
+  const freightCompleted = providerCompleted.filter((r) => r.serviceType === "Frete").length;
+  const activityData = buildHeatmapCells(providerCompleted);
+  const streak = (() => {
+    let s = 0;
+    for (let i = activityData.length - 1; i >= 0; i--) {
+      if (activityData[i].count > 0) s++;
+      else break;
+    }
+    return s;
+  })();
+
+  const badges: { icon: "trophy" | "flash" | "flame" | "shield-checkmark"; label: string; unlocked: boolean; target: number; current: number }[] = [
+    { icon: "trophy", label: "100 serviços", unlocked: totalCompleted >= 100, target: 100, current: Math.min(totalCompleted, 100) },
+    { icon: "flash", label: "50 fretes", unlocked: freightCompleted >= 50, target: 50, current: Math.min(freightCompleted, 50) },
+    { icon: "flame", label: "7 dias seguidos", unlocked: streak >= 7, target: 7, current: Math.min(streak, 7) },
+    { icon: "shield-checkmark", label: "Verificado", unlocked: Boolean(user?.verified), target: 1, current: user?.verified ? 1 : 0 },
+  ];
+
   return (
     <View style={[pStyles.card, { backgroundColor: c.card, borderColor: c.border }]}>
       <View style={[pStyles.cardHead, { marginBottom: 14 }]}>
         <Ionicons name="ribbon" size={15} color={c.warning} />
         <Text style={[pStyles.cardTitle, { color: c.text }]}>Conquistas</Text>
         <Text style={[pStyles.cardBadge, { backgroundColor: c.successLight, color: c.success }]}>
-          {BADGES.filter((b) => b.unlocked).length}/{BADGES.length}
+          {badges.filter((b) => b.unlocked).length}/{badges.length}
         </Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-        {BADGES.map((b) => (
+        {badges.map((b) => (
           <View
             key={b.label}
             style={[
@@ -417,12 +375,6 @@ function BadgeRow() {
 }
 
 /* 6. Recent reviews carousel */
-const RECENT_REVIEWS = [
-  { author: "Juliana M.", text: "Chegou cedo, embalou tudo com cuidado e subiu quatro andares sem perder o ritmo.", rating: 5, when: "há 2 dias" },
-  { author: "Thiago P.", text: "Foi transparente no valor final e explicou cada etapa antes de carregar.", rating: 5, when: "há 1 semana" },
-  { author: "Sandra L.", text: "Pontual e muito cuidadoso com os móveis. Super indico!", rating: 5, when: "hoje" },
-];
-
 function RecentReviews() {
   const c = colors.light;
   return (
@@ -430,29 +382,13 @@ function RecentReviews() {
       <View style={[pStyles.cardHead, { marginBottom: 12 }]}>
         <Ionicons name="star" size={15} color={c.warning} />
         <Text style={[pStyles.cardTitle, { color: c.text }]}>Avaliações recentes</Text>
-        <Text style={[pStyles.cardBadge, { backgroundColor: c.warningLight, color: c.warning }]}>★ 4.9</Text>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-        {RECENT_REVIEWS.map((r, i) => (
-          <View key={i} style={[pStyles.reviewCard, { backgroundColor: c.background, borderColor: c.borderLight }]}>
-            <View style={pStyles.reviewHead}>
-              <View style={[pStyles.reviewAvatar, { backgroundColor: `${c.primary}22` }]}>
-                <Text style={[pStyles.reviewIni, { color: "#8B6F00" }]}>{r.author[0]}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[pStyles.reviewAuthor, { color: c.text }]}>{r.author}</Text>
-                <Text style={[pStyles.reviewWhen, { color: c.softMuted }]}>{r.when}</Text>
-              </View>
-              <View style={pStyles.reviewStars}>
-                {Array.from({ length: r.rating }).map((_, k) => (
-                  <Ionicons key={k} name="star" size={10} color={c.warning} />
-                ))}
-              </View>
-            </View>
-            <Text style={[pStyles.reviewText, { color: c.sub }]} numberOfLines={3}>{r.text}</Text>
-          </View>
-        ))}
-      </ScrollView>
+      <View style={{ alignItems: "center", paddingVertical: 16 }}>
+        <Ionicons name="star-outline" size={28} color={c.softMuted} />
+        <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.softMuted, textAlign: "center", marginTop: 8 }}>
+          Sem avaliações ainda.{"\n"}Complete serviços para receber avaliações.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -942,70 +878,69 @@ const tabBarStyles = StyleSheet.create({
 });
 
 /* ─── PedidosTab (Cliente) ──────────────────────────────────────────────── */
-const MOCK_PEDIDOS = [
-  {
-    id: "PD001", cat: "Mudança", provider: "Carlos Oliveira", providerIni: "CO", status: "in_progress",
-    price: "R$320", priceBase: "R$280", priceTaxa: "R$40", date: "Hoje, 14h30", color: "#FF5500",
-    origin: "Rua General Glicério, 248 — Laranjeiras", dest: "Av. das Américas, 1510 — Barra",
-    vehicle: "Van", rating: 4.9, timeline: [
-      { label: "Solicitado", when: "Hoje, 14h30", done: true },
-      { label: "Aceito", when: "Hoje, 14h35", done: true },
-      { label: "A caminho", when: "Hoje, 14h50", done: true },
-      { label: "Iniciado", when: "Hoje, 15h10", done: false },
-      { label: "Concluído", when: "—", done: false },
-    ],
-  },
-  {
-    id: "PD002", cat: "Frete", provider: "Marcos Frete", providerIni: "MF", status: "completed",
-    price: "R$120", priceBase: "R$100", priceTaxa: "R$20", date: "Ontem, 10h00", color: "#2563EB",
-    origin: "Rua Voluntários da Pátria, 90 — Botafogo", dest: "Rua do Catete, 350 — Catete",
-    vehicle: "Caminhão", rating: 4.7, timeline: [
-      { label: "Solicitado", when: "Ontem, 09h50", done: true },
-      { label: "Aceito", when: "Ontem, 09h55", done: true },
-      { label: "A caminho", when: "Ontem, 10h05", done: true },
-      { label: "Iniciado", when: "Ontem, 10h30", done: true },
-      { label: "Concluído", when: "Ontem, 12h15", done: true },
-    ],
-  },
-  {
-    id: "PD003", cat: "Entrega", provider: "Pedro Entrega", providerIni: "PE", status: "completed",
-    price: "R$52", priceBase: "R$45", priceTaxa: "R$7", date: "22 abr, 16h00", color: "#9333EA",
-    origin: "Loja Magazine — Shopping Tijuca", dest: "Rua Araguaia, 120 — Jacarepaguá",
-    vehicle: "Moto", rating: 4.8, timeline: [
-      { label: "Solicitado", when: "22 abr, 15h50", done: true },
-      { label: "Aceito", when: "22 abr, 15h53", done: true },
-      { label: "A caminho", when: "22 abr, 16h00", done: true },
-      { label: "Iniciado", when: "22 abr, 16h10", done: true },
-      { label: "Concluído", when: "22 abr, 16h45", done: true },
-    ],
-  },
-  {
-    id: "PD004", cat: "Frete", provider: "Rafael Carreto", providerIni: "RC", status: "cancelled",
-    price: "R$80", priceBase: "R$80", priceTaxa: "R$0", date: "19 abr, 11h00", color: "#2563EB",
-    origin: "Rua Álvaro Ramos, 200 — Botafogo", dest: "Rua Conde de Bonfim, 88 — Tijuca",
-    vehicle: "Caminhonete", rating: 4.5, timeline: [
-      { label: "Solicitado", when: "19 abr, 11h00", done: true },
-      { label: "Cancelado pelo prestador", when: "19 abr, 11h15", done: true },
-    ],
-  },
-];
+
+function deriveTimeline(status: string): { label: string; done: boolean }[] {
+  const steps = [
+    { label: "Solicitado", keys: ["requested", "matching", "accepted", "provider_en_route", "provider_arrived", "in_progress", "completed_pending_confirmation", "completed", "cancelled", "disputed"] },
+    { label: "Aceito", keys: ["accepted", "provider_en_route", "provider_arrived", "in_progress", "completed_pending_confirmation", "completed"] },
+    { label: "A caminho", keys: ["provider_en_route", "provider_arrived", "in_progress", "completed_pending_confirmation", "completed"] },
+    { label: "Em andamento", keys: ["in_progress", "completed_pending_confirmation", "completed"] },
+    { label: "Concluído", keys: ["completed"] },
+  ];
+  if (status === "cancelled") {
+    return [
+      { label: "Solicitado", done: true },
+      { label: "Cancelado", done: true },
+    ];
+  }
+  if (status === "disputed") {
+    return [
+      { label: "Solicitado", done: true },
+      { label: "Em disputa", done: true },
+    ];
+  }
+  return steps.map((s) => ({ label: s.label, done: s.keys.includes(status) }));
+}
+
+function formatRequestDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function catColor(serviceType: string): string {
+  if (serviceType === "Mudança") return "#FF5500";
+  if (serviceType === "Frete") return "#2563EB";
+  if (serviceType === "Entrega") return "#16A34A";
+  return "#FF5500";
+}
 
 const STATUS_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
   in_progress: { label: "Em andamento", bg: "#FEF3C7", fg: "#D97706" },
   completed: { label: "Concluído", bg: "#DCFCE7", fg: "#16A34A" },
   cancelled: { label: "Cancelado", bg: "#FEE2E2", fg: "#DC2626" },
   requested: { label: "Aguardando", bg: "#DBEAFE", fg: "#2563EB" },
+  matching: { label: "Buscando", bg: "#DBEAFE", fg: "#2563EB" },
+  accepted: { label: "Aceito", bg: "#DCFCE7", fg: "#16A34A" },
+  provider_en_route: { label: "A caminho", bg: "#FEF3C7", fg: "#D97706" },
+  provider_arrived: { label: "Chegou", bg: "#FEF3C7", fg: "#D97706" },
+  completed_pending_confirmation: { label: "Aguardando PIN", bg: "#EDE9FE", fg: "#7C3AED" },
+  disputed: { label: "Em disputa", bg: "#FEE2E2", fg: "#DC2626" },
 };
 
-type MockPedido = typeof MOCK_PEDIDOS[number];
-
-function PedidoDetailModal({ pedido, onClose }: { pedido: MockPedido; onClose: () => void }) {
+function PedidoDetailModal({ pedido, onClose }: { pedido: ServiceRequest; onClose: () => void }) {
   const c = colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const color = catColor(pedido.serviceType);
   const st = STATUS_LABEL[pedido.status] || STATUS_LABEL.requested;
   const isCompleted = pedido.status === "completed";
   const isCancelled = pedido.status === "cancelled";
+  const providerName = pedido.providerName ?? "Prestador";
+  const providerIni = providerName.split(" ").map((p) => p[0]).slice(0, 2).join("");
+  const priceBase = pedido.price > 0 ? pedido.price * 0.85 : 0;
+  const priceTaxa = pedido.price > 0 ? pedido.price * 0.15 : 0;
+  const timeline = deriveTimeline(pedido.status);
 
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -1016,8 +951,8 @@ function PedidoDetailModal({ pedido, onClose }: { pedido: MockPedido; onClose: (
             <Ionicons name="close" size={18} color={c.text} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontFamily: fonts.sans.bold, color: c.text }}>{pedido.cat} · #{pedido.id}</Text>
-            <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 1 }}>{pedido.date}</Text>
+            <Text style={{ fontSize: 15, fontFamily: fonts.sans.bold, color: c.text }}>{pedido.serviceType} · #{pedido.id.slice(0, 8)}</Text>
+            <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 1 }}>{formatRequestDate(pedido.createdAt)}</Text>
           </View>
           <View style={[{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: st.bg }]}>
             <Text style={{ fontSize: 11, fontFamily: fonts.sans.bold, color: st.fg }}>{st.label}</Text>
@@ -1027,19 +962,19 @@ function PedidoDetailModal({ pedido, onClose }: { pedido: MockPedido; onClose: (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + insets.bottom }} showsVerticalScrollIndicator={false}>
           {/* Provider */}
           <View style={[{ backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 12 }, shadows.sm]}>
-            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: pedido.color, alignItems: "center", justifyContent: "center" }}>
-              <Text style={{ color: "#fff", fontSize: 15, fontFamily: fonts.serif.extra }}>{pedido.providerIni}</Text>
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: color, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ color: color === "#FFCC00" ? "#1A1714" : "#fff", fontSize: 15, fontFamily: fonts.serif.extra }}>{providerIni}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>{pedido.provider}</Text>
-              <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 2 }}>{pedido.vehicle} · ★ {pedido.rating}</Text>
+              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>{providerName}</Text>
+              <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 2 }}>{pedido.serviceType}</Text>
             </View>
-            {!isCancelled && (
+            {!isCancelled && pedido.providerId && (
               <Pressable
-                onPress={() => { onClose(); router.push({ pathname: "/chat", params: { id: `c-1`, name: pedido.provider, ini: pedido.providerIni, color: pedido.color, type: "dm" } } as any); }}
-                style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: `${pedido.color}18`, alignItems: "center", justifyContent: "center" }}
+                onPress={() => { onClose(); router.push({ pathname: "/chat", params: { id: pedido.id, name: providerName, ini: providerIni, color, type: "dm", requestId: pedido.id } } as any); }}
+                style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: `${color}18`, alignItems: "center", justifyContent: "center" }}
               >
-                <Ionicons name="chatbubble-ellipses" size={16} color={pedido.color} />
+                <Ionicons name="chatbubble-ellipses" size={16} color={color} />
               </Pressable>
             )}
           </View>
@@ -1053,7 +988,7 @@ function PedidoDetailModal({ pedido, onClose }: { pedido: MockPedido; onClose: (
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.4 }}>ORIGEM</Text>
-                <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text, marginTop: 2 }}>{pedido.origin}</Text>
+                <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text, marginTop: 2 }}>{pedido.origin || "—"}</Text>
               </View>
             </View>
             <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
@@ -1062,7 +997,7 @@ function PedidoDetailModal({ pedido, onClose }: { pedido: MockPedido; onClose: (
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.4 }}>DESTINO</Text>
-                <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text, marginTop: 2 }}>{pedido.dest}</Text>
+                <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text, marginTop: 2 }}>{pedido.destination || "—"}</Text>
               </View>
             </View>
           </View>
@@ -1070,48 +1005,59 @@ function PedidoDetailModal({ pedido, onClose }: { pedido: MockPedido; onClose: (
           {/* Price */}
           <View style={[{ backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 12 }, shadows.sm]}>
             <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 10 }}>PAGAMENTO</Text>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
-              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.sub }}>Serviço</Text>
-              <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text }}>{pedido.priceBase}</Text>
-            </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
-              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.sub }}>Taxa da plataforma</Text>
-              <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text }}>{pedido.priceTaxa}</Text>
-            </View>
-            <View style={{ height: 1, backgroundColor: c.borderLight, marginBottom: 10 }} />
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Total</Text>
-              <Text style={{ fontSize: 16, fontFamily: fonts.serif.extra, color: pedido.color }}>{pedido.price}</Text>
-            </View>
+            {pedido.price > 0 ? (
+              <>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.sub }}>Serviço</Text>
+                  <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text }}>
+                    {priceBase.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+                  <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.sub }}>Taxa da plataforma</Text>
+                  <Text style={{ fontSize: 13, fontFamily: fonts.sans.semibold, color: c.text }}>
+                    {priceTaxa.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: c.borderLight, marginBottom: 10 }} />
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: c.text }}>Total</Text>
+                  <Text style={{ fontSize: 16, fontFamily: fonts.serif.extra, color }}>
+                    {pedido.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.softMuted }}>Valor a confirmar</Text>
+            )}
           </View>
 
           {/* Timeline */}
           <View style={[{ backgroundColor: c.card, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }, shadows.sm]}>
             <Text style={{ fontSize: 10, fontFamily: fonts.sans.bold, color: c.softMuted, letterSpacing: 0.6, marginBottom: 12 }}>LINHA DO TEMPO</Text>
-            {pedido.timeline.map((t, i) => (
-              <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: i < pedido.timeline.length - 1 ? 12 : 0 }}>
+            {timeline.map((t, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: i < timeline.length - 1 ? 12 : 0 }}>
                 <View style={{ alignItems: "center", width: 22 }}>
-                  <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: t.done ? (isCancelled && i === pedido.timeline.length - 1 ? "#FEE2E2" : "#DCFCE7") : c.borderLight, alignItems: "center", justifyContent: "center" }}>
-                    <Ionicons name={t.done ? (isCancelled && i === pedido.timeline.length - 1 ? "close" : "checkmark") : "ellipse-outline"} size={12} color={t.done ? (isCancelled && i === pedido.timeline.length - 1 ? "#DC2626" : "#16A34A") : c.softMuted} />
+                  <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: t.done ? (isCancelled && i === timeline.length - 1 ? "#FEE2E2" : "#DCFCE7") : c.borderLight, alignItems: "center", justifyContent: "center" }}>
+                    <Ionicons name={t.done ? (isCancelled && i === timeline.length - 1 ? "close" : "checkmark") : "ellipse-outline"} size={12} color={t.done ? (isCancelled && i === timeline.length - 1 ? "#DC2626" : "#16A34A") : c.softMuted} />
                   </View>
-                  {i < pedido.timeline.length - 1 && <View style={{ width: 1, height: 14, backgroundColor: t.done ? c.success : c.borderLight, marginTop: 3 }} />}
+                  {i < timeline.length - 1 && <View style={{ width: 1, height: 14, backgroundColor: t.done ? c.success : c.borderLight, marginTop: 3 }} />}
                 </View>
                 <View style={{ flex: 1, paddingTop: 2 }}>
                   <Text style={{ fontSize: 13, fontFamily: t.done ? fonts.sans.semibold : fonts.sans.regular, color: t.done ? c.text : c.softMuted }}>{t.label}</Text>
-                  <Text style={{ fontSize: 11, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 1 }}>{t.when}</Text>
                 </View>
               </View>
             ))}
           </View>
 
           {/* Actions */}
-          {isCompleted && (
+          {isCompleted && pedido.providerId && (
             <Pressable
-              onPress={() => { onClose(); router.push({ pathname: "/chat", params: { id: `c-1`, name: pedido.provider, ini: pedido.providerIni, color: pedido.color, type: "dm" } } as any); }}
-              style={[{ height: 48, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: pedido.color }, shadows.sm]}
+              onPress={() => { onClose(); router.push({ pathname: "/chat", params: { id: pedido.id, name: providerName, ini: providerIni, color, type: "dm", requestId: pedido.id } } as any); }}
+              style={[{ height: 48, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: color }, shadows.sm]}
             >
-              <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
-              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: "#fff" }}>Mensagem ao prestador</Text>
+              <Ionicons name="chatbubble-ellipses" size={16} color={color === "#FFCC00" ? "#1A1714" : "#fff"} />
+              <Text style={{ fontSize: 14, fontFamily: fonts.sans.bold, color: color === "#FFCC00" ? "#1A1714" : "#fff" }}>Mensagem ao prestador</Text>
             </Pressable>
           )}
           {!isCompleted && !isCancelled && (
@@ -1144,11 +1090,13 @@ function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { active } = useService();
+  const { requests } = useRequests();
   const initials = (user?.name || "RA").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [selectedPedido, setSelectedPedido] = useState<MockPedido | null>(null);
+  const [selectedPedido, setSelectedPedido] = useState<ServiceRequest | null>(null);
   const hasActive = !!(active && active.status !== "completed" && active.status !== "cancelled");
+  const clientRequests = requests.filter((r) => r.customerId === user?.id);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -1197,37 +1145,51 @@ function PedidosTab({ onGoHome }: { onGoHome: () => void }) {
         </View>
 
         <Text style={[pedidosStyles.sectionTitle, { color: c.text }]}>Histórico</Text>
-        {MOCK_PEDIDOS.map((p) => {
-          const st = STATUS_LABEL[p.status] || STATUS_LABEL.requested;
-          return (
-            <Pressable
-              key={p.id}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setSelectedPedido(p); }}
-              style={[pedidosStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
-            >
-              <View style={[pedidosStyles.catDot, { backgroundColor: `${p.color}22` }]}>
-                {p.cat === "Mudança" ? (
-                  <Ionicons name="home" size={16} color={p.color} />
-                ) : p.cat === "Frete" ? (
-                  <MaterialCommunityIcons name="truck" size={16} color={p.color} />
-                ) : (
-                  <Ionicons name="cube" size={16} color={p.color} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[pedidosStyles.cardTitle, { color: c.text }]}>{p.cat} · {p.provider}</Text>
-                <Text style={[pedidosStyles.cardSub, { color: c.softMuted }]}>{p.date} · #{p.id}</Text>
-              </View>
-              <View style={{ alignItems: "flex-end", gap: 4 }}>
-                <Text style={[pedidosStyles.cardPrice, { color: c.text }]}>{p.price}</Text>
-                <View style={[pedidosStyles.statusBadge, { backgroundColor: st.bg }]}>
-                  <Text style={[pedidosStyles.statusText, { color: st.fg }]}>{st.label}</Text>
+        {clientRequests.length === 0 ? (
+          <View style={{ alignItems: "center", paddingVertical: 32 }}>
+            <Ionicons name="receipt-outline" size={32} color={c.softMuted} />
+            <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 10, textAlign: "center" }}>
+              Nenhum pedido realizado ainda.{"\n"}Solicite seu primeiro serviço!
+            </Text>
+          </View>
+        ) : (
+          clientRequests.map((p) => {
+            const st = STATUS_LABEL[p.status] || STATUS_LABEL.requested;
+            const color = catColor(p.serviceType);
+            return (
+              <Pressable
+                key={p.id}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); setSelectedPedido(p); }}
+                style={[pedidosStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}
+              >
+                <View style={[pedidosStyles.catDot, { backgroundColor: `${color}22` }]}>
+                  {p.serviceType === "Mudança" ? (
+                    <Ionicons name="home" size={16} color={color} />
+                  ) : p.serviceType === "Frete" ? (
+                    <MaterialCommunityIcons name="truck" size={16} color={color} />
+                  ) : (
+                    <Ionicons name="cube" size={16} color={color} />
+                  )}
                 </View>
-              </View>
-              <Ionicons name="chevron-forward" size={14} color={c.softMuted} />
-            </Pressable>
-          );
-        })}
+                <View style={{ flex: 1 }}>
+                  <Text style={[pedidosStyles.cardTitle, { color: c.text }]}>{p.serviceType} · {p.providerName ?? "Aguardando"}</Text>
+                  <Text style={[pedidosStyles.cardSub, { color: c.softMuted }]}>{formatRequestDate(p.createdAt)} · #{p.id.slice(0, 8)}</Text>
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  {p.price > 0 ? (
+                    <Text style={[pedidosStyles.cardPrice, { color: c.text }]}>{p.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</Text>
+                  ) : (
+                    <Text style={[pedidosStyles.cardPrice, { color: c.softMuted }]}>A confirmar</Text>
+                  )}
+                  <View style={[pedidosStyles.statusBadge, { backgroundColor: st.bg }]}>
+                    <Text style={[pedidosStyles.statusText, { color: st.fg }]}>{st.label}</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={c.softMuted} />
+              </Pressable>
+            );
+          })
+        )}
       </ScrollView>
       {selectedPedido && <PedidoDetailModal pedido={selectedPedido} onClose={() => setSelectedPedido(null)} />}
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -1255,24 +1217,19 @@ const pedidosStyles = StyleSheet.create({
 });
 
 /* ─── HistoricoTab (Prestador) ──────────────────────────────────────────── */
-const MOCK_HISTORICO = [
-  { id: "SV001", cat: "Mudança", client: "Ricardo A.", status: "completed", earned: "R$272", date: "Hoje", color: "#FF5500" },
-  { id: "SV002", cat: "Frete", client: "Julia Nunes", status: "completed", earned: "R$102", date: "Ontem", color: "#2563EB" },
-  { id: "SV003", cat: "Entrega", client: "Marcelo T.", status: "completed", earned: "R$44", date: "22 abr", color: "#9333EA" },
-  { id: "SV004", cat: "Mudança", client: "Helena R.", status: "cancelled", earned: "—", date: "20 abr", color: "#FF5500" },
-];
-
 function HistoricoTab() {
   const c = colors.light;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { requests } = useRequests();
   const initials = (user?.name || "CO").split(" ").map((p) => p[0]).slice(0, 2).join("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const totalEarned = MOCK_HISTORICO.filter((h) => h.status === "completed")
-    .reduce((s, h) => s + parseFloat(h.earned.replace("R$", "") || "0"), 0);
+  const providerRequests = requests.filter((r) => r.providerId === user?.id);
+  const completedRequests = providerRequests.filter((r) => r.status === "completed");
+  const totalEarned = completedRequests.reduce((s, r) => s + r.price * 0.85, 0);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -1290,11 +1247,11 @@ function HistoricoTab() {
       >
         <View style={[histStyles.summaryRow]}>
           <View style={[histStyles.summaryCard, { backgroundColor: c.successLight, borderColor: `${c.success}33` }, shadows.sm]}>
-            <Text style={[histStyles.summaryVal, { color: c.success }]}>R${totalEarned.toFixed(2)}</Text>
+            <Text style={[histStyles.summaryVal, { color: c.success }]}>{totalEarned.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</Text>
             <Text style={[histStyles.summaryLbl, { color: c.sub }]}>Total recebido</Text>
           </View>
           <View style={[histStyles.summaryCard, { backgroundColor: c.blueLight, borderColor: `${c.blue}33` }, shadows.sm]}>
-            <Text style={[histStyles.summaryVal, { color: c.blue }]}>{MOCK_HISTORICO.filter((h) => h.status === "completed").length}</Text>
+            <Text style={[histStyles.summaryVal, { color: c.blue }]}>{completedRequests.length}</Text>
             <Text style={[histStyles.summaryLbl, { color: c.sub }]}>Concluídos</Text>
           </View>
         </View>
@@ -1317,32 +1274,45 @@ function HistoricoTab() {
         </View>
 
         <Text style={[histStyles.sectionTitle, { color: c.text }]}>Serviços recentes</Text>
-        {MOCK_HISTORICO.map((h) => {
-          const st = STATUS_LABEL[h.status] || STATUS_LABEL.completed;
-          return (
-            <View key={h.id} style={[histStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
-              <View style={[histStyles.catDot, { backgroundColor: `${h.color}22` }]}>
-                {h.cat === "Mudança" ? (
-                  <Ionicons name="home" size={16} color={h.color} />
-                ) : h.cat === "Frete" ? (
-                  <MaterialCommunityIcons name="truck" size={16} color={h.color} />
-                ) : (
-                  <Ionicons name="cube" size={16} color={h.color} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[histStyles.cardTitle, { color: c.text }]}>{h.cat} · {h.client}</Text>
-                <Text style={[histStyles.cardSub, { color: c.softMuted }]}>{h.date} · #{h.id}</Text>
-              </View>
-              <View style={{ alignItems: "flex-end", gap: 4 }}>
-                <Text style={[histStyles.cardEarned, { color: h.status === "completed" ? c.success : c.softMuted }]}>{h.earned}</Text>
-                <View style={[histStyles.statusBadge, { backgroundColor: st.bg }]}>
-                  <Text style={[histStyles.statusText, { color: st.fg }]}>{st.label}</Text>
+        {providerRequests.length === 0 ? (
+          <View style={{ alignItems: "center", paddingVertical: 32 }}>
+            <Ionicons name="briefcase-outline" size={32} color={c.softMuted} />
+            <Text style={{ fontSize: 13, fontFamily: fonts.sans.regular, color: c.softMuted, marginTop: 10, textAlign: "center" }}>
+              Nenhum serviço realizado ainda.{"\n"}Fique online para receber pedidos!
+            </Text>
+          </View>
+        ) : (
+          providerRequests.map((h) => {
+            const st = STATUS_LABEL[h.status] || STATUS_LABEL.requested;
+            const color = catColor(h.serviceType);
+            const earned = h.status === "completed" && h.price > 0
+              ? (h.price * 0.85).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+              : "—";
+            return (
+              <View key={h.id} style={[histStyles.card, { backgroundColor: c.card, borderColor: c.border }, shadows.sm]}>
+                <View style={[histStyles.catDot, { backgroundColor: `${color}22` }]}>
+                  {h.serviceType === "Mudança" ? (
+                    <Ionicons name="home" size={16} color={color} />
+                  ) : h.serviceType === "Frete" ? (
+                    <MaterialCommunityIcons name="truck" size={16} color={color} />
+                  ) : (
+                    <Ionicons name="cube" size={16} color={color} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[histStyles.cardTitle, { color: c.text }]}>{h.serviceType} · {h.clientName ?? "Cliente"}</Text>
+                  <Text style={[histStyles.cardSub, { color: c.softMuted }]}>{formatRequestDate(h.createdAt)} · #{h.id.slice(0, 8)}</Text>
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  <Text style={[histStyles.cardEarned, { color: h.status === "completed" ? c.success : c.softMuted }]}>{earned}</Text>
+                  <View style={[histStyles.statusBadge, { backgroundColor: st.bg }]}>
+                    <Text style={[histStyles.statusText, { color: st.fg }]}>{st.label}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          );
-        })}
+            );
+          })
+        )}
       </ScrollView>
       <SideSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
       <ProfileOverlay open={profileOpen} onClose={() => setProfileOpen(false)} name={user?.name || "Prestador"} initials={initials} />
@@ -1370,10 +1340,10 @@ const histStyles = StyleSheet.create({
 
 /* ─── PerfilTab (Both roles) ────────────────────────────────────────────── */
 const PERFIL_ITEMS = [
-  { icon: "card" as const, label: "Métodos de Pagamento", sub: "Pix · Cartão •••• 9768", color: "#16A34A" },
-  { icon: "location" as const, label: "Meus Endereços", sub: "Tijuca, Rio de Janeiro", color: "#FF5500" },
-  { icon: "list" as const, label: "Histórico de Pedidos", sub: "12 pedidos realizados", color: "#2563EB" },
-  { icon: "star" as const, label: "Avaliações", sub: "Média 4.9 de 5", color: "#F59E0B" },
+  { icon: "card" as const, label: "Métodos de Pagamento", sub: "Gerenciar formas de pagamento", color: "#16A34A" },
+  { icon: "location" as const, label: "Meus Endereços", sub: "Gerenciar endereços salvos", color: "#FF5500" },
+  { icon: "list" as const, label: "Histórico de Pedidos", sub: "Ver todos os pedidos", color: "#2563EB" },
+  { icon: "star" as const, label: "Avaliações", sub: "Ver avaliações recebidas", color: "#F59E0B" },
   { icon: "lock-closed" as const, label: "Segurança", sub: "PIN e documentos", color: "#9333EA" },
   { icon: "settings" as const, label: "Configurações", sub: "Notificações, privacidade", color: "#6B7280" },
 ];
@@ -1410,7 +1380,7 @@ function PerfilTab() {
           <View style={{ flex: 1 }}>
             <Text style={[perfilStyles.name, { color: c.text }]}>{user?.name || "Usuário"}</Text>
             <Text style={[perfilStyles.role, { color: c.softMuted }]}>
-              {role === "cliente" ? "Cliente · Ajudaê" : "Prestador · Van · ★ 4.9"}
+              {role === "cliente" ? "Cliente · Ajudaê" : "Prestador · Ajudaê"}
             </Text>
           </View>
           {role === "prestador" && !user?.verified && (
