@@ -20,9 +20,45 @@ const Schema = z.object({
   provider_id: z.string().uuid(),
 })
 
-// ─── Providers ────────────────────────────────────────────────────────────
-// Priority: Z-API (WhatsApp) → Twilio (SMS) → skip
+// ─── Notification providers ───────────────────────────────────────────────
+// Priority: Expo Push (in-app + lock screen) → Z-API (WhatsApp) → Twilio (SMS)
 // Configure via Supabase secrets (supabase secrets set KEY=value)
+
+async function sendExpoPush(
+  token: string,
+  payload: {
+    title: string
+    body: string
+    data?: Record<string, string>
+    categoryId?: string
+    channelId?: string
+  },
+): Promise<boolean> {
+  try {
+    const resp = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: token,
+        title: payload.title,
+        body: payload.body,
+        data: payload.data ?? {},
+        sound: 'default',
+        priority: 'high',
+        ttl: 300,
+        ...(payload.channelId && { channelId: payload.channelId }),
+        ...(payload.categoryId && { categoryIdentifier: payload.categoryId }),
+      }),
+    })
+    return resp.ok
+  } catch {
+    return false
+  }
+}
 
 async function sendWhatsApp(phone: string, message: string): Promise<boolean> {
   const zApiInstanceId = Deno.env.get('ZAPI_INSTANCE_ID')
@@ -85,40 +121,69 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Load provider phone
+    // Load provider profile (phone + expo push token)
     const { data: provider } = await supabase
       .from('providers')
-      .select('profiles(name, phone)')
+      .select('profiles(name, phone, expo_push_token)')
       .eq('id', input.provider_id)
       .single()
 
     const phone: string | undefined = (provider as any)?.profiles?.phone
     const providerName: string = (provider as any)?.profiles?.name ?? 'Prestador'
+    const expoPushToken: string | undefined = (provider as any)?.profiles?.expo_push_token
 
-    if (!phone) {
-      return new Response(
-        JSON.stringify({ ok: true, skipped: true, reason: 'no_phone' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-
-    const category = (request as any)?.categories?.name ?? 'Serviço'
+    const category: string = (request as any)?.categories?.name ?? 'Serviço'
     const origin: string = (request as any).address_origin ?? ''
     const price: number = Number((request as any).price_estimated ?? 0)
     const priceStr = price > 0 ? `R$ ${price.toFixed(0)}` : 'a consultar'
 
-    const message =
-      `🚛 *Nova proposta no Ajudaê!*\n\n` +
-      `Olá, ${providerName}! Há uma nova solicitação de *${category}* na sua região.\n\n` +
-      `📍 Origem: ${origin}\n` +
-      `💰 Valor estimado: ${priceStr}\n\n` +
-      `Abra o app agora para ver os detalhes e aceitar antes de outro prestador! 🏃`
+    const channels: string[] = []
 
-    const sentWa = await sendWhatsApp(phone, message)
-    const sentSms = sentWa ? false : await sendSMS(phone, message)
+    // 1. Expo Push — reaches locked screen, notification center, triggers heads-up on Android
+    if (expoPushToken && expoPushToken !== 'local-only') {
+      const originSnippet = origin.length > 50 ? `${origin.slice(0, 47)}…` : origin
+      const sentPush = await sendExpoPush(expoPushToken, {
+        title: `🚛 Nova proposta — ${category}`,
+        body: `${originSnippet} · ${priceStr}. Toque para aceitar!`,
+        data: {
+          screen: 'proposals',
+          type: 'new_job_request',
+          request_id: input.request_id,
+        },
+        channelId: 'ajudae-proposals',
+        categoryId: 'new-proposal',
+      })
+      if (sentPush) channels.push('expo_push')
+    }
+
+    // 2. WhatsApp (Z-API) — fallback for providers without the app installed/active
+    if (phone) {
+      const message =
+        `🚛 *Nova proposta no Ajudaê!*\n\n` +
+        `Olá, ${providerName}! Há uma nova solicitação de *${category}* na sua região.\n\n` +
+        `📍 Origem: ${origin}\n` +
+        `💰 Valor estimado: ${priceStr}\n\n` +
+        `Abra o app agora para ver os detalhes e aceitar antes de outro prestador! 🏃`
+
+      const sentWa = await sendWhatsApp(phone, message)
+      if (sentWa) channels.push('whatsapp')
+
+      // 3. SMS — last resort
+      if (!sentWa) {
+        const sentSms = await sendSMS(phone, message)
+        if (sentSms) channels.push('sms')
+      }
+    }
+
+    if (channels.length === 0 && !phone && !expoPushToken) {
+      return new Response(
+        JSON.stringify({ ok: true, skipped: true, reason: 'no_contact' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
     return new Response(
-      JSON.stringify({ ok: true, channel: sentWa ? 'whatsapp' : sentSms ? 'sms' : 'none' }),
+      JSON.stringify({ ok: true, channels }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (err) {
