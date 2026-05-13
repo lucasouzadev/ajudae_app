@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ProposalAlert, type ProposalAlertPayload } from "@/components/ProposalAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -130,7 +131,7 @@ function getCatalog(language: AppLanguage): Record<NotificationEvent, (v?: Vars)
       pin_start_disputed: () => ({ title: "Attempt limit reached", body: "A dispute was opened automatically.", data: { screen: "ticket" } }),
       pin_end_wrong: (v) => ({ title: "Incorrect completion PIN", body: `Check the code with the provider. ${v?.left ?? "?"} attempt(s) left.`, data: { screen: "otp-modal" } }),
       pin_end_disputed: () => ({ title: "Attempt limit reached", body: "A dispute was opened automatically.", data: { screen: "ticket" } }),
-      new_job_request: (v) => ({ title: "New request available", body: v?.category ? `${v.category} in ${v.origin ?? "your area"}.` : "Tap to view details.", data: { screen: "job" } }),
+      new_job_request: (v) => ({ title: "New request available", body: v?.category ? `${v.category} in ${v.origin ?? "your area"}.` : "Tap to view details.", data: { screen: "proposals", type: "new_job_request" } }),
       job_accepted: (v) => ({ title: "Job accepted", body: v?.origin ? `Head toward ${v.origin}.` : "Get ready to leave.", data: { screen: "job" } }),
       job_en_route: () => ({ title: "On route", body: "You are on the way. The customer was notified.", data: { screen: "job" } }),
       job_in_progress: () => ({ title: "Service started", body: "Start PIN confirmed.", data: { screen: "job" } }),
@@ -159,7 +160,7 @@ function getCatalog(language: AppLanguage): Record<NotificationEvent, (v?: Vars)
       pin_start_disputed: () => ({ title: "Límite de intentos alcanzado", body: "Se abrió una disputa automáticamente.", data: { screen: "ticket" } }),
       pin_end_wrong: (v) => ({ title: "PIN final incorrecto", body: `Verifica el código con el prestador. ${v?.left ?? "?"} intento(s) restante(s).`, data: { screen: "otp-modal" } }),
       pin_end_disputed: () => ({ title: "Límite de intentos alcanzado", body: "Se abrió una disputa automáticamente.", data: { screen: "ticket" } }),
-      new_job_request: (v) => ({ title: "Nuevo pedido disponible", body: v?.category ? `${v.category} en ${v.origin ?? "tu zona"}.` : "Toca para ver los detalles.", data: { screen: "job" } }),
+      new_job_request: (v) => ({ title: "Nuevo pedido disponible", body: v?.category ? `${v.category} en ${v.origin ?? "tu zona"}.` : "Toca para ver los detalles.", data: { screen: "proposals", type: "new_job_request" } }),
       job_accepted: (v) => ({ title: "Servicio aceptado", body: v?.origin ? `Dirígete a ${v.origin}.` : "Prepárate para salir.", data: { screen: "job" } }),
       job_en_route: () => ({ title: "En ruta", body: "Vas en camino. El cliente fue notificado.", data: { screen: "job" } }),
       job_in_progress: () => ({ title: "Servicio iniciado", body: "PIN de inicio confirmado.", data: { screen: "job" } }),
@@ -187,7 +188,7 @@ function getCatalog(language: AppLanguage): Record<NotificationEvent, (v?: Vars)
     pin_start_disputed: () => ({ title: "Limite de tentativas atingido", body: "Disputa aberta automaticamente. Aguarde o contato do suporte.", data: { screen: "ticket" } }),
     pin_end_wrong: (v) => ({ title: "PIN de conclusão incorreto", body: `Verifique o código com o prestador. ${v?.left ?? "?"}x tentativa(s) restante(s).`, data: { screen: "otp-modal" } }),
     pin_end_disputed: () => ({ title: "Limite de tentativas atingido", body: "Disputa aberta automaticamente. Aguarde o contato do suporte.", data: { screen: "ticket" } }),
-    new_job_request: (v) => ({ title: "Novo pedido disponível!", body: v?.category ? `${v.category} em ${v.origin ?? "sua região"}. Confira agora.` : "Toque para ver os detalhes.", data: { screen: "job" } }),
+    new_job_request: (v) => ({ title: "Novo pedido disponível!", body: v?.category ? `${v.category} em ${v.origin ?? "sua região"}. Confira agora.` : "Toque para ver os detalhes.", data: { screen: "proposals", type: "new_job_request" } }),
     job_accepted: (v) => ({ title: "Serviço aceito!", body: v?.origin ? `Saia em direção a ${v.origin}.` : "Prepare-se para sair.", data: { screen: "job" } }),
     job_en_route: () => ({ title: "Em rota!", body: "Você está a caminho. O cliente foi notificado.", data: { screen: "job" } }),
     job_in_progress: () => ({ title: "Serviço iniciado!", body: "PIN de início confirmado. O serviço está em andamento.", data: { screen: "job" } }),
@@ -247,7 +248,7 @@ async function fire(
   ) {
     channelId = "ajudae-service";
   } else if (event === "new_job_request" || event === "job_accepted") {
-    channelId = "ajudae-jobs";
+    channelId = "ajudae-proposals";
   }
 
   try {
@@ -283,6 +284,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [pushRegistrationError, setPushRegistrationError] = useState<string | null>(null);
   const [banner, setBanner] = useState<ForegroundBannerState | null>(null);
 
+  const [proposalAlert, setProposalAlert] = useState<ProposalAlertPayload | null>(null);
+
   const prevStatus = useRef<ServiceStatus | null>(null);
   const prevStartAttempts = useRef(0);
   const prevEndAttempts = useRef(0);
@@ -294,6 +297,87 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { roleRef.current = role; }, [role]);
+
+  // Set up Android notification channels and action categories once on mount
+  useEffect(() => {
+    if (!Notifications) return;
+
+    const setup = async () => {
+      try {
+        await Notifications.setNotificationCategoryAsync("new-proposal", [
+          {
+            identifier: "accept",
+            buttonTitle: "✅ Aceitar",
+            options: { opensAppToForeground: true },
+          },
+          {
+            identifier: "decline",
+            buttonTitle: "❌ Recusar",
+            options: { opensAppToForeground: false, isDestructive: true },
+          },
+        ]);
+      } catch {
+        // Categories unsupported on simulator/web
+      }
+
+      if (Platform.OS === "android") {
+        try {
+          // MAX importance → heads-up display on top of any app + visible on lock screen
+          await Notifications.setNotificationChannelAsync("ajudae-proposals", {
+            name: "Novas Propostas",
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 150, 250, 150, 500],
+            lightColor: "#FFC90E",
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            sound: "default",
+            enableVibrate: true,
+            showBadge: true,
+            bypassDnd: false,
+          });
+          await Notifications.setNotificationChannelAsync("ajudae-service", {
+            name: "Status do Serviço",
+            importance: Notifications.AndroidImportance.HIGH,
+            vibrationPattern: [0, 200, 100, 200],
+            lightColor: "#FFC90E",
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            sound: "default",
+            enableVibrate: true,
+          });
+          await Notifications.setNotificationChannelAsync("ajudae-default", {
+            name: "Notificações Gerais",
+            importance: Notifications.AndroidImportance.DEFAULT,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+          });
+        } catch {
+          // Channel setup failed (simulator or API<26)
+        }
+      }
+    };
+
+    setup().catch(() => {});
+  }, []);
+
+  // Show in-app overlay when a new proposal notification arrives while app is foreground
+  useEffect(() => {
+    if (!Notifications || !isAuthenticated) return;
+
+    const sub = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data as Record<string, string> | undefined;
+      if (
+        data?.type === "new_job_request" &&
+        roleRef.current === "prestador" &&
+        AppState.currentState === "active"
+      ) {
+        setProposalAlert({
+          title: notification.request.content.title ?? "Novo pedido disponível!",
+          body: notification.request.content.body ?? "",
+          requestId: data.request_id,
+        });
+      }
+    });
+
+    return () => sub.remove();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated || notifications.granted || !notifications.canAsk || !Notifications) {
@@ -545,6 +629,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }}
     >
       {children}
+      {proposalAlert ? (
+        <ProposalAlert
+          payload={proposalAlert}
+          onDismiss={() => setProposalAlert(null)}
+        />
+      ) : null}
       {banner ? (
         <Animated.View
           pointerEvents="box-none"

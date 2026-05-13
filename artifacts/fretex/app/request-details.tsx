@@ -10,10 +10,6 @@ import { useService } from "@/contexts/ServiceContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { CATEGORY_COLORS } from "@/constants/mockData";
 
-const PHOTOS = [
-  "https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=400&q=80",
-  "https://images.unsplash.com/photo-1582719188393-bb71ca45dbb9?w=400&q=80",
-];
 
 const ACCEPT_WINDOW_S = 30;
 
@@ -27,7 +23,13 @@ export default function RequestDetailsScreen() {
 
   useEffect(() => {
     if (!active || active.status !== "requested") return;
-    const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    const t = setInterval(() => setSecondsLeft((s) => {
+      if (s <= 1) {
+        clearInterval(t);
+        setTimeout(() => router.back(), 1800);
+      }
+      return Math.max(0, s - 1);
+    }), 1000);
     return () => clearInterval(t);
   }, [active]);
 
@@ -194,9 +196,9 @@ export default function RequestDetailsScreen() {
             <Text style={[styles.itemTitle, { color: c.text, flex: 1 }]}>{active.description}</Text>
           </View>
 
-          {(active.photos.length > 0 ? active.photos : PHOTOS.slice(0, 0)).length > 0 ? (
+          {active.photos.length > 0 ? (
             <View style={styles.photosRow}>
-              {(active.photos.length > 0 ? active.photos : PHOTOS).slice(0, 3).map((uri, i) => (
+              {active.photos.slice(0, 3).map((uri, i) => (
                 <Image key={i} source={{ uri }} style={[styles.photo, { borderColor: c.borderLight }]} />
               ))}
               {active.photos.length > 3 ? (

@@ -79,10 +79,26 @@ function mapRowToProvider(row: ProviderRow): Provider {
   };
 }
 
+// ─── Haversine distance (km) ───────────────────────────────────────────────────
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // ─── Listagem pública (mapa / marketplace) ─────────────────────────────────────
 // Omite vehicle_plate e vehicle_model — dados sensíveis desnecessários para listagem
 // Usa LEFT JOIN (profiles) para não descartar providers com perfil inconsistente
-export async function fetchOnlineProviders(): Promise<Provider[]> {
+// Filtra por raio de 30 km quando userLat/userLng são fornecidos
+export async function fetchOnlineProviders(
+  userLat?: number,
+  userLng?: number,
+  radiusKm = 30,
+): Promise<Provider[]> {
   const { data, error } = await supabase
     .from('providers')
     .select(`
@@ -99,7 +115,23 @@ export async function fetchOnlineProviders(): Promise<Provider[]> {
     return [];
   }
 
-  return (data ?? []).map((row) => mapRowToProvider(row as ProviderRow));
+  const rows = (data ?? []) as ProviderRow[];
+
+  const filtered =
+    userLat != null && userLng != null
+      ? rows.filter((r) => {
+          if (!r.location_lat || !r.location_lng) return false;
+          return haversineKm(userLat, userLng, r.location_lat, r.location_lng) <= radiusKm;
+        })
+      : rows;
+
+  return filtered.map((row) => {
+    const provider = mapRowToProvider(row);
+    if (userLat != null && userLng != null && row.location_lat && row.location_lng) {
+      provider.km = Math.round(haversineKm(userLat, userLng, row.location_lat, row.location_lng) * 10) / 10;
+    }
+    return provider;
+  });
 }
 
 // ─── Detalhe do provider (perfil completo) ─────────────────────────────────────

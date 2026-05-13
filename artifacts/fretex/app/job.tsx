@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Modal } from "react-native";
+import { Alert, View, Text, ScrollView, Pressable, StyleSheet, Modal } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -12,6 +12,7 @@ import { ProfileOverlay } from "@/components/ProfileOverlay";
 import { useAuth } from "@/contexts/AuthContext";
 import { useService } from "@/contexts/ServiceContext";
 import type { ServiceStatus } from "@/contexts/ServiceContext";
+import { useRequests } from "@/contexts/RequestsContext";
 import { sendQuickMessage } from "@/lib/quickMessages";
 
 const STAGES: {
@@ -39,6 +40,7 @@ export default function JobScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { active, advanceStatus } = useService();
+  const { requests } = useRequests();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -70,6 +72,14 @@ export default function JobScreen() {
   const current = STAGES[safeIndex];
   const progress = ((safeIndex + 1) / STAGES.length) * 100;
 
+  const completedByProvider = requests.filter(
+    (r) => r.providerId === user?.id && r.status === "completed",
+  ).length;
+  const isFirstService = completedByProvider === 0;
+  const providerEarnings = isFirstService
+    ? active.estimatedPrice
+    : active.estimatedPrice * 0.85;
+
   const advance = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     if (active.status === "accepted") {
@@ -77,6 +87,14 @@ export default function JobScreen() {
     } else if (active.status === "en_route") {
       router.push("/start-pin");
     } else if (active.status === "in_progress") {
+      if (active.estimatedPrice === 0) {
+        Alert.alert(
+          "Valor não definido",
+          "O valor do serviço ainda é R$ 0,00. Combine o valor com o cliente antes de concluir.",
+          [{ text: "Ok", style: "cancel" }],
+        );
+        return;
+      }
       router.push("/job-otp");
     }
   };
@@ -135,7 +153,13 @@ export default function JobScreen() {
           <Pressable onPress={openServiceChat} style={[styles.iconBtn, { backgroundColor: c.background, borderColor: c.border }]}>
             <Ionicons name="chatbubble-ellipses" size={15} color={c.text} />
           </Pressable>
-          <Pressable onPress={() => Linking.openURL("tel:+5521999998888").catch(() => {})} style={[styles.iconBtn, { backgroundColor: accent, borderColor: accent }]}>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              Alert.alert("Contato por telefone", "Use o chat para se comunicar com o cliente durante o serviço.", [{ text: "Abrir chat", onPress: openServiceChat }, { text: "Cancelar", style: "cancel" }]);
+            }}
+            style={[styles.iconBtn, { backgroundColor: accent, borderColor: accent }]}
+          >
             <Ionicons name="call" size={15} color="#fff" />
           </Pressable>
         </View>
@@ -190,7 +214,12 @@ export default function JobScreen() {
             </View>
             <View style={styles.kpi}>
               <Text style={[styles.kpiLabel, { color: c.softMuted }]}>VOCÊ RECEBE</Text>
-              <Text style={[styles.kpiValue, { color: c.success }]}>R${(active.estimatedPrice * 0.85).toFixed(0)}</Text>
+              <Text style={[styles.kpiValue, { color: c.success }]}>R${providerEarnings.toFixed(0)}</Text>
+              {isFirstService ? (
+                <Text style={{ fontSize: 9, fontFamily: fonts.sans.bold, color: c.success, marginTop: 2 }}>
+                  1º serviço · sem taxa!
+                </Text>
+              ) : null}
             </View>
           </View>
         </View>

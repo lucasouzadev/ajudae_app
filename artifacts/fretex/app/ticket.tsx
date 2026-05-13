@@ -22,6 +22,8 @@ export default function TicketScreen() {
 
   const valid = description.trim().length >= 20;
 
+  const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+
   const addPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -30,7 +32,13 @@ export default function TicketScreen() {
       selectionLimit: 5,
     });
     if (result.canceled) return;
-    setPhotos((prev) => Array.from(new Set([...prev, ...result.assets.map((asset) => asset.uri)])).slice(0, 5));
+
+    const oversized = result.assets.filter((a) => a.fileSize != null && a.fileSize > MAX_FILE_BYTES);
+    if (oversized.length > 0) {
+      setError(`${oversized.length} arquivo(s) excedem 10 MB e foram removidos. Escolha imagens menores.`);
+    }
+    const valid = result.assets.filter((a) => a.fileSize == null || a.fileSize <= MAX_FILE_BYTES);
+    setPhotos((prev) => Array.from(new Set([...prev, ...valid.map((asset) => asset.uri)])).slice(0, 5));
   };
 
   const submit = async () => {

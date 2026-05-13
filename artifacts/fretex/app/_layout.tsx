@@ -78,9 +78,19 @@ function AuthGate() {
   useEffect(() => {
     if (!Notifications) return;
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const screen = response.notification.request.content.data?.screen;
-      if (screen && isAuthenticated) {
-        router.push(`/${screen}` as never);
+      const data = response.notification.request.content.data as Record<string, string> | undefined;
+      const actionId = response.actionIdentifier;
+
+      // Handle action buttons from the "new-proposal" notification category
+      if (actionId === "accept") {
+        if (isAuthenticated) router.push("/proposals" as never);
+        return;
+      }
+      if (actionId === "decline") return; // Dismissed — no navigation needed
+
+      // Default: tap on notification body → navigate to target screen
+      if (data?.screen && isAuthenticated) {
+        router.push(`/${data.screen}` as never);
       }
     });
     return () => sub.remove();

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Text, ScrollView, Pressable, Image } from "react-native";
+import { Share, View, StyleSheet, Text, ScrollView, Pressable, Image } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,6 +30,18 @@ export default function PaymentScreen() {
   const [payment, setPayment] = useState<CreatedPayment | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+
+  const sharePixCode = async (code: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      await Share.share({ message: code });
+    } catch {
+      // User cancelled share sheet
+    }
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 3000);
+  };
 
   const amount = active?.estimatedPrice ?? payment?.amount ?? 0;
   const total = formatBRL(amount);
@@ -177,6 +189,15 @@ export default function PaymentScreen() {
                 <Text selectable style={[styles.pixCode, { color: c.text }]}>
                   {payment.qr_code}
                 </Text>
+                <Pressable
+                  onPress={() => sharePixCode(payment.qr_code!)}
+                  style={[styles.copyBtn, { backgroundColor: codeCopied ? `${c.success}18` : `${c.success}10`, borderColor: c.success }]}
+                >
+                  <Ionicons name={codeCopied ? "checkmark-circle" : "copy-outline"} size={15} color={c.success} />
+                  <Text style={[styles.copyBtnText, { color: c.success }]}>
+                    {codeCopied ? "Copiado!" : "Copiar código Pix"}
+                  </Text>
+                </Pressable>
               </View>
             ) : null}
 
@@ -293,8 +314,10 @@ const styles = StyleSheet.create({
   paymentHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   qrBox: { alignSelf: "center", padding: 12, borderRadius: 16, borderWidth: 1, marginTop: 16 },
   qrImage: { width: 212, height: 212, borderRadius: 8 },
-  pixCodeBox: { borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 12 },
+  pixCodeBox: { borderRadius: 12, borderWidth: 1, padding: 12, marginTop: 12, gap: 10 },
   pixCode: { fontSize: 11, fontFamily: fonts.sans.medium, lineHeight: 16 },
+  copyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 38, borderRadius: 10, borderWidth: 1 },
+  copyBtnText: { fontSize: 12, fontFamily: fonts.sans.bold },
   securityCard: {
     flexDirection: "row",
     alignItems: "center",

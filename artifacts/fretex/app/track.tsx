@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Linking } from "react-native";
+import { Alert, View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -211,7 +211,10 @@ export default function TrackScreen() {
               <Ionicons name="chatbubble-ellipses" size={15} color={c.text} />
             </Pressable>
             <Pressable
-              onPress={() => Linking.openURL("tel:+5521999998888").catch(() => {})}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                Alert.alert("Contato por telefone", "Use o chat para se comunicar com o prestador durante o serviço.", [{ text: "Abrir chat", onPress: openServiceChat }, { text: "Cancelar", style: "cancel" }]);
+              }}
               style={[styles.iconBtn, { backgroundColor: accent, borderColor: accent }]}
             >
               <Ionicons name="call" size={15} color="#fff" />
@@ -318,7 +321,7 @@ export default function TrackScreen() {
             <Ionicons name="chatbubbles" size={15} color={c.text} />
             <Text style={[styles.actionTxt, { color: c.text }]}>Mensagem</Text>
           </Pressable>
-          {active.status !== "requested" && !isDisputed ? (
+          {!isDisputed ? (
             <Pressable onPress={() => router.push("/ticket")} style={[styles.actionBtn, { backgroundColor: c.warningLight, borderColor: `${c.warning}55` }]}>
               <Ionicons name="alert-circle" size={15} color={c.warning} />
               <Text style={[styles.actionTxt, { color: c.text }]}>Problema?</Text>

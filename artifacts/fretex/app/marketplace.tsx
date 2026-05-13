@@ -19,7 +19,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
-import { MOCK_POSTINGS, FILTERS, CATEGORIES, type Category, type Provider } from "@/constants/mockData";
+import { FILTERS, CATEGORIES, type Category, type Provider } from "@/constants/mockData";
 import { fetchOnlineProviders } from "@/lib/providers";
 import { createProposal } from "@/lib/proposals";
 import colors, { fonts, shadows } from "@/constants/colors";

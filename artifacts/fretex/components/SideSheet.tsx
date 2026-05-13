@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors, { fonts, shadows } from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
-import { MOCK_FAQS } from "@/constants/mockData";
+import { STATIC_FAQS } from "@/constants/mockData";
 
 interface SideSheetProps {
   open: boolean;
@@ -95,7 +95,7 @@ export function SideSheet({ open, onClose }: SideSheetProps) {
   const accentEnd = role === "cliente" ? c.primaryDeep : "#60A5FA";
   const steps = STEPS[role];
   const help = HELP[role];
-  const faqs = MOCK_FAQS[role];
+  const faqs = STATIC_FAQS[role];
 
   if (!mounted) return null;
 
