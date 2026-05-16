@@ -111,7 +111,7 @@ export async function fetchOnlineProviders(
     .not('location_lng', 'is', null);
 
   if (error) {
-    console.warn('[providers] fetchOnlineProviders error:', error.message);
+    if (__DEV__) console.warn('[providers] fetchOnlineProviders error:', error.message);
     return [];
   }
 
@@ -149,7 +149,7 @@ export async function fetchProviderById(id: string): Promise<Provider | null> {
     .maybeSingle();  // maybeSingle retorna null (sem error) quando não encontrado
 
   if (error) {
-    console.warn('[providers] fetchProviderById error:', error.message);
+    if (__DEV__) console.warn('[providers] fetchProviderById error:', error.message);
     return null;
   }
   if (!data) return null;

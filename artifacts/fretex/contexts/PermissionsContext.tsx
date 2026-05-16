@@ -323,7 +323,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       .then(({ error }) => {
         if (error) {
           lastSyncedProfileState.current = null;
-          console.warn("[PermissionsContext] DB sync error:", error.message);
+          if (__DEV__) console.warn("[PermissionsContext] DB sync error:", error.message);
         }
       });
   }, [
@@ -349,7 +349,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       setLocation(perm);
       return perm.granted;
     } catch (error) {
-      console.warn("[PermissionsContext] requestLocation failed:", (error as Error).message);
+      if (__DEV__) console.warn("[PermissionsContext] requestLocation failed:", (error as Error).message);
       return false;
     }
   };
@@ -378,7 +378,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       setBackgroundLocation(perm);
       return perm.granted;
     } catch (error) {
-      console.warn("[PermissionsContext] requestBackgroundLocation failed:", (error as Error).message);
+      if (__DEV__) console.warn("[PermissionsContext] requestBackgroundLocation failed:", (error as Error).message);
       return false;
     }
   };
@@ -390,7 +390,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       setCamera(perm);
       return perm.granted;
     } catch (error) {
-      console.warn("[PermissionsContext] requestCamera failed:", (error as Error).message);
+      if (__DEV__) console.warn("[PermissionsContext] requestCamera failed:", (error as Error).message);
       return false;
     }
   };
@@ -402,7 +402,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       setMediaLibrary(perm);
       return perm.granted;
     } catch (error) {
-      console.warn("[PermissionsContext] requestMediaLibrary failed:", (error as Error).message);
+      if (__DEV__) console.warn("[PermissionsContext] requestMediaLibrary failed:", (error as Error).message);
       return false;
     }
   };
@@ -430,7 +430,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       setNotifications(perm);
       return perm.granted;
     } catch (error) {
-      console.warn("[PermissionsContext] requestNotifications failed:", (error as Error).message);
+      if (__DEV__) console.warn("[PermissionsContext] requestNotifications failed:", (error as Error).message);
       return false;
     }
   };

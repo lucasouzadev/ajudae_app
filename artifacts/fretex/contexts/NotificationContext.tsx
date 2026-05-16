@@ -30,7 +30,7 @@ if (Notifications) {
       }),
     });
   } catch (e) {
-    console.warn("NotificationHandler setup failed:", (e as Error).message);
+    if (__DEV__) console.warn("NotificationHandler setup failed:", (e as Error).message);
   }
 }
 
@@ -500,7 +500,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       .eq("id", user.id)
       .then(({ error }) => {
         if (error) {
-          console.warn("[NotificationContext] token sync error:", error.message);
+          if (__DEV__) console.warn("[NotificationContext] token sync error:", error.message);
         }
       });
   }, [isAuthenticated, notifications.granted, pushToken, user?.id]);

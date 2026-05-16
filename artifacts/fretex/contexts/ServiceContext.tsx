@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import * as Crypto from "expo-crypto";
 import { supabase } from "@/lib/supabase";
 import type { Category } from "@/constants/mockData";
 
@@ -114,23 +115,9 @@ function genPin(digits: number): string {
   return Math.floor(min + Math.random() * (max - min + 1)).toString();
 }
 
-function djb2Hash(str: string): string {
-  let h = 5381;
-  for (let i = 0; i < str.length; i++) {
-    h = ((h << 5) + h) ^ str.charCodeAt(i);
-    h = h >>> 0; // keep unsigned 32-bit
-  }
-  // extend to 16 hex chars by mixing two passes
-  let h2 = 0x811c9dc5;
-  for (let i = str.length - 1; i >= 0; i--) {
-    h2 = ((h2 ^ str.charCodeAt(i)) * 0x01000193) >>> 0;
-  }
-  return (h >>> 0).toString(16).padStart(8, "0") + (h2 >>> 0).toString(16).padStart(8, "0");
-}
-
 async function computeCommitment(serviceId: string, pinStart: string, pinConclusion: string): Promise<string> {
   const input = `${serviceId}|${pinStart}|${pinConclusion}`;
-  return djb2Hash(input);
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, input);
 }
 
 async function readEdgeErrorMessage(error: unknown): Promise<string> {
@@ -170,8 +157,8 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       if (!stored) return;
       const parsed = JSON.parse(stored) as ActiveService;
       // Discard data from old format that lacks the commitment field,
-      // or uses the legacy djb2 hash (8 hex chars) instead of SHA-256 (64 hex chars)
-      if (!parsed.commitment || parsed.commitment.length < 16) {
+      // or uses the legacy djb2 hash (16 hex chars) instead of SHA-256 (64 hex chars)
+      if (!parsed.commitment || parsed.commitment.length < 64) {
         AsyncStorage.removeItem(STORAGE_KEY);
         return;
       }
@@ -227,7 +214,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error('Edge Function error:', error);
+        if (__DEV__) console.error('Edge Function error:', error);
         throw error;
       }
 
@@ -252,7 +239,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       await persist(next);
       return next;
     } catch (error) {
-      console.error('Create service error:', error);
+      if (__DEV__) console.error('Create service error:', error);
       throw error;
     }
   };
@@ -272,7 +259,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error('Accept request error:', error);
+        if (__DEV__) console.error('Accept request error:', error);
         throw error;
       }
 
@@ -285,7 +272,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       };
       await persist(next);
     } catch (error) {
-      console.error('Assign provider error:', error);
+      if (__DEV__) console.error('Assign provider error:', error);
       throw error;
     }
   };
@@ -310,7 +297,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error('Update status error:', error);
+        if (__DEV__) console.error('Update status error:', error);
         throw error;
       }
 
@@ -323,7 +310,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       await persist(updated);
       return { ok: true };
     } catch (error) {
-      console.error('Advance status error:', error);
+      if (__DEV__) console.error('Advance status error:', error);
       return { ok: false, error: String(error) };
     }
   };
@@ -345,7 +332,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error('Cancel service error:', error);
+        if (__DEV__) console.error('Cancel service error:', error);
         // Continue anyway - update local state
       }
 
@@ -359,7 +346,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       await persist(next);
       return { ok: true };
     } catch (error) {
-      console.error('Cancel error:', error);
+      if (__DEV__) console.error('Cancel error:', error);
       return { ok: false, error: String(error) };
     }
   };
@@ -427,7 +414,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       await persist({ ...active, startPinAttempts: attempts });
       return { ok: false, attemptsLeft: 5 - attempts };
     } catch (error) {
-      console.error('Validate start PIN error:', error);
+      if (__DEV__) console.error('Validate start PIN error:', error);
       return { ok: false, error: error instanceof Error ? error.message : "Não foi possível validar o PIN" };
     }
   };
@@ -507,7 +494,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       await persist({ ...active, conclusionAttempts: attempts });
       return { ok: false, attemptsLeft: 5 - attempts };
     } catch (error) {
-      console.error('Complete with conclusion error:', error);
+      if (__DEV__) console.error('Complete with conclusion error:', error);
       return { ok: false, error: error instanceof Error ? error.message : "Não foi possível concluir o serviço" };
     }
   };
@@ -526,7 +513,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error('Open ticket error:', error);
+        if (__DEV__) console.error('Open ticket error:', error);
         // Continue anyway - update local state
       }
 
@@ -538,7 +525,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
         events: [...active.events, { at: now, status: "disputed", note: `Ticket ${ticketId} aberto` }],
       });
     } catch (error) {
-      console.error('Open ticket error:', error);
+      if (__DEV__) console.error('Open ticket error:', error);
     }
   };
 
@@ -546,7 +533,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     try {
       await persist(null);
     } catch (error) {
-      console.error('Clear error:', error);
+      if (__DEV__) console.error('Clear error:', error);
     }
   };
 

@@ -70,6 +70,7 @@ interface AuthContextType {
   completeOnboarding: (name: string, phone: string, gpsGranted: boolean) => Promise<void>;
   logout: () => Promise<void>;
   switchRole: (newRole: Role) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -569,6 +570,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function deleteAccount() {
+    const { error } = await supabase.functions.invoke('user_delete_account', { body: {} });
+    if (error) throw new Error(error.message || 'Não foi possível excluir a conta');
+    await persistUser(null);
+    await persistPending(null);
+    setRole('cliente');
+    setAccountStatus('signed_out');
+  }
+
   async function switchRole(newRole: Role) {
     if (!user) return;
 
@@ -646,6 +656,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         completeOnboarding,
         logout,
         switchRole,
+        deleteAccount,
       }}
     >
       {children}
@@ -675,6 +686,7 @@ export function useAuthSafe() {
     resendSignupOtp: async () => {},
     clearPendingAccount: () => {},
     completeOnboarding: async () => {},
+    deleteAccount: async () => {},
     pendingAccount: null,
   };
 }

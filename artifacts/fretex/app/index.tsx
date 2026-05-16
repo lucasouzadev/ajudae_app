@@ -1541,7 +1541,7 @@ function PrestadorHome() {
       .maybeSingle()
       .then(({ data, error }) => {
         if (error) {
-          console.warn("[PrestadorHome] Erro ao carregar status online:", error.message);
+          if (__DEV__) console.warn("[PrestadorHome] Erro ao carregar status online:", error.message);
           return;
         }
         if (data) setOnline(data.active ?? false);
