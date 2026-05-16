@@ -323,4 +323,196 @@ Watcher reativo dentro de `NotificationProvider` detecta mudanças em `active.st
 
 ---
 
-_Ajudaê — PROGRESS v2.0 — atualizado em 2026-05-04 — **33/34 ✅** (Notificações + LGPD completos)_
+## 🟣 Sessão 2026-05-07 — Correções Críticas Android
+
+### 34. Fix: crash silencioso Android (New Architecture)
+**Status:** ✅ Implementado
+**Detalhe:** `newArchEnabled: false` em `app.config.js` — módulos nativos (`react-native-maps`, `react-native-keyboard-controller`, `react-native-worklets`) não são compatíveis com a nova arch. Remove `reactCompiler` experimental pelo mesmo motivo. Remove `origin` hardcoded para replit.com que causava falhas de roteamento em builds externos.
+**Arquivo:** `app.config.js`
+
+---
+
+### 35. Fix: animação do sheet e do mapa (spring → timing)
+**Status:** ✅ Implementado
+**Detalhe:** Substitui `Animated.spring` (oscillação visível por tension/friction) por `Animated.timing` com `Easing.out(Easing.cubic)` para movimento fluido e simultâneo entre mapa e sheet.
+**Arquivo:** `app/index.tsx`, `app/marketplace.tsx`
+
+---
+
+### 36. Fix: botão de localização (TypeError síncrono)
+**Status:** ✅ Implementado
+**Detalhe:** `mapRef.current?.recenter()` retornava `undefined` e `.finally()` lançava `TypeError` síncrono, impedindo o `setLocating(true)` de ser commitado pelo React. Adicionado `?? Promise.resolve()` como guard. Borda azul permanente e opacidade no press para feedback visual.
+**Arquivo:** `components/MapReal.tsx`, `app/index.tsx`
+
+---
+
+## 🟣 Sessão 2026-05-10 — UI/UX Brand Identity (6 Etapas)
+
+### 37. Color tokens alinhados ao branding Ajudaê
+**Status:** ✅ Implementado
+**Detalhe:** Tokens atualizados — `primary: #FFC90E` (amarelo preciso), `background: #FAF9ED` (papel creme), `primaryLight: #FFF8D6`, `primaryMid: #FFE040`, `primaryDeep: #E6B400`, `bgDeep: #F0EDD8`. Splash e ícone Android corrigidos de `#FF5500` para `#FFC90E`.
+**Arquivos:** `constants/colors.ts`, `app.config.js`
+
+---
+
+### 38. Fontes: Fraunces → Nunito
+**Status:** ✅ Implementado
+**Detalhe:** `@expo-google-fonts/fraunces` substituído por `@expo-google-fonts/nunito` (700Bold, 800ExtraBold, 900Black). Tokens `fonts.serif.*` remapeados. Dependência atualizada no `package.json`.
+**Arquivos:** `constants/colors.ts`, `app/_layout.tsx`, `package.json`
+
+---
+
+### 39. Zero emojis (23+ substituições por Ionicons/MCI)
+**Status:** ✅ Implementado
+**Detalhe:** Todos os emojis removidos — mapeados para ícones vetoriais. `RadioRow` e `ServiceTypeCard` ganham prop `iconLib: "mci" | "ion"` para suportar ambas as bibliotecas. Arquivos afetados: `index.tsx`, `provider-validation.tsx`, `onboarding.tsx`.
+**Arquivos:** `app/index.tsx`, `app/provider-validation.tsx`, `app/onboarding.tsx`
+
+---
+
+### 40. Novo componente: EmptyState
+**Status:** ✅ Implementado (mascote assets pendentes)
+**Detalhe:** Componente com mascote flutuante (±6px vertical, `Animated.loop`). Fallback gracioso com placeholder circular quando assets ausentes. Usado em: `inbox.tsx`, `proposals.tsx`, `marketplace.tsx`, `support.tsx`. Assets esperados em `assets/images/mascot/mascot-running.png` e `mascot-standing.png`.
+**Arquivo:** `components/EmptyState.tsx` (novo)
+
+---
+
+### 41. Chat bubbles com cor primária
+**Status:** ✅ Implementado
+**Detalhe:** Bubbles "me" em DMs agora usam `c.primary (#FFC90E)` com texto escuro. Suporte mantém `c.blue` para consistência.
+**Arquivo:** `app/chat.tsx`
+
+---
+
+### 42. Payment: TopNav padronizado
+**Status:** ✅ Implementado
+**Detalhe:** Header manual substituído por `<TopNav title="Pagamento" onBack={() => router.back()} />`. Remove estilos custom `header`, `iconBtn`, `headerTitle`.
+**Arquivo:** `app/payment.tsx`
+
+---
+
+### 43. ProfileOverlay: toggles simplificados
+**Status:** ✅ Implementado
+**Detalhe:** Toggles agora usam apenas ícone `checkmark-circle` / `ellipse-outline` (1 mudança visual). Badge de biometria muda de purple `#9333EA` para `c.success` (verde), padronizando toda a seção Security.
+**Arquivo:** `components/ProfileOverlay.tsx`
+
+---
+
+### 44. Heatmap 2-tons e stats uniformes
+**Status:** ✅ Implementado
+**Detalhe:** Heatmap: binary (ativo=`c.primary`, inativo=`c.bgDeep`), remove 5 níveis de opacidade. Stats grid: todos com `bg: c.card` e `color: c.text` — remove gradientes coloridos por categoria.
+**Arquivo:** `app/index.tsx`
+
+---
+
+### 45. Skeleton com shimmer LinearGradient
+**Status:** ✅ Implementado
+**Detalhe:** Substitui opacity pulse (0.4→1→0.4) por shimmer wave via `LinearGradient` translúcido animado com `translateX` (toValue 400, 1200ms loop).
+**Arquivo:** `components/Skeleton.tsx`
+
+---
+
+### 46. Novo hook: useEntranceAnim
+**Status:** ✅ Implementado
+**Detalhe:** Fade + slide-up de 280ms com `Easing.out(Easing.cubic)`. Usado para entrada de telas. 25 linhas, sem dependências.
+**Arquivo:** `hooks/useEntranceAnim.ts` (novo)
+
+---
+
+### 47. Novo componente: BottomTabBar (role-aware)
+**Status:** ✅ Implementado
+**Detalhe:** `#1F1F1F` bg, `#FFC90E` tab ativa, branco 40% inativo. Label visível apenas na tab ativa. Animação `scale 1→1.12→1` na seleção. **Oculta automaticamente** quando há serviço ativo. Cliente: Início/Buscar/Inbox/Ajuda; Prestador: Início/Serviços/Inbox/Portfólio.
+**Arquivo:** `components/BottomTabBar.tsx` (novo)
+
+---
+
+## 🟣 Sessão 2026-05-11 — Remoção de Mocks + UX Launch-Ready
+
+### 48. Remoção total de dados mockados
+**Status:** ✅ Implementado
+**Detalhe:** `MOCK_PEDIDOS` → `RequestsContext` (cliente), `MOCK_HISTORICO` → requests reais do prestador, `MOCK_THREADS/AUTO_REPLIES` → estado vazio honesto no chat, `MOCK_POSTINGS` → prestadores reais, `MOCK_FAQS` → `STATIC_FAQS`, analytics hub (ActivityHeatmap, BadgeRow, MonthlyGoals) → dados reais do `RequestsContext`. `RequestsContext` aprimorado com joins para `providerName` e `clientName`.
+**Arquivos:** `app/index.tsx`, `app/chat.tsx`, `app/marketplace.tsx`, `contexts/RequestsContext.tsx`, `constants/mockData.ts`
+
+---
+
+### 49. ProposalAlert — overlay 99-style para novas propostas
+**Status:** ✅ Implementado
+**Detalhe:** Modal fullscreen com countdown de 60s, botões Accept/Decline com haptics. `NotificationContext` configura canal Android MAX-importance (`ajudae-proposals`) com heads-up display sobre qualquer app. Listener foreground exibe `ProposalAlert` em vez de banner nativo. `_layout.tsx` trata action buttons de background: `'accept'` → `/proposals`, `'decline'` → noop.
+**Arquivos:** `components/ProposalAlert.tsx` (novo), `contexts/NotificationContext.tsx`, `app/_layout.tsx`
+
+---
+
+### 50. Portfolio persistence — debounced writes para Supabase
+**Status:** ✅ Implementado
+**Detalhe:** `PortfolioContext` agora faz writes debounced (1.2s) para coluna `portfolio_data JSONB` na tabela `providers`. Lê `portfolio_data` completo no mount com fallback para `bio` existente. Migration `029_portfolio_data.sql` adiciona `portfolio_data jsonb` aos `providers` e `messages_last_read_at timestamptz` aos `profiles`.
+**Arquivos:** `contexts/PortfolioContext.tsx`, `supabase/migrations/029_portfolio_data.sql`
+
+---
+
+### 51. Provider validation — tela de confirmação com protocolo
+**Status:** ✅ Implementado
+**Detalhe:** Substitui redirecionamento silencioso (`router.replace('/')`) por tela de sucesso fullscreen mostrando código de protocolo `AJD-{userId[:6]}` e botão "Ir para o início".
+**Arquivo:** `app/provider-validation.tsx`
+
+---
+
+### 52. Payment UX — botão "Copiar código Pix"
+**Status:** ✅ Implementado
+**Detalhe:** Botão "Copiar código Pix" usa native Share sheet. Estado "Copiado!" por 3s após share. Sem novos pacotes.
+**Arquivo:** `app/payment.tsx`
+
+---
+
+### 53. Proposals — chips de horário rápido
+**Status:** ✅ Implementado
+**Detalhe:** 4 chips no modal de agendamento (Hoje 14h, Hoje 18h, Amanhã 9h, Amanhã 14h) que auto-preenchem o input de data. Input manual mantido como fallback.
+**Arquivo:** `app/proposals.tsx`
+
+---
+
+### 54. Tab badge para propostas e inbox
+**Status:** ✅ Implementado
+**Detalhe:** `BottomTabBar` faz polling na tabela `proposals` a cada 30s para contagem de pendentes. Badge vermelho exibido em `/proposals` (prestador) e `/inbox` (cliente). Auto-limpa quando count volta a 0.
+**Arquivo:** `components/BottomTabBar.tsx`
+
+---
+
+### 55. Edge Function: notify_new_proposal
+**Status:** ✅ Implementado
+**Detalhe:** Envia WhatsApp (Z-API) ou SMS (Twilio) ao prestador em nova proposta. Skip gracioso quando sem telefone ou sem secrets configurados. Lê `ZAPI_INSTANCE_ID` / `TWILIO_*` dos Supabase Secrets. Expo Push API como canal primário (alcança tela bloqueada + botões Accept/Decline).
+**Arquivo:** `supabase/functions/notify_new_proposal/`
+
+---
+
+### 56. Primeiro serviço: badge 0% de taxa
+**Status:** ✅ Implementado
+**Detalhe:** `job.tsx` detecta prestador com zero serviços concluídos e exibe badge "1º serviço · sem taxa!" no KPI "VOCÊ RECEBE". Bloqueia "Concluir serviço" se `estimatedPrice === 0`.
+**Arquivo:** `app/job.tsx`
+
+---
+
+### 57. Haversine 30km no fetchOnlineProviders
+**Status:** ✅ Implementado
+**Detalhe:** Filtro de 30km de raio com fórmula Haversine em `lib/providers.ts`. Popula `provider.km` com distância arredondada do usuário.
+**Arquivo:** `lib/providers.ts`
+
+---
+
+### 58. Sistema de indicações (referral)
+**Status:** ✅ Implementado
+**Detalhe:** `ProfileOverlay.tsx` ganha item "Indicar amigos" com código de indicação determinístico (djb2 do userId) e Share sheet. Exibe R$10 por indicação como incentivo.
+**Arquivo:** `components/ProfileOverlay.tsx`
+
+---
+
+## Contagem geral
+
+| Status | Quantidade |
+|--------|-----------|
+| ✅ Implementado | 57 |
+| 🔶 Parcial | 1 |
+| ❌ Pendente | 0 |
+| **Total** | **58** |
+
+---
+
+_Ajudaê — PROGRESS v3.0 — atualizado em 2026-05-14 — **57/58 ✅** (Brand Identity + Launch-Ready UX + Remoção de Mocks)_

@@ -3,8 +3,8 @@
 **Project:** Ajudaê Marketplace (Mudança, Frete, Entrega)  
 **Type:** React Native (Expo) mobile app + CRM Web admin  
 **Stack:** TypeScript, React Native, Expo SDK 54, Supabase (Auth + DB + Edge Functions), expo-notifications; CRM: Vite + React 19 + Tailwind v4  
-**Status:** MVP Test Closed — CRM web operacional; formulário do prestador paginado  
-**Stage:** ~92% MVP — CRM em produção (Cloudflare Pages); pagamento e chat pendentes
+**Status:** Build-Ready — brand identity completa, mocks removidos, portfólio persistido  
+**Stage:** ~95% MVP — pronto para EAS build (TestFlight/APK); bloqueadores são externos (EAS Secrets, anon key rotation, mascote assets)
 
 ---
 
@@ -19,9 +19,11 @@ Ajudaê is a **two-sided marketplace** for service delivery (moving, freight, de
 
 | File | Purpose |
 |------|---------|
-| `arquitetura/HANDOFF_2026-05-06.md` | **Latest** handoff — CRM web, formulários paginados, security hardening |
-| `arquitetura/HANDOFF_2026-05-04_MVP_CLOSED_SPRINT.md` | Sprint anterior — providers reais, QA manual |
-| `arquitetura/HANDOFF_2026-05-04.md` | Handoff — bug fixes, notifications, permissions |
+| `arquitetura/HANDOFF_2026-05-10.md` | **Latest** handoff — brand identity (6 etapas), EmptyState, BottomTabBar |
+| `arquitetura/LAUNCH_CHECKLIST.md` | Checklist completo de lançamento (EAS Secrets, builds, QA) |
+| `arquitetura/EXTERNAL_TASKS_2026-05-10.md` | Tasks externas bloqueadoras (mascote, key rotation, builds) |
+| `arquitetura/HANDOFF_2026-05-06.md` | CRM web, formulários paginados, security hardening |
+| `arquitetura/HANDOFF_2026-05-04.md` | Bug fixes, notifications, permissions |
 | `arquitetura/HANDOFF_2026-04-28.md` | UI Layer v2 — design decisions, API contracts |
 | `arquitetura/PRD.md` | Product Requirements Document |
 | `arquitetura/BETA_ROADMAP.md` | Roadmap 24 meses — 4 fases |
@@ -284,23 +286,56 @@ else { openSettings(); }
 
 ---
 
+## Recent Changes (2026-05-11 — Launch-Ready UX)
+
+- ✅ Todos os mocks removidos — dados reais ou estados vazios honestos em todos os fluxos
+- ✅ `ProposalAlert` — overlay fullscreen 99-style com countdown 60s (Accept/Decline)
+- ✅ `NotificationContext` — canal Android MAX-importance `ajudae-proposals`, action buttons, Expo Push API
+- ✅ `PortfolioContext` — debounced writes (1.2s) para `portfolio_data JSONB` no Supabase
+- ✅ Migration `029_portfolio_data.sql` — `portfolio_data jsonb` em `providers`
+- ✅ `provider-validation.tsx` — tela de confirmação com código de protocolo `AJD-{userId}`
+- ✅ `payment.tsx` — botão "Copiar código Pix" com Share sheet nativo
+- ✅ `proposals.tsx` — chips de horário rápido (4 opções)
+- ✅ `BottomTabBar` — badge polling a cada 30s na tabela `proposals`
+- ✅ Edge Function `notify_new_proposal` — WhatsApp (Z-API) / SMS (Twilio) / Expo Push
+- ✅ `job.tsx` — badge "1º serviço · sem taxa!" para prestadores com 0 serviços concluídos
+- ✅ `lib/providers.ts` — filtro Haversine 30km, campo `provider.km`
+- ✅ `ProfileOverlay` — sistema de indicações com código djb2 + Share sheet
+
+## Recent Changes (2026-05-10 — UI/UX Brand Identity)
+
+- ✅ Color tokens: `primary: #FFC90E`, `background: #FAF9ED` (branding preciso)
+- ✅ Fontes: Fraunces → Nunito (700/800/900)
+- ✅ Zero emojis — 23+ substituições por Ionicons/MCI
+- ✅ Novo componente `EmptyState` com mascote flutuante + fallback gracioso
+- ✅ Novo componente `BottomTabBar` role-aware (#1F1F1F bg, #FFC90E ativo)
+- ✅ Novo hook `useEntranceAnim` (fade + slide 280ms)
+- ✅ `Skeleton` — shimmer LinearGradient (substitui opacity pulse)
+- ✅ `chat.tsx` — bubble "me" usa `c.primary` (#FFC90E)
+- ✅ `payment.tsx` — TopNav padronizado
+- ✅ Heatmap 2-tons, stats grid uniforme, ProfileOverlay toggle simplificado
+
+## Recent Changes (2026-05-07 — Correções Críticas Android)
+
+- ✅ `newArchEnabled: false` — fix crash silencioso Android (react-native-maps, worklets)
+- ✅ Animação sheet: `Animated.spring` → `Animated.timing` com `Easing.out(Easing.cubic)`
+- ✅ Botão localizar: guard `?? Promise.resolve()` para TypeError síncrono
+
 ## Recent Changes (2026-05-06)
 
 - ✅ CRM Web criado em `artifacts/crm` — Vite + React + Tailwind v4 + Supabase
-- ✅ Formulário do prestador (`provider-validation.tsx`) reescrito em 5 etapas paginadas com validação por campo, máscaras e câmera
-- ✅ `onboarding.tsx` — mensagens de erro descritivas + câmera para foto de perfil
-- ✅ Security hardening no CRM: CSP, HSTS, signed URLs, sanitização, rate limiting, TOCTOU fix
-- ✅ Schema corrigido: `support_tickets→tickets`, `services→requests`, `profiles(name,email)→profiles(name)`, `not_started→incomplete`
-- ✅ Responsividade mobile no CRM (hamburger sidebar, painéis alternados)
+- ✅ Formulário do prestador reescrito em 5 etapas paginadas com validação, máscaras e câmera
+- ✅ Security hardening no CRM: CSP, HSTS, signed URLs, sanitização, rate limiting
+- ✅ Schema corrigido: `support_tickets→tickets`, `services→requests`, `not_started→incomplete`
 - ✅ `.claude/settings.local.json` removido do tracking git + adicionado ao `.gitignore`
-- ⚠️ `anon key` do ajudae_banco exposta — **rotacionar no Supabase dashboard**
+- ⚠️ `anon key` do ajudae_banco exposta — **rotacionar no Supabase dashboard (CRÍTICO)**
 
 ## Recent Changes (2026-05-04)
 
 - ✅ `lib/providers.ts` — query real na tabela `providers` (substitui `MOCK_PROVIDERS`)
 - ✅ Toggle online do prestador atualiza `providers.active` no banco
-- ✅ Credenciais demo hardcoded removidas
-- ✅ Métricas do dashboard do prestador lidas do banco
+- ✅ Push notifications: 22 eventos com watcher reativo, 3 canais Android
+- ✅ LGPD + permissões OS: modal bloqueante, sync para `profiles`
 
 ---
 
@@ -308,14 +343,16 @@ else { openSettings(); }
 
 | Item | Severity | Recomendação |
 |------|----------|-------------|
-| `anon key` ajudae_banco exposta em git history | **Crítica** | Rotacionar no Supabase dashboard imediatamente |
-| Cloudflare Access sem domínio customizado | Alta | Registrar domínio para habilitar Zero Trust |
+| `anon key` ajudae_banco exposta em git history | **Crítica** | Rotacionar no Supabase dashboard — **bloqueador de deploy** |
+| EAS Secrets não configurados | **Crítica** | `eas secret:create` para URL, anon key e Google Maps key |
+| Mascote assets ausentes | Alta | Fornecer `mascot-running.png` + `mascot-standing.png` em `assets/images/mascot/` |
+| Cloudflare Access sem domínio customizado | Alta | Registrar domínio para habilitar Zero Trust no CRM |
 | Bucket `provider-docs` deve ser privado | Alta | Configurar no Supabase Storage |
 | `djb2` vs HMAC-SHA256 no dual-PIN | Alta | Migrar via `expo-crypto` antes da produção (Fase 2.1) |
-| Push apenas foreground | Alta | Backend salvar `push_token` e chamar Expo Push API (Fase 1.5) |
-| `PortfolioContext` não persistido | Média | Wire `PATCH /providers/me/portfolio` (Fase 3.4) |
-| Coordenadas SVG no mapa vs GPS real | Alta | Conectar `location_lat`/`lng` ao mapa |
+| Push em background | Alta | Backend salvar `expo_push_token` e chamar Expo Push API (Fase 1.5) |
+| Coordenadas GPS dos prestadores no mapa | Alta | Popular `location_lat`/`lng` no Supabase e conectar ao `react-native-maps` |
 | `lib/providers.ts` sem cache | Média | Adicionar SWR ou React Query antes da beta |
+| `console.log` nos contexts | Média | Guardar com `if (__DEV__)` antes da produção |
 | CRM sem paginação nas listas | Baixa | Adicionar quando volume crescer |
 | `PortfolioSheet` inline em `index.tsx` | Baixa | Extrair para `components/PortfolioSheet.tsx` |
 | `MapExpandModal` inline em `marketplace.tsx` | Baixa | Extrair para `components/MapExpandModal.tsx` |
@@ -325,13 +362,16 @@ else { openSettings(); }
 ## Quick Links
 
 - **App Mobile:** `npx expo start` → scan QR
+- **Build APK:** `cd artifacts/fretex && eas build --platform android --profile preview`
+- **Build iOS:** `cd artifacts/fretex && eas build --platform ios --profile preview`
 - **CRM Dev:** `pnpm --filter @workspace/crm run dev`
 - **CRM Prod:** Cloudflare Pages (ajudae-app.pages.dev)
-- **Git:** branch atual: `main` (PR #15 mergeado)
+- **Git:** branch principal: `main` (último PR: #22, 2026-05-11)
 - **Supabase ajudae_banco:** `https://rlehpgvvevarpkkamied.supabase.co`
-- **Handoff mais recente:** `arquitetura/HANDOFF_2026-05-06.md`
+- **Handoff mais recente:** `arquitetura/HANDOFF_2026-05-10.md`
+- **Launch checklist:** `arquitetura/LAUNCH_CHECKLIST.md`
 - **Roadmap:** `arquitetura/BETA_ROADMAP.md`
 
 ---
 
-_Last Updated: 2026-05-06 — CRM Web + formulários paginados + security hardening_
+_Last Updated: 2026-05-14 — Brand identity + mocks removidos + portfolio persistido + build-ready_

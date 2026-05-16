@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Modal, View, Text, Pressable, StyleSheet, Animated, ScrollView, Easing, Share } from "react-native";
+import { Alert, Modal, View, Text, Pressable, StyleSheet, Animated, ScrollView, Easing, Share } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,7 +34,7 @@ function genReferralCode(userId: string): string {
 }
 
 function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Object.assign> }) {
-  const { user } = useAuth();
+  const { user, deleteAccount } = useAuth();
   const {
     notifications,
     backgroundLocation,
@@ -629,15 +629,38 @@ function SubMenuContent({ label, c }: { label: string; c: ReturnType<typeof Obje
 
         {showDangerZone ? (
           <View style={[subStyles.dangerZone, { borderColor: "#E5373718", backgroundColor: "#FEF2F218" }]}>
-            <View style={[subStyles.row, { backgroundColor: "transparent", borderColor: "transparent", paddingHorizontal: 0, paddingVertical: 0 }]}>
+            <Pressable
+              style={[subStyles.row, { backgroundColor: "transparent", borderColor: "transparent", paddingHorizontal: 0, paddingVertical: 0 }]}
+              onPress={() => {
+                Alert.alert(
+                  "Excluir conta",
+                  "Todos os seus dados serão anonimizados conforme a LGPD (Art. 18). Esta ação é irreversível.",
+                  [
+                    { text: "Cancelar", style: "cancel" },
+                    {
+                      text: "Excluir",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          await deleteAccount();
+                        } catch (e) {
+                          Alert.alert("Erro", e instanceof Error ? e.message : "Não foi possível excluir a conta.");
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
               <View style={[subStyles.iconBox, { backgroundColor: "#E5373718" }]}>
                 <Ionicons name="trash" size={18} color="#E53737" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[subStyles.rowLabel, { color: "#E53737" }]}>Excluir conta</Text>
-                <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Ação irreversível</Text>
+                <Text style={[subStyles.rowSub, { color: c.softMuted }]}>Anonimiza dados (LGPD Art. 18)</Text>
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={16} color="#E53737" />
+            </Pressable>
           </View>
         ) : null}
       </View>

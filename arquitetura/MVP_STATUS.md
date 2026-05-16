@@ -5,20 +5,26 @@
 
 ## Resumo Executivo
 
-O app está **pronto para testes fechados com backend real**. Todos os fluxos críticos — autenticação (Supabase), onboarding, LGPD + permissões OS, criação de pedido via Edge Function, rastreamento, sistema dual-PIN, disputa e avaliação — estão implementados. Push notifications disparam automaticamente em cada mudança de estado. O único bloco para lançamento é a substituição de `MOCK_PROVIDERS` por dados reais e integração de mapa/pagamento.
+O app está **pronto para o primeiro build (TestFlight + APK)**. Todos os fluxos críticos — autenticação, onboarding, LGPD, dual-PIN, push notifications, portfólio persistido — estão implementados com dados reais do Supabase. Todos os mocks foram removidos. Identidade visual alinhada ao branding (Nunito, #FFC90E, zero emojis). Os únicos bloqueadores para o build são externos: configurar EAS Secrets, rotacionar a anon key e fornecer os assets do mascote.
 
 | Dimensão | Status |
 |---|---|
 | Fluxos de negócio core | ✅ 100% testável |
 | Segurança dual-PIN | ✅ Implementado (commitment hash djb2) |
 | UI Blocking durante serviço | ✅ Implementado |
-| Push notifications | ✅ 22 eventos — todos os fluxos cobertos |
+| Push notifications foreground | ✅ 22 eventos — todos os fluxos cobertos |
+| Push notifications background | ⚠️ Expo Push API configurada — requer expo_push_token salvo no server |
 | LGPD / permissões OS | ✅ Implementado com sync no DB |
 | Backend real (Auth + Edge Fns) | ✅ Supabase integrado |
-| MOCK_PROVIDERS → API real | ✅ Integrado (`lib/providers.ts`) |
-| Mapa real (GPS) | ❌ SVG estático (react-native-maps pronto para coords reais) |
-| Pagamento real | ❌ Mock visual |
+| MOCK_PROVIDERS → API real | ✅ `lib/providers.ts` com Haversine 30km |
+| Todos os mocks removidos | ✅ Dados reais ou estados vazios honestos |
+| Portfolio persistence | ✅ Debounced writes → Supabase `portfolio_data` JSONB |
+| Identidade visual (brand) | ✅ #FFC90E, Nunito, zero emojis, BottomTabBar |
+| ProposalAlert (99-style) | ✅ Overlay fullscreen + countdown 60s |
+| Mapa real (coords GPS) | ❌ react-native-maps pronto; coords reais pendentes no DB |
 | Chat em tempo real | ❌ Dados estáticos |
+| Pagamento real | ❌ Pix copy button; sem gateway integrado |
+| Mascote assets | ❌ EmptyState usa placeholder circular |
 
 ---
 
@@ -26,11 +32,12 @@ O app está **pronto para testes fechados com backend real**. Todos os fluxos cr
 
 | Métrica | Valor |
 |---|---|
-| Total de linhas estimado | ~14.500 |
-| Telas (`app/*.tsx`) | 21 |
-| Componentes (`components/`) | 27 |
+| Total de linhas estimado | ~18.000+ |
+| Telas (`app/*.tsx`) | 26 |
+| Componentes (`components/`) | 30+ (EmptyState, BottomTabBar, ProposalAlert adicionados) |
 | Contextos (`contexts/`) | 8 (Auth, Permissions, Notifications, Portfolio, Service, Requests, Payments, Support) |
-| Branch de desenvolvimento | `main` (PR #15 mergeado) |
+| Edge Functions (Supabase) | 5+ (request_create, request_update_status, request_complete_with_otp, notify_new_proposal, ...) |
+| Último PR mergeado | #22 (2026-05-11) |
 | Branch de produção | `main` |
 
 ---
@@ -172,17 +179,19 @@ As notificações disparam automaticamente ao alterar `ServiceContext`. Toque na
 
 ## O que NÃO está pronto para produção
 
-| Item | Detalhe |
-|---|---|
-| `MOCK_PROVIDERS` | Lista de prestadores é estática. Substituir por `GET /providers/nearby?lat=X&lng=Y` |
-| Mapa real GPS | `MapSVG.tsx` estático. `react-native-maps` está integrado e pronto para coordenadas reais |
-| WebSocket posições | Sem stream de posições em tempo real dos prestadores |
-| Pagamento real | `payment.tsx` é visual. Sem Pix/Stripe |
-| Chat em tempo real | `inbox.tsx` usa dados estáticos. Sem WebSocket |
-| djb2 → HMAC-SHA256 | Migrar para `expo-crypto` antes de produção |
-| Upload de fotos | `request.tsx` tem picker mas sem upload real (sem S3/GCS) |
-| Portfólio → Supabase | `PortfolioContext` é local. Sem `PATCH /providers/me/portfolio` ainda |
-| Camera permission onboarding | Câmera só é pedida pelo `ImagePicker` quando necessário, sem passo no `PermissionGate` para prestadores |
+| Item | Detalhe | Bloqueador de build? |
+|---|---|---|
+| Mapa real GPS | `react-native-maps` integrado; coords reais dos prestadores precisam estar no DB | Não |
+| WebSocket posições | Sem stream de posições em tempo real dos prestadores | Não |
+| Pagamento real | Pix copy button existe; sem integração com gateway | Não |
+| Chat em tempo real | `chat.tsx` mostra estado vazio honesto; sem WebSocket | Não |
+| Push em background | Funciona em foreground; server precisa salvar `expo_push_token` e chamar Expo Push API | Não |
+| djb2 → HMAC-SHA256 | Migrar para `expo-crypto` antes de produção pública | Não |
+| Upload de fotos | `request.tsx` tem picker mas sem upload real (sem S3/GCS) | Não |
+| LGPD exclusão de conta | `DELETE /users/me` (Art. 18) não implementado | Não |
+| Mascote assets | `EmptyState` usa placeholder circular; assets em `assets/images/mascot/` | Não (visual) |
+| **EAS Secrets** | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` | **Sim — build** |
+| **Anon key rotation** | Chave exposta no git history (2026-05-06) — rotacionar antes de qualquer deploy público | **Sim — segurança** |
 
 ---
 
@@ -222,30 +231,47 @@ As notificações disparam automaticamente ao alterar `ServiceContext`. Toque na
 
 | Área | Completude estimada |
 |---|---|
-| Autenticação e onboarding | 92% |
+| Autenticação e onboarding | 95% |
 | LGPD e permissões OS | 95% |
-| Push notifications | 95% |
-| Fluxo do cliente (criação → conclusão) | 90% |
-| Fluxo do prestador (aceitação → conclusão) | 92% |
+| Push notifications (foreground) | 98% |
+| Push notifications (background) | 40% (Expo Push API configurada; falta save token no server) |
+| Fluxo do cliente (criação → conclusão) | 95% |
+| Fluxo do prestador (aceitação → conclusão) | 95% |
 | Sistema de segurança dual-PIN | 95% |
-| Dashboard do prestador (UX/UI) | 95% |
-| Portfólio do prestador (UX/UI) | 88% (backend 0%) |
-| Marketplace (UX/UI) | 88% |
-| Inbox / Chat | 30% (visual estático) |
-| Pagamentos | 15% (visual apenas) |
-| Mapa e geolocalização | 30% (react-native-maps pronto, sem coords reais) |
-| **MVP testável end-to-end** | **~90%** |
+| Dashboard do prestador (UX/UI) | 98% |
+| Portfólio do prestador | 85% (UX 100%, persistence ✅, S3 upload ❌) |
+| Marketplace (UX/UI) | 92% |
+| ProposalAlert (UX) | 100% |
+| Identidade visual (brand) | 98% (mascote assets pendentes) |
+| Inbox / Chat | 35% (estado vazio honesto; WebSocket pendente) |
+| Pagamentos | 25% (Pix copy button; gateway pendente) |
+| Mapa e geolocalização | 35% (react-native-maps pronto; coords reais pendentes) |
+| **MVP build-ready (TestFlight/APK)** | **~95%** |
 
 ---
 
-## Próximos Passos Recomendados (por prioridade)
+## Próximos Passos para o Primeiro Build
 
-1. **QA fechado** — testar todos os cenários acima em 2 dispositivos iOS e 2 Android
-2. **`MOCK_PROVIDERS` → API real** — `GET /providers/nearby` + WebSocket de posições
-3. **Mapa real** — substituir `MapSVG.tsx` por `react-native-maps` com coordenadas Supabase
-4. **Portfolio → Supabase** — `PATCH /providers/me/portfolio` para persistir portfolio remotamente
-5. **Pagamento** — integração Pix/Stripe
-6. **djb2 → HMAC-SHA256** — migrar antes de ir para produção
+### Pré-requisitos externos (bloqueadores reais)
+1. **Rotacionar anon key** — Supabase Dashboard → Settings → API → Generate new key
+2. **Configurar EAS Secrets** — `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`
+3. **Fornecer mascote assets** — `assets/images/mascot/mascot-running.png` + `mascot-standing.png`
+4. **Conta Apple Developer** — bundle ID `com.ajuda.app` registrado (para iOS)
+
+### Build commands
+```bash
+cd artifacts/fretex
+eas build --platform android --profile preview  # APK para testes
+eas build --platform ios --profile preview       # IPA para TestFlight
+```
+
+### Pós-build (próximas iterações)
+1. **Coords GPS reais** — popular `location_lat`/`location_lng` nos prestadores no DB
+2. **Push background** — salvar `expo_push_token` no `profiles` e chamar Expo Push API server-side
+3. **Chat real** — Supabase Realtime na tabela `messages`
+4. **Pagamento** — integração Pix/Mercado Pago
+5. **djb2 → HMAC-SHA256** — migrar via `expo-crypto` antes da produção pública
+6. **LGPD exclusão** — endpoint `DELETE /users/me`
 
 ---
 
@@ -262,4 +288,4 @@ As notificações disparam automaticamente ao alterar `ServiceContext`. Toque na
 
 ---
 
-_Ajudaê — MVP Status v3.0 — 2026-05-06 — CRM Web em produção + formulários paginados, ~92% MVP testável_
+_Ajudaê — MVP Status v4.0 — 2026-05-14 — Brand Identity + mocks removidos + portfolio persistido, ~95% build-ready_
