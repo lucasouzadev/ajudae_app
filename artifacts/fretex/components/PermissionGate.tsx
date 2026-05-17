@@ -41,7 +41,11 @@ export function PermissionGate() {
   const [step, setStep] = useState<Step | null>(null);
 
   const finishOnboarding = async () => {
-    await AsyncStorage.setItem(ONBOARDING_KEY, "1");
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, "1");
+    } catch {
+      // Best-effort — always advance past the gate even if storage fails
+    }
     setStep("done");
   };
 
@@ -145,10 +149,14 @@ export function PermissionGate() {
             insets={insets}
             onAllow={async () => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              if (notifications.canAsk) {
-                await requestNotifications();
-              } else {
-                Linking.openSettings();
+              try {
+                if (notifications.canAsk) {
+                  await requestNotifications();
+                } else {
+                  Linking.openSettings();
+                }
+              } catch {
+                // Proceed regardless
               }
               afterNotifications();
             }}
