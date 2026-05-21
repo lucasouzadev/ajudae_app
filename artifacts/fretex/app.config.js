@@ -4,12 +4,21 @@ module.exports = {
   expo: {
     name: "Ajudaê!",
     slug: "ajuda",
-    version: "1.0.0",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "ajuda",
     userInterfaceStyle: "automatic",
     newArchEnabled: false,
+    runtimeVersion: {
+      policy: "appVersion",
+    },
+    updates: {
+      url: "https://u.expo.dev/58679028-d339-4d8d-9fde-bd7dd1ad7725",
+      enabled: true,
+      checkAutomatically: "ON_LOAD",
+      fallbackToCacheTimeout: 0,
+    },
     splash: {
       image: "./assets/images/icon.png",
       resizeMode: "contain",
@@ -36,6 +45,7 @@ module.exports = {
       "expo-font",
       "expo-web-browser",
       "expo-notifications",
+      "expo-updates",
     ],
     experiments: {
       typedRoutes: true,
