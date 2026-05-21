@@ -6,12 +6,17 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development"
     },
     "preview": {
-      "distribution": "internal",
+      "channel": "preview",
       "android": {
+        "distribution": "internal",
         "buildType": "apk"
+      },
+      "ios": {
+        "distribution": "store"
       },
       "env": {
         "EXPO_PUBLIC_MAP_PROVIDER": "google"
@@ -19,6 +24,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_MAP_PROVIDER": "google"
       }
