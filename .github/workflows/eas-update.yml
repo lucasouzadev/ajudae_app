@@ -1,0 +1,49 @@
+name: EAS Update (OTA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Canal de atualização'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+      message:
+        description: 'Descrição do update'
+        required: false
+        default: 'Manual update'
+        type: string
+
+jobs:
+  update:
+    name: EAS Update (${{ github.event.inputs.channel }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10.x'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish update
+        working-directory: artifacts/fretex
+        run: eas update --channel ${{ github.event.inputs.channel }} --message "${{ github.event.inputs.message }}" --non-interactive
