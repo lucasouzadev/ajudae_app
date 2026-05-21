@@ -46,4 +46,7 @@ jobs:
 
       - name: Publish update
         working-directory: artifacts/fretex
-        run: eas update --channel ${{ github.event.inputs.channel }} --message "${{ github.event.inputs.message }}" --non-interactive
+        env:
+          EAS_CHANNEL: ${{ github.event.inputs.channel }}
+          EAS_MESSAGE: ${{ github.event.inputs.message }}
+        run: eas update --channel "$EAS_CHANNEL" --message "$EAS_MESSAGE" --non-interactive
