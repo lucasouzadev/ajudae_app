@@ -9,41 +9,46 @@ Execute cada item em ordem. Não avance para a próxima seção sem concluir a a
 
 > Estas ações são pré-requisito absoluto. Sem elas, não há build seguro.
 
-- [ ] **0.1 Rotacionar a anon key do Supabase**
+- [x] **0.1 Rotacionar a anon key do Supabase**
   - Acesse: [Supabase Dashboard](https://supabase.com/dashboard) → projeto `ajudae_banco`
   - Vá em: **Settings → API**
   - Clique em **"Reveal"** ao lado de `anon public` e depois em **"Generate new key"**
   - Salve a nova chave em local seguro (gerenciador de senhas da equipe)
   - **Motivo:** A chave anterior foi exposta no git history em 2026-05-06
+  - **Status:** ✅ Feito
 
-- [ ] **0.2 Tornar o bucket `provider-docs` privado**
+- [x] **0.2 Tornar o bucket `provider-docs` privado**
   - No Supabase Dashboard → **Storage → Buckets**
   - Clique em `provider-docs` → **Edit bucket**
   - Desmarque "Public bucket" → **Save**
   - Confirme que as políticas RLS do bucket estão configuradas (só admins e o próprio provider podem ler)
+  - **Status:** ✅ Feito
 
-- [ ] **0.3 Atualizar o CRM com a nova anon key**
+- [x] **0.3 Atualizar o CRM com a nova anon key**
   - No Cloudflare Pages → projeto `ajudae-crm` → **Settings → Environment variables**
   - Atualize `VITE_SUPABASE_ANON_KEY` com o novo valor
   - Faça um novo deploy do CRM para aplicar a mudança
+  - **Status:** ✅ Feito
 
 ---
 
 ## SEÇÃO 1 — CONFIGURAÇÃO DO AMBIENTE DE BUILD
 
-- [ ] **1.1 Instalar o EAS CLI (se ainda não tiver)**
+- [x] **1.1 Instalar o EAS CLI (se ainda não tiver)**
   ```bash
   npm install -g eas-cli
   eas --version  # deve ser >= 18.8.1
   ```
+  - **Status:** ✅ Feito
 
-- [ ] **1.2 Fazer login no EAS**
+- [x] **1.2 Fazer login no EAS**
   ```bash
   eas login
   # Use a conta Expo do projeto (owner: juiceluqi)
   ```
+  - **Status:** ✅ Feito (conta Apple Developer + Bundle ID registrado)
 
-- [ ] **1.3 Configurar os EAS Secrets (nova anon key + Maps)**
+- [x] **1.3 Configurar os EAS Secrets (nova anon key + Maps)**
   ```bash
   cd artifacts/fretex
 
@@ -58,12 +63,14 @@ Execute cada item em ordem. Não avance para a próxima seção sem concluir a a
   eas secret:create --scope project --name EXPO_PUBLIC_GOOGLE_MAPS_API_KEY \
     --value "<sua_google_maps_api_key>"
   ```
+  - **Status:** ✅ Feito
 
-- [ ] **1.4 Verificar que os secrets foram criados**
+- [x] **1.4 Verificar que os secrets foram criados**
   ```bash
   eas secret:list
   # Deve listar os 3 secrets acima
   ```
+  - **Status:** ✅ Feito
 
 ---
 
