@@ -1,0 +1,65 @@
+name: EAS Submit iOS → TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Perfil de submit'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+      build_id:
+        description: 'Build ID específico (deixe vazio para usar o último build do perfil)'
+        required: false
+        default: ''
+        type: string
+
+jobs:
+  submit:
+    name: Submit iOS → TestFlight (${{ github.event.inputs.profile }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10.x'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Submit latest build to TestFlight
+        if: github.event.inputs.build_id == ''
+        working-directory: artifacts/fretex
+        run: |
+          eas submit \
+            --platform ios \
+            --profile ${{ github.event.inputs.profile }} \
+            --latest \
+            --non-interactive
+
+      - name: Submit specific build to TestFlight
+        if: github.event.inputs.build_id != ''
+        working-directory: artifacts/fretex
+        run: |
+          eas submit \
+            --platform ios \
+            --profile ${{ github.event.inputs.profile }} \
+            --id ${{ github.event.inputs.build_id }} \
+            --non-interactive
