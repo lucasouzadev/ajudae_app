@@ -54,3 +54,12 @@ jobs:
           EAS_PLATFORM: ${{ github.event.inputs.platform }}
           EAS_PROFILE: ${{ github.event.inputs.profile }}
         run: eas build --platform "$EAS_PLATFORM" --profile "$EAS_PROFILE" --non-interactive
+
+      - name: Submit iOS to TestFlight
+        if: |
+          success() &&
+          (github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all')
+        working-directory: artifacts/fretex
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas submit --platform ios --latest --non-interactive
