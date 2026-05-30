@@ -1,5 +1,26 @@
 const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+const iosConfig = {
+  supportsTablet: false,
+  bundleIdentifier: "com.ajuda.app",
+  infoPlist: {
+    ITSAppUsesNonExemptEncryption: false,
+  },
+};
+
+const androidConfig = {
+  package: "com.ajuda.app",
+  adaptiveIcon: {
+    foregroundImage: "./assets/images/icon.png",
+    backgroundColor: "#FFC90E",
+  },
+};
+
+if (googleMapsApiKey) {
+  iosConfig.config = { googleMapsApiKey };
+  androidConfig.config = { googleMaps: { apiKey: googleMapsApiKey } };
+}
+
 module.exports = {
   expo: {
     name: "Ajudaê!",
@@ -24,22 +45,8 @@ module.exports = {
       resizeMode: "contain",
       backgroundColor: "#FFC90E",
     },
-    ios: {
-      supportsTablet: false,
-      bundleIdentifier: "com.ajuda.app",
-      config: googleMapsApiKey ? { googleMapsApiKey } : undefined,
-      infoPlist: {
-        ITSAppUsesNonExemptEncryption: false,
-      },
-    },
-    android: {
-      package: "com.ajuda.app",
-      adaptiveIcon: {
-        foregroundImage: "./assets/images/icon.png",
-        backgroundColor: "#FFC90E",
-      },
-      config: googleMapsApiKey ? { googleMaps: { apiKey: googleMapsApiKey } } : undefined,
-    },
+    ios: iosConfig,
+    android: androidConfig,
     plugins: [
       "expo-router",
       "expo-font",
