@@ -30,7 +30,7 @@ module.exports = {
     icon: "./assets/images/icon.png",
     scheme: "ajuda",
     userInterfaceStyle: "automatic",
-    newArchEnabled: false,
+    newArchEnabled: true,
     runtimeVersion: {
       policy: "appVersion",
     },

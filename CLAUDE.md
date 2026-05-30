@@ -286,6 +286,12 @@ else { openSettings(); }
 
 ---
 
+## Recent Changes (2026-05-30 — Build Fixes)
+
+- ✅ `newArchEnabled: true` — reativado: `react-native-reanimated@4.1.x` exige New Architecture; `react-native-maps@1.20.1` já suporta
+- ✅ `app.config.js` — removida definição de `config: undefined` que causava crash em `eas credentials`
+- ✅ `.github/workflows/eas-submit-ios.yml` — workflow dedicado de submit iOS → TestFlight
+
 ## Recent Changes (2026-05-11 — Launch-Ready UX)
 
 - ✅ Todos os mocks removidos — dados reais ou estados vazios honestos em todos os fluxos
@@ -317,7 +323,7 @@ else { openSettings(); }
 
 ## Recent Changes (2026-05-07 — Correções Críticas Android)
 
-- ✅ `newArchEnabled: false` — fix crash silencioso Android (react-native-maps, worklets)
+- ⚠️ `newArchEnabled: false` — workaround temporário para crash Android (revertido em 2026-05-30)
 - ✅ Animação sheet: `Animated.spring` → `Animated.timing` com `Easing.out(Easing.cubic)`
 - ✅ Botão localizar: guard `?? Promise.resolve()` para TypeError síncrono
 
