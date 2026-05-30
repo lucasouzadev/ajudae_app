@@ -3,6 +3,7 @@ const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 const iosConfig = {
   supportsTablet: false,
   bundleIdentifier: "com.ajuda.app",
+  deploymentTarget: "16.0",
   infoPlist: {
     ITSAppUsesNonExemptEncryption: false,
   },
