@@ -299,11 +299,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const storedPending = await AsyncStorage.getItem(PENDING_STORAGE_KEY);
       if (storedPending) {
-        const parsed = JSON.parse(storedPending) as PendingAccount;
-        await persistUser(null);
-        setRole(parsed.role);
-        setPendingAccount(parsed);
-        setAccountStatus('pending_email');
+        try {
+          const parsed = JSON.parse(storedPending) as PendingAccount;
+          await persistUser(null);
+          setRole(parsed.role);
+          setPendingAccount(parsed);
+          setAccountStatus('pending_email');
+        } catch {
+          await AsyncStorage.removeItem(PENDING_STORAGE_KEY);
+          await persistUser(null);
+          setRole('cliente');
+          setAccountStatus('signed_out');
+        }
       } else {
         await persistUser(null);
         setRole('cliente');
@@ -331,11 +338,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (storedPending) {
-        const parsed = JSON.parse(storedPending) as PendingAccount;
-        await persistUser(null);
-        setPendingAccount(parsed);
-        setRole(parsed.role);
-        setAccountStatus('pending_email');
+        try {
+          const parsed = JSON.parse(storedPending) as PendingAccount;
+          await persistUser(null);
+          setPendingAccount(parsed);
+          setRole(parsed.role);
+          setAccountStatus('pending_email');
+        } catch {
+          await AsyncStorage.removeItem(PENDING_STORAGE_KEY);
+        }
         return;
       }
 
