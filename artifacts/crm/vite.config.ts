@@ -7,7 +7,7 @@ export default defineConfig({
   resolve: {
     alias: { "@": "/src" },
   },
-  /* Dev server: accessible from Replit proxy.
+  /* Dev server config for local development.
      NOT used in production builds (vite build doesn't start a server).
      Security headers for production are set in public/_headers (Cloudflare)
      and vercel.json (Vercel). */

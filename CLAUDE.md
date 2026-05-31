@@ -22,14 +22,14 @@ Ajudaê is a **two-sided marketplace** for service delivery (moving, freight, de
 | `arquitetura/HANDOFF_2026-05-10.md` | **Latest** handoff — brand identity (6 etapas), EmptyState, BottomTabBar |
 | `arquitetura/LAUNCH_CHECKLIST.md` | Checklist completo de lançamento (EAS Secrets, builds, QA) |
 | `arquitetura/EXTERNAL_TASKS_2026-05-10.md` | Tasks externas bloqueadoras (mascote, key rotation, builds) |
-| `arquitetura/HANDOFF_2026-05-06.md` | CRM web, formulários paginados, security hardening |
-| `arquitetura/HANDOFF_2026-05-04.md` | Bug fixes, notifications, permissions |
-| `arquitetura/HANDOFF_2026-04-28.md` | UI Layer v2 — design decisions, API contracts |
+| `arquitetura/GITHUB_ACTIONS_SETUP.md` | GitHub Actions workflows para EAS build e submit |
 | `arquitetura/PRD.md` | Product Requirements Document |
 | `arquitetura/BETA_ROADMAP.md` | Roadmap 24 meses — 4 fases |
 | `arquitetura/MVP_STATUS.md` | Feature completeness by screen |
 | `arquitetura/CPO_ASSESSMENT.md` | Product assessment + roadmap |
 | `arquitetura/PROGRESS.md` | Implementation tracker |
+| `arquitetura/Comissionados/Documentos Técnicos/` | Database schema, Edge Functions, RLS policies, KYC, Architecture |
+| `arquitetura/Comissionados/Documentos JurídicosLegais/` | Terms of Service, Privacy Policy, Shareholder Agreement |
 
 ---
 
@@ -286,6 +286,21 @@ else { openSettings(); }
 
 ---
 
+## Recent Changes (2026-05-31 — Production Build Readiness + Documentation Organization)
+
+- ✅ **Documentation reorganization:** limpeza de `arquitetura/` removendo guias operacionais (`Runbooks`, `Documentacao da Equipe`, `TODO_Comissionados`) mantendo apenas docs técnicos e legais importantes em `Comissionados/`
+- ✅ **Removed old/superseded docs:** deletados `HANDOFF_2026-05-06.md`, `SUMMARY_2026-05-10.md`, `Introducao/` (guides obsoletos)
+- ✅ **Kept essential technical docs:** `ARCHITECTURE.md`, `DB_SCHEMA.md`, `EDGE_FUNCTIONS.md`, `RLS_POLICIES.md`, `KYC_IDWALL.md` em `Comissionados/Documentos Técnicos/`
+- ✅ **Kept legal docs:** `Documentos JurídicosLegais/` com Termos de Serviço, Política de Privacidade, Acordo de Sócios
+- ✅ **Replit removal:** simplicado `scripts/build.js` (removidos checks para `REPLIT_*` env vars), atualizado `pnpm-workspace.yaml`
+- ✅ **Removed @replit packages:** deletados de mockup-sandbox e pnpm-workspace.yaml
+- ✅ **package.json architecture fix:** ALL native modules (`react-native-reanimated`, `gesture-handler`, `screens`, `keyboard-controller`, etc) movidos de devDependencies → dependencies
+- ✅ **app.config.js plugins:** adicionados `expo-location`, `expo-image-picker`, `react-native-keyboard-controller`
+- ✅ **iOS deployment target:** `deploymentTarget: "16.0"` (requerido por New Architecture + Reanimated 4.1.x)
+- ✅ **Crash fixes:** AsyncStorage JSON parse wrapped em try/catch; `expo-crypto` SHA256 para commitment hash
+- ✅ **ExpoGO compatibility:** app roda em Expo Go (nenhum EAS-only modules)
+- ✅ **EAS channels:** configured `preview` e `production` channels com OTA updates
+
 ## Recent Changes (2026-05-30 — Build Fixes)
 
 - ✅ `newArchEnabled: true` — reativado: `react-native-reanimated@4.1.x` exige New Architecture; `react-native-maps@1.20.1` já suporta
@@ -350,15 +365,13 @@ else { openSettings(); }
 | Item | Severity | Recomendação |
 |------|----------|-------------|
 | `anon key` ajudae_banco exposta em git history | **Crítica** | Rotacionar no Supabase dashboard — **bloqueador de deploy** |
-| EAS Secrets não configurados | **Crítica** | `eas secret:create` para URL, anon key e Google Maps key |
+| EAS Secrets não configurados | **Crítica** | `eas secret:create` para URL, anon key e Google Maps key — blockers para TestFlight build |
 | Mascote assets ausentes | Alta | Fornecer `mascot-running.png` + `mascot-standing.png` em `assets/images/mascot/` |
 | Cloudflare Access sem domínio customizado | Alta | Registrar domínio para habilitar Zero Trust no CRM |
 | Bucket `provider-docs` deve ser privado | Alta | Configurar no Supabase Storage |
-| `djb2` vs HMAC-SHA256 no dual-PIN | Alta | Migrar via `expo-crypto` antes da produção (Fase 2.1) |
 | Push em background | Alta | Backend salvar `expo_push_token` e chamar Expo Push API (Fase 1.5) |
 | Coordenadas GPS dos prestadores no mapa | Alta | Popular `location_lat`/`lng` no Supabase e conectar ao `react-native-maps` |
 | `lib/providers.ts` sem cache | Média | Adicionar SWR ou React Query antes da beta |
-| `console.log` nos contexts | Média | Guardar com `if (__DEV__)` antes da produção |
 | CRM sem paginação nas listas | Baixa | Adicionar quando volume crescer |
 | `PortfolioSheet` inline em `index.tsx` | Baixa | Extrair para `components/PortfolioSheet.tsx` |
 | `MapExpandModal` inline em `marketplace.tsx` | Baixa | Extrair para `components/MapExpandModal.tsx` |
@@ -380,4 +393,4 @@ else { openSettings(); }
 
 ---
 
-_Last Updated: 2026-05-14 — Brand identity + mocks removidos + portfolio persistido + build-ready_
+_Last Updated: 2026-05-31 — Production-build-ready + cleanup + Replit removed + package.json fixed + crash recovery_
