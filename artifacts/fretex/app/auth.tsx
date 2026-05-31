@@ -91,8 +91,10 @@ function mapAuthError(error: unknown): string {
   if (msg.includes("weak") || msg.includes("Password should contain"))
     return "Senha fraca — use maiúscula, minúscula, número e símbolo (ex: Senha@123).";
   if (msg.includes("Password should be at least")) return "Senha muito curta — mínimo 6 caracteres.";
-  if (msg.includes("Invalid API key") || msg.includes("Invalid Refresh Token"))
-    return "Sessão expirada. Feche o app e abra novamente.";
+  if (msg.includes("Invalid API key") || msg.includes("apikey") || msg.includes("No API key"))
+    return "Erro de conexão com o servidor. Tente novamente.";
+  if (msg.includes("Invalid Refresh Token") || msg.includes("Refresh Token Not Found"))
+    return "Sessão expirada. Fazendo novo login…";
   if (msg.includes("rate limit") || msg.includes("too many"))
     return "Muitas tentativas. Aguarde alguns minutos.";
   if (msg.includes("Network") || msg.includes("fetch"))
@@ -452,11 +454,24 @@ export default function AuthScreen() {
     setApiError("");
     setLoading(true);
     try {
-      await login(
-        IS_DEMO ? (cleanEmail || "ricardo@ajudae.app") : cleanEmail,
-        IS_DEMO ? (cleanSenha || "123456") : cleanSenha,
-      );
+      const loginEmail = IS_DEMO ? (cleanEmail || "ricardo@ajudae.app") : cleanEmail;
+      const loginSenha = IS_DEMO ? (cleanSenha || "123456") : cleanSenha;
+      await login(loginEmail, loginSenha);
     } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      // Stale refresh token stored in AsyncStorage — clear and retry once
+      if (raw.includes("Invalid Refresh Token") || raw.includes("Refresh Token Not Found")) {
+        try {
+          await supabase.auth.signOut();
+          const loginEmail = IS_DEMO ? (cleanEmail || "ricardo@ajudae.app") : cleanEmail;
+          const loginSenha = IS_DEMO ? (cleanSenha || "123456") : cleanSenha;
+          await login(loginEmail, loginSenha);
+          return;
+        } catch (retryErr) {
+          setApiError(mapAuthError(retryErr));
+          return;
+        }
+      }
       setApiError(mapAuthError(e));
     } finally {
       setLoading(false);
