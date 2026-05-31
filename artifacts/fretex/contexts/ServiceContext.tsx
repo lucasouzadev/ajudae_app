@@ -153,17 +153,24 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState<ActiveService | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
-      if (!stored) return;
-      const parsed = JSON.parse(stored) as ActiveService;
-      // Discard data from old format that lacks the commitment field,
-      // or uses the legacy djb2 hash (16 hex chars) instead of SHA-256 (64 hex chars)
-      if (!parsed.commitment || parsed.commitment.length < 64) {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((stored) => {
+        if (!stored) return;
+        try {
+          const parsed = JSON.parse(stored) as ActiveService;
+          // Discard legacy djb2 hash (16 hex chars) — SHA-256 is 64 hex chars
+          if (!parsed.commitment || parsed.commitment.length < 64) {
+            AsyncStorage.removeItem(STORAGE_KEY);
+            return;
+          }
+          setActive(parsed);
+        } catch {
+          AsyncStorage.removeItem(STORAGE_KEY);
+        }
+      })
+      .catch(() => {
         AsyncStorage.removeItem(STORAGE_KEY);
-        return;
-      }
-      setActive(parsed);
-    });
+      });
   }, []);
 
   const persist = async (next: ActiveService | null) => {
