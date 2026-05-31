@@ -423,7 +423,6 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
           allowAlert: true,
           allowBadge: true,
           allowSound: true,
-          provideAppNotificationSettings: true,
         },
       });
       const perm = toNotificationPerm(result);

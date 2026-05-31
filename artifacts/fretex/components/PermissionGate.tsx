@@ -357,8 +357,8 @@ function PermissionScreen({
   return (
     <View style={[s.screen, s.permScreen]}>
       <View style={s.permSkipRow}>
-        <Pressable onPress={onSkip} hitSlop={12}>
-          <Text style={[s.permSkip, { color: c.muted, fontFamily: fonts.sans.regular }]}>
+        <Pressable onPress={onSkip} hitSlop={16} style={s.permSkipBtn}>
+          <Text style={[s.permSkip, { color: c.sub, fontFamily: fonts.sans.semibold }]}>
             Agora não
           </Text>
         </Pressable>
@@ -424,7 +424,8 @@ const s = StyleSheet.create({
 
   permScreen: { paddingHorizontal: 32 },
   permSkipRow: { alignItems: "flex-end", paddingRight: 4, marginBottom: 48 },
-  permSkip: { fontSize: 14 },
+  permSkipBtn: { paddingVertical: 6, paddingHorizontal: 8 },
+  permSkip: { fontSize: 15 },
   permIconWrap: {
     width: 96, height: 96, borderRadius: 28,
     alignItems: "center", justifyContent: "center",

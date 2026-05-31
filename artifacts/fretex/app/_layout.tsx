@@ -32,7 +32,6 @@ import { PortfolioProvider } from "@/contexts/PortfolioContext";
 import { NotificationProvider, useNotification } from "@/contexts/NotificationContext";
 import { PermissionsProvider, usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionGate } from "@/components/PermissionGate";
-import { BottomTabBar } from "@/components/BottomTabBar";
 import { StatusBar } from "expo-status-bar";
 import colors from "@/constants/colors";
 
@@ -203,7 +202,6 @@ function AuthGate() {
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="reset-password" options={{ headerShown: false, gestureEnabled: false }} />
       </Stack>
-      <BottomTabBar />
     </View>
   );
 }

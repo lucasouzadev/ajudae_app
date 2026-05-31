@@ -379,30 +379,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return () => sub.remove();
   }, [isAuthenticated]);
 
+  // Push token registration after PermissionGate grants notifications
   useEffect(() => {
-    if (!isAuthenticated || notifications.granted || !notifications.canAsk || !Notifications) {
-      return;
-    }
-
-    let cancelled = false;
-    const timeout = setTimeout(() => {
-      AsyncStorage.getItem(NOTIFICATION_PROMPT_KEY)
-        .then(async (prompted) => {
-          if (cancelled || prompted === "1") return;
-          await AsyncStorage.setItem(NOTIFICATION_PROMPT_KEY, "1");
-          const granted = await requestNotifications();
-          if (granted) {
-            await registerPushToken(true);
-          }
-        })
-        .catch(() => {});
-    }, 900);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-    };
-  }, [isAuthenticated, notifications.canAsk, notifications.granted, requestNotifications]);
+    if (!isAuthenticated || !notifications.granted || !Notifications) return;
+    registerPushToken().catch(() => {});
+  }, [isAuthenticated, notifications.granted]);
 
   useEffect(() => {
     return () => {
